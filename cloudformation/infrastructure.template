@@ -1,0 +1,24 @@
+# A template that creates global infrastructure
+#
+# Copyright 2017 Melon Software Ltd (UK), all rights reserved
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates global infrastructure for the pre-processing pipeline"
+
+Resources:
+
+    ##########################################################################################################
+    ##  S3
+    ##########################################################################################################
+
+    S3Bucket:
+        Type: "AWS::S3::Bucket"
+        Properties:
+            BucketName: { "Fn::Sub": "biometrix-preprocessing-infrastructure" }
+            Tags:
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: "infra" }
+        # Don't delete this if we accidentally delete the stack (which would fail anyway unless the bucket is empty)
+        DeletionPolicy : "Retain"
+
