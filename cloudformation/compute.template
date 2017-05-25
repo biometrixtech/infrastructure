@@ -132,18 +132,17 @@ Resources:
             GatewayId: { Ref: "InternetGateway" }
             DestinationCidrBlock: "0.0.0.0/0"
 
-#    NatGatewayEipAlpha:
-#        Type: "AWS::EC2::EIP"
-#        Properties:
-#            Domain: "vpc"
-#
-#    NatGatewayAlpha:
-#        DependsOn: "InternetGatewayVpcAttachment"
-#        Type: "AWS::EC2::NatGateway"
-#        Properties:
-#            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipAlpha", "AllocationId" ] }
-#            SubnetId: { Ref: "PublicSubnetAlpha" }
-#            RouteTableId: { Ref: "PublicRouteTableAlpha" }
+    NatGatewayEipAlpha:
+        Type: "AWS::EC2::EIP"
+        Properties:
+            Domain: "vpc"
+
+    NatGatewayAlpha:
+        DependsOn: "InternetGatewayVpcAttachment"
+        Type: "AWS::EC2::NatGateway"
+        Properties:
+            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipAlpha", "AllocationId" ] }
+            SubnetId: { Ref: "PublicSubnetAlpha" }
 
     ##########################################################################################################
     ##  PUBLIC AZ BETA
@@ -189,20 +188,19 @@ Resources:
             DestinationCidrBlock: "0.0.0.0/0"
         Condition: "MultiAz"
 
-#    NatGatewayEipBeta:
-#        Type: "AWS::EC2::EIP"
-#        Properties:
-#            Domain: "vpc"
-#        Condition: "MultiAz"
-#
-#    NatGatewayBeta:
-#        DependsOn: "InternetGatewayVpcAttachment"
-#        Type: "AWS::EC2::NatGateway"
-#        Properties:
-#            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipBeta", "AllocationId" ] }
-#            SubnetId: { Ref: "PublicSubnetBeta" }
-#            RouteTableId: { Ref: "PublicRouteTableBeta" }
-#        Condition: "MultiAz"
+    NatGatewayEipBeta:
+        Type: "AWS::EC2::EIP"
+        Properties:
+            Domain: "vpc"
+        Condition: "MultiAz"
+
+    NatGatewayBeta:
+        DependsOn: "InternetGatewayVpcAttachment"
+        Type: "AWS::EC2::NatGateway"
+        Properties:
+            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipBeta", "AllocationId" ] }
+            SubnetId: { Ref: "PublicSubnetBeta" }
+        Condition: "MultiAz"
 
     ##########################################################################################################
     ##  PRIVATE AZ ALPHA
@@ -236,12 +234,12 @@ Resources:
             SubnetId: { Ref: "PrivateSubnetAlpha" }
             RouteTableId: { Ref: "PrivateRouteTableAlpha" }
 
-#    PrivateRouteAlpha:
-#        Type: "AWS::EC2::Route"
-#        Properties:
-#            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
-#            NatGatewayId: { Ref: "NatGatewayAlpha" }
-#            DestinationCidrBlock: "0.0.0.0/0"
+    PrivateRouteAlpha:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
+            NatGatewayId: { Ref: "NatGatewayAlpha" }
+            DestinationCidrBlock: "0.0.0.0/0"
 
     ##########################################################################################################
     ##  PRIVATE AZ BETA
@@ -278,13 +276,13 @@ Resources:
             RouteTableId: { Ref: "PrivateRouteTableBeta" }
         Condition: "MultiAz"
 
-#    PrivateRouteBeta:
-#        Type: "AWS::EC2::Route"
-#        Properties:
-#            RouteTableId: { Ref: "PrivateRouteTableBeta" }
-#            NatGatewayId: { Ref: "NatGatewayBeta" }
-#            DestinationCidrBlock: "0.0.0.0/0"
-#        Condition: "MultiAz"
+    PrivateRouteBeta:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PrivateRouteTableBeta" }
+            NatGatewayId: { Ref: "NatGatewayBeta" }
+            DestinationCidrBlock: "0.0.0.0/0"
+        Condition: "MultiAz"
 
     ##########################################################################################################
     ##  ENDPOINTS
