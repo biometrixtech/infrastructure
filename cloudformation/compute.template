@@ -311,6 +311,86 @@ Resources:
             VpcId: { Ref: "Vpc" }
 
     ##########################################################################################################
+    ##  ROUTE53
+    ##########################################################################################################
+
+    PrivateHostedZone:
+        Type: "AWS::Route53::HostedZone"
+        Properties:
+            Name: "internal"
+            HostedZoneConfig:
+                Comment: { "Fn::Sub": "Hosted zone created by the '${AWS::StackName}' CloudFormation stack" }
+            HostedZoneTags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-private" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "private" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            VPCs:
+              - VPCId: { Ref: "Vpc" }
+                VPCRegion: { Ref: "AWS::Region" }
+
+    ##########################################################################################################
+    ##  EFS
+    ##########################################################################################################
+
+    EfsSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Security group which allows access to the Elastic File System"
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-efs" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    EfsSecurityGroupSelfReference:
+        Type: "AWS::EC2::SecurityGroupIngress"
+        Properties:
+            GroupId: { Ref: "EfsSecurityGroup" }
+            IpProtocol: "tcp"
+            FromPort: "0"
+            ToPort: "65535"
+            SourceSecurityGroupId: { Ref: "EfsSecurityGroup" }
+
+    EfsFileSystem:
+        Type: "AWS::EFS::FileSystem"
+        Properties:
+            FileSystemTags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            PerformanceMode: "generalPurpose"
+
+    EfsMountTargetAlpha:
+        Type: "AWS::EFS::MountTarget"
+        Properties:
+            FileSystemId: { Ref: "EfsFileSystem" }
+            SecurityGroups:
+              - { Ref: "EfsSecurityGroup" }
+            SubnetId: { Ref: "PrivateSubnetAlpha" }
+
+    EfsMountTargetBeta:
+        Type: "AWS::EFS::MountTarget"
+        Properties:
+            FileSystemId: { Ref: "EfsFileSystem" }
+            SecurityGroups:
+              - { Ref: "EfsSecurityGroup" }
+            SubnetId: { Ref: "PrivateSubnetBeta" }
+        Condition: "MultiAz"
+
+    EfsDnsRecord:
+      Type: "AWS::Route53::RecordSet"
+      Properties:
+          HostedZoneId: { Ref: "PrivateHostedZone" }
+          Name: "efs.internal"
+          Type: "CNAME"
+          TTL: '600'
+          ResourceRecords:
+            - { "Fn::Sub": "${EfsFileSystem}.efs.${AWS::Region}.amazonaws.com." }
+
+    ##########################################################################################################
     ##  EC2
     ##########################################################################################################
 
@@ -327,7 +407,24 @@ Resources:
                 CidrIp: { "Fn::Sub": "10.0.0.0/16" }
 
             Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-ec2" } }
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2" } }
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    Ec2SecurityGroupExternalSsh:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Security group allowing external SSH access"
+            VpcId: { Ref: "Vpc" }
+
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2-ssh" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+Outputs:
+    EfsId:
+        Description: "The id of the Elastic File System"
+        Value: { Ref: "EfsFileSystem" }
