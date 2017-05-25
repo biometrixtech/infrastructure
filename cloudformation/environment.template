@@ -1,0 +1,87 @@
+# A template that creates an environment
+#
+# Copyright 2017 Melon Software Ltd (UK), all rights reserved.  Used under license.
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates an preprocessing environment"
+
+Parameters:
+
+    # Environment name
+    Environment:
+        Type: "String"
+        Description: "The name of the environment"
+
+    MultiAz:
+        Type: "String"
+        AllowedValues: [ "true", "false" ]
+        Description: "Whether to create instances in multiple AZs.  This has an additional cost."
+
+    ComputeEc2InstanceSize:
+        Type: "String"
+        AllowedValues: [ "t2.nano" ]
+        Default: "t2.nano"
+        Description: "What type the EC2 instances should be"
+
+    ComputeEc2Ami:
+        Type: "AWS::EC2::Image::Id"
+        Default: "ami-45224425"
+        Description: "The AMI to build the EC2 instances from"
+
+    ComputeEc2Keypair:
+        Type: "String"
+        Description: "A SSH keypair to grant access to instances"
+
+    ComputeTemplate:
+        Type: "String"
+        Default: "https://s3.amazonaws.com/biometrix-preprocessing-infrastructure/cloudformation/compute.template"
+        Description: "Path to an S3 file containing the CloudFormation template for the EC2 Cluster"
+        
+Metadata:
+    "AWS::CloudFormation::Interface":
+        ParameterGroups:
+          - Label: { default: "Definition" }
+            Parameters:
+              - "Environment"
+          - Label: { default: "Configuration" }
+            Parameters:
+              - "MultiAz"
+              - "Ec2InstanceSize"
+              - "Ec2Ami"
+              - "Ec2Keypair"
+            
+        ParameterLabels:
+            Environment: { default: "Environment" }
+            MultiAz: { default: "Multi AZ?" }
+            ComputeEc2InstanceSize: { default: "EC2 Instance Size" }
+            ComputeEc2Ami: { default: "EC2 AMI" }
+            ComputeEc2Keypair: { default: "EC2 Keypair" }
+            ComputeTemplate: { default: "CF template: Compute Cluster" }
+
+Conditions:
+    CreateComputeCluster: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "ComputeTemplate" }, "" ] } ] }
+
+Resources:
+
+    ##########################################################################################################
+    ##  COMPUTE CLUSTER
+    ##########################################################################################################
+
+    ComputeCluster:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+                MultiAz: { Ref: "MultiAz" }
+                InstanceSize: { Ref: "ComputeEc2InstanceSize" }
+                Ami: { Ref: "ComputeEc2Ami" }
+                Keypair: { Ref: "ComputeEc2Keypair" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "compute" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "public" }
+            TemplateURL: { Ref: "ComputeTemplate" }
+            TimeoutInMinutes: 10
+        Condition: "CreateComputeCluster"
