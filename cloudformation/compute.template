@@ -25,11 +25,12 @@ Parameters:
 
     Ami:
         Type: "AWS::EC2::Image::Id"
-        Default: "ami-402f1a33"
+        Default: "ami-45224425"
         Description: "The AMI to build the Compute Environment EC2 instances from"
 
     Keypair:
         Type: "String"
+        Default: ""
         Description: "A SSH keypair to grant access to instances"
         
 Metadata:
@@ -91,243 +92,244 @@ Resources:
             VpcId: { Ref: "Vpc" }
             InternetGatewayId: { Ref: "InternetGateway" }
 
-#    ##########################################################################################################
-#    ##  PUBLIC AZ ALPHA
-#    ##########################################################################################################
-#
-#    PublicSubnetAlpha:
-#        Type: "AWS::EC2::Subnet"
+    ##########################################################################################################
+    ##  PUBLIC AZ ALPHA
+    ##########################################################################################################
+
+    PublicSubnetAlpha:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            CidrBlock: { "Fn::Sub": "10.0.0.0/24" }
+            MapPublicIpOnLaunch: true
+            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    PublicRouteTableAlpha:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    PublicSubnetAlphaRouteTableAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            SubnetId: { Ref: "PublicSubnetAlpha" }
+            RouteTableId: { Ref: "PublicRouteTableAlpha" }
+
+    PublicRouteAlpha:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PublicRouteTableAlpha" }
+            GatewayId: { Ref: "InternetGateway" }
+            DestinationCidrBlock: "0.0.0.0/0"
+
+#    NatGatewayEipAlpha:
+#        Type: "AWS::EC2::EIP"
 #        Properties:
-#            VpcId: { Ref: "Vpc" }
-#            CidrBlock: { "Fn::Sub": "10.0.0.0/24" }
-#            MapPublicIpOnLaunch: true
-#            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-alpha" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
+#            Domain: "vpc"
 #
-#    PublicRouteTableAlpha:
-#        Type: "AWS::EC2::RouteTable"
+#    NatGatewayAlpha:
+#        DependsOn: "InternetGatewayVpcAttachment"
+#        Type: "AWS::EC2::NatGateway"
 #        Properties:
-#            VpcId: { Ref: "Vpc" }
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-alpha" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
-#
-#    PublicSubnetAlphaRouteTableAssociation:
-#        Type: "AWS::EC2::SubnetRouteTableAssociation"
-#        Properties:
+#            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipAlpha", "AllocationId" ] }
 #            SubnetId: { Ref: "PublicSubnetAlpha" }
 #            RouteTableId: { Ref: "PublicRouteTableAlpha" }
-#
-#    PublicRouteAlpha:
-#        Type: "AWS::EC2::Route"
+
+    ##########################################################################################################
+    ##  PUBLIC AZ BETA
+    ##########################################################################################################
+
+    PublicSubnetBeta:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            CidrBlock:  { "Fn::Sub": "10.0.100.0/24" }
+            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
+            MapPublicIpOnLaunch: true
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+        Condition: "MultiAz"
+
+    PublicRouteTableBeta:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+        Condition: "MultiAz"
+
+    PublicSubnetBetaRouteTableAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            SubnetId: { Ref: "PublicSubnetBeta" }
+            RouteTableId: { Ref: "PublicRouteTableBeta" }
+        Condition: "MultiAz"
+
+    PublicRouteBeta:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PublicRouteTableBeta" }
+            GatewayId: { Ref: "InternetGateway" }
+            DestinationCidrBlock: "0.0.0.0/0"
+        Condition: "MultiAz"
+
+#    NatGatewayEipBeta:
+#        Type: "AWS::EC2::EIP"
 #        Properties:
-#            RouteTableId: { Ref: "PublicRouteTableAlpha" }
-#            GatewayId: { Ref: "InternetGateway" }
-#            DestinationCidrBlock: "0.0.0.0/0"
-#
-##    NatGatewayEipAlpha:
-##        Type: "AWS::EC2::EIP"
-##        Properties:
-##            Domain: "vpc"
-##
-##    NatGatewayAlpha:
-##        DependsOn: "InternetGatewayVpcAttachment"
-##        Type: "AWS::EC2::NatGateway"
-##        Properties:
-##            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipAlpha", "AllocationId" ] }
-##            SubnetId: { Ref: "PublicSubnetAlpha" }
-#
-#    ##########################################################################################################
-#    ##  PUBLIC AZ BETA
-#    ##########################################################################################################
-#
-#    PublicSubnetBeta:
-#        Type: "AWS::EC2::Subnet"
-#        Properties:
-#            VpcId: { Ref: "Vpc" }
-#            CidrBlock:  { "Fn::Sub": "10.0.100.0/24" }
-#            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
-#            MapPublicIpOnLaunch: true
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-beta" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
+#            Domain: "vpc"
 #        Condition: "MultiAz"
 #
-#    PublicRouteTableBeta:
-#        Type: "AWS::EC2::RouteTable"
+#    NatGatewayBeta:
+#        DependsOn: "InternetGatewayVpcAttachment"
+#        Type: "AWS::EC2::NatGateway"
 #        Properties:
-#            VpcId: { Ref: "Vpc" }
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-beta" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
-#        Condition: "MultiAz"
-#
-#    PublicSubnetBetaRouteTableAssociation:
-#        Type: "AWS::EC2::SubnetRouteTableAssociation"
-#        Properties:
+#            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipBeta", "AllocationId" ] }
 #            SubnetId: { Ref: "PublicSubnetBeta" }
 #            RouteTableId: { Ref: "PublicRouteTableBeta" }
 #        Condition: "MultiAz"
-#
-#    PublicRouteBeta:
+
+    ##########################################################################################################
+    ##  PRIVATE AZ ALPHA
+    ##########################################################################################################
+
+    PrivateSubnetAlpha:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            CidrBlock: { "Fn::Sub": "10.0.1.0/24" }
+            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    PrivateRouteTableAlpha:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    PrivateSubnetAlphaRouteTableAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            SubnetId: { Ref: "PrivateSubnetAlpha" }
+            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
+
+#    PrivateRouteAlpha:
 #        Type: "AWS::EC2::Route"
 #        Properties:
-#            RouteTableId: { Ref: "PublicRouteTableBeta" }
-#            GatewayId: { Ref: "InternetGateway" }
+#            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
+#            NatGatewayId: { Ref: "NatGatewayAlpha" }
+#            DestinationCidrBlock: "0.0.0.0/0"
+
+    ##########################################################################################################
+    ##  PRIVATE AZ BETA
+    ##########################################################################################################
+
+    PrivateSubnetBeta:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            CidrBlock: { "Fn::Sub": "10.0.101.0/24" }
+            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+        Condition: "MultiAz"
+
+    PrivateRouteTableBeta:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+        Condition: "MultiAz"
+
+    PrivateSubnetBetaRouteTableAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            SubnetId: { Ref: "PrivateSubnetBeta" }
+            RouteTableId: { Ref: "PrivateRouteTableBeta" }
+        Condition: "MultiAz"
+
+#    PrivateRouteBeta:
+#        Type: "AWS::EC2::Route"
+#        Properties:
+#            RouteTableId: { Ref: "PrivateRouteTableBeta" }
+#            NatGatewayId: { Ref: "NatGatewayBeta" }
 #            DestinationCidrBlock: "0.0.0.0/0"
 #        Condition: "MultiAz"
-#
-##    NatGatewayEipBeta:
-##        Type: "AWS::EC2::EIP"
-##        Properties:
-##            Domain: "vpc"
-##        Condition: "MultiAz"
-##
-##    NatGatewayBeta:
-##        DependsOn: "InternetGatewayVpcAttachment"
-##        Type: "AWS::EC2::NatGateway"
-##        Properties:
-##            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipBeta", "AllocationId" ] }
-##            SubnetId: { Ref: "PublicSubnetBeta" }
-##        Condition: "MultiAz"
-#
-#    ##########################################################################################################
-#    ##  PRIVATE AZ ALPHA
-#    ##########################################################################################################
-#
-#    PrivateSubnetAlpha:
-#        Type: "AWS::EC2::Subnet"
-#        Properties:
-#            VpcId: { Ref: "Vpc" }
-#            CidrBlock: { "Fn::Sub": "10.0.1.0/24" }
-#            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-alpha" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
-#
-#    PrivateRouteTableAlpha:
-#        Type: "AWS::EC2::RouteTable"
-#        Properties:
-#            VpcId: { Ref: "Vpc" }
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-alpha" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
-#
-#    PrivateSubnetAlphaRouteTableAssociation:
-#        Type: "AWS::EC2::SubnetRouteTableAssociation"
-#        Properties:
-#            SubnetId: { Ref: "PrivateSubnetAlpha" }
-#            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
-#
-##    PrivateRouteAlpha:
-##        Type: "AWS::EC2::Route"
-##        Properties:
-##            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
-##            NatGatewayId: { Ref: "NatGatewayAlpha" }
-##            DestinationCidrBlock: "0.0.0.0/0"
-#
-#    ##########################################################################################################
-#    ##  PRIVATE AZ BETA
-#    ##########################################################################################################
-#
-#    PrivateSubnetBeta:
-#        Type: "AWS::EC2::Subnet"
-#        Properties:
-#            VpcId: { Ref: "Vpc" }
-#            CidrBlock: { "Fn::Sub": "10.0.101.0/24" }
-#            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-beta" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
-#        Condition: "MultiAz"
-#
-#    PrivateRouteTableBeta:
-#        Type: "AWS::EC2::RouteTable"
-#        Properties:
-#            VpcId: { Ref: "Vpc" }
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-beta" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
-#        Condition: "MultiAz"
-#
-#    PrivateSubnetBetaRouteTableAssociation:
-#        Type: "AWS::EC2::SubnetRouteTableAssociation"
-#        Properties:
-#            SubnetId: { Ref: "PrivateSubnetBeta" }
-#            RouteTableId: { Ref: "PrivateRouteTableBeta" }
-#        Condition: "MultiAz"
-#
-##    PrivateRouteBeta:
-##        Type: "AWS::EC2::Route"
-##        Properties:
-##            RouteTableId: { Ref: "PrivateRouteTableBeta" }
-##            NatGatewayId: { Ref: "NatGatewayBeta" }
-##            DestinationCidrBlock: "0.0.0.0/0"
-##        Condition: "MultiAz"
-#
-#    ##########################################################################################################
-#    ##  ENDPOINTS
-#    ##########################################################################################################
-#
-#    # An S3 endpoint provides a direct connection from the EC2 instances to S3; providing lower latency
-#    # and without incurring network bandwidth charges.  Note that currently they don't support commands like
-#    # sync between S3 buckets in different regions :(
-#    S3Endpoint:
-#        Type: "AWS::EC2::VPCEndpoint"
-#        Properties:
-#            RouteTableIds: { "Fn::If": [
-#                "MultiAz",
-#                [
-#                    { Ref: "PublicRouteTableAlpha" },
-#                    { Ref: "PrivateRouteTableAlpha" },
-#                    { Ref: "PublicRouteTableBeta" },
-#                    { Ref: "PrivateRouteTableBeta" }
-#                ],
-#                [
-#                    { Ref: "PublicRouteTableAlpha" },
-#                    { Ref: "PublicRouteTableBeta" },
-#                    { Ref: "PrivateRouteTableAlpha" }
-#                ]
-#            ] }
-#            ServiceName: { "Fn::Sub": "com.amazonaws.${AWS::Region}.s3" }
-#            VpcId: { Ref: "Vpc" }
-#
-#    ##########################################################################################################
-#    ##  EC2
-#    ##########################################################################################################
-#
-#    Ec2SecurityGroup:
-#        Type: "AWS::EC2::SecurityGroup"
-#        Properties:
-#            GroupDescription: "Security group for preprocessing ECS instances"
-#            VpcId: { Ref: "Vpc" }
-#            SecurityGroupIngress:
-#                # All ports open from internal access
-#              - IpProtocol: "tcp"
-#                FromPort: "0"
-#                ToPort: "65535"
-#                CidrIp: { "Fn::Sub": "10.0.0.0/16" }
-#
-#            Tags:
-#              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-ec2" } }
-#              - { Key: "Management", Value: "managed" }
-#              - { Key: "Project", Value: "preprocessing" }
-#              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    ##########################################################################################################
+    ##  ENDPOINTS
+    ##########################################################################################################
+
+    # An S3 endpoint provides a direct connection from the EC2 instances to S3; providing lower latency
+    # and without incurring network bandwidth charges.  Note that currently they don't support commands like
+    # sync between S3 buckets in different regions :(
+    S3Endpoint:
+        Type: "AWS::EC2::VPCEndpoint"
+        Properties:
+            RouteTableIds: { "Fn::If": [
+                "MultiAz",
+                [
+                    { Ref: "PublicRouteTableAlpha" },
+                    { Ref: "PrivateRouteTableAlpha" },
+                    { Ref: "PublicRouteTableBeta" },
+                    { Ref: "PrivateRouteTableBeta" }
+                ],
+                [
+                    { Ref: "PublicRouteTableAlpha" },
+                    { Ref: "PrivateRouteTableAlpha" }
+                ]
+            ] }
+            ServiceName: { "Fn::Sub": "com.amazonaws.${AWS::Region}.s3" }
+            VpcId: { Ref: "Vpc" }
+
+    ##########################################################################################################
+    ##  EC2
+    ##########################################################################################################
+
+    Ec2SecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Security group for preprocessing EC2 instances"
+            VpcId: { Ref: "Vpc" }
+            SecurityGroupIngress:
+                # All ports open from internal access
+              - IpProtocol: "tcp"
+                FromPort: "0"
+                ToPort: "65535"
+                CidrIp: { "Fn::Sub": "10.0.0.0/16" }
+
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-ec2" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
