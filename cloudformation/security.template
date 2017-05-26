@@ -24,6 +24,19 @@ Resources:
               - "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
             RoleName: { "Fn::Sub": "preprocessing-service-batch" }
 
+    CodeBuildServiceRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "codebuild.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+            RoleName: "preprocessing-service-codebuild"
+
 Outputs:
 
     CodeBuildServiceRole:

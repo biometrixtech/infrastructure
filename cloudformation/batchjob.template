@@ -1,0 +1,154 @@
+# A template that creates a code pipeline to create a new Docker image and register it to ECR
+#
+# Copyright 2016 Melon Software Ltd (UK), all rights reserved
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates a Code Pipeline to create a Job Definition with a new Docker image registered in ECR"
+
+Parameters:
+
+    JobName:
+        Type: "String"
+        Description: "The name of the job"
+
+    GithubUser:
+        Type: "String"
+        Description: "Use an automation user rather than a personal user"
+    GithubToken:
+        Type: "String"
+        Description: "See https://help.github.com/articles/creating-an-access-token-for-command-line-use/"
+        NoEcho: true
+
+    DefaultMemory:
+        Type: "Number"
+        Description: "Default memory allocation, in MB"
+
+    DefaultVcpus:
+        Type: "Number"
+        Description: "Default number of vCPUs to use for this job"
+
+Metadata:
+    "AWS::CloudFormation::Interface":
+        ParameterGroups:
+          - Label: { default: "VCS Source" }
+            Parameters:
+              - "GithubUser"
+              - "GithubToken"
+          - Label: { default: "Configuration" }
+            Parameters:
+              - "JobName"
+
+        ParameterLabels:
+            GithubUser: { default: "Username" }
+            GithubToken: { default: "Access Token" }
+            JobName: { default: "Job Name" }
+
+Mappings:
+    ServiceConfiguration:
+        sessionprocess2:
+            Cpu: 128
+            Memory: 128
+            Port: 80
+            BuildSize: "BUILD_GENERAL1_SMALL"
+
+Resources:
+
+    ##########################################################################################################
+    ## ECR
+    ##########################################################################################################
+
+    EcrRepository:
+        Type: "AWS::ECR::Repository"
+        Properties:
+            RepositoryName: { "Fn::Sub": "preprocessing/${JobName}" }
+
+    ##########################################################################################################
+    ##  IAM
+    ##########################################################################################################
+
+    JobRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            RoleName: { "Fn::Sub": "preprocessing-batchjob-${JobName}" }
+
+    ##########################################################################################################
+    ##  CODEBUILD
+    ##########################################################################################################
+
+    CodeBuildProject:
+        Type: "AWS::CodeBuild::Project"
+        Properties:
+            Name: { "Fn::Sub": 'preprocessing-codebuild-${JobName}' }
+            Description: { "Fn::Sub": 'Builds a new Docker image for the ${JobName} service and registers it to ECR' }
+            ServiceRole: { "Fn::ImportValue": "CodeBuildServiceRole" }
+            Artifacts:
+                Type: "no_artifacts"
+            Environment:
+                Type: "linuxContainer"
+                ComputeType: "BUILD_GENERAL1_SMALL"
+                Image: "aws/codebuild/docker:1.12.1"
+                EnvironmentVariables:
+                  - { Name: "REGISTRY_HOST", Value: { Ref: "EcrRepository" } }
+                  - { Name: "JOB_NAME", Value: { Ref: "JobName" } }
+                  - { Name: "JOB_ROLE_ARN", Value: { "Fn::GetAtt": [ "JobRole", "Arn" ] } }
+                  - { Name: "DEFAULT_CPU", Value: { Ref : "DefaultVcpus" } }
+                  - { Name: "DEFAULT_MEMORY", Value: { Ref : "DefaultMemory" } }
+            TimeoutInMinutes: 30
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-codebuild-${JobName}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: "infra" }
+            Source:
+                Location: { "Fn::Sub": 'https://${GithubUser}:${GithubToken}@github.com/biometrixtech/PreProcess.git' }
+                Type: "GITHUB"
+                BuildSpec: |
+                    version: 0.1
+                    phases:
+                        pre_build:
+                            commands:
+                                # Log in to the registry
+                              - aws ecr get-login | sh
+
+                        build:
+                            commands:
+                                # Build the docker image
+                              - "docker build -t preprocessing/batchjob/$JOB_NAME:`git rev-parse --short HEAD` ."
+
+                                # Tag the image
+                              - "IMAGE_NAME=preprocessing/batchjob/:`git rev-parse --short HEAD` &&
+                                docker tag \"$IMAGE_NAME\" \"$REGISTRY_HOST/$IMAGE_NAME\""
+
+                        post_build:
+                            commands:
+
+                                # Push the image to the docker registry
+                              - "IMAGE=$REGISTRY_HOST/preprocessing/batchjob/$JOB_NAME:`git rev-parse --short HEAD` &&
+                                docker push \"$IMAGE\""
+
+                                # Create the job definition skeleton
+                              - 'IMAGE=$REGISTRY_HOST/preprocessing/batchjob/$JOB_NAME:`git rev-parse --short HEAD` && echo "{
+                                    \"jobDefinitionName\": \"preprocessing-batchjob-$JOB_NAME\",
+                                    \"type\": \"container\",
+                                    \"parameters\": {},
+                                    \"containerProperties\": {
+                                        \"command\": [ \"sleep", \"30\" ],
+                                        \"image\": \"$IMAGE\",
+                                        \"jobRoleArn\": \"$JOB_ROLE_ARN\",
+                                        \"memory\": 128,
+                                        \"privileged\": true,
+                                        \"readOnlyRootFilesystem\": true,
+                                        \"vcpus\": 1
+                                    },
+                                    \"retryStrategy\": {
+                                        \"attempts\": 2
+                                    }
+                                }" > taskdefinition.tmp'
+
+                              - aws batch register-job-definition --job-definition-name preprocessing-batchjob-$SERVICE --cli-input-json file://taskdefinition.tmp
