@@ -494,7 +494,21 @@ Resources:
             State: "ENABLED"
             Type: "MANAGED"
 
+    BatchJobQueue:
+        Type: "Custom::Batch_JobQueue"
+        Properties:
+            ServiceToken: { "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:aws-cloudformation-polyfill" }
+            ComputeEnvironments:
+              - ComputeEnvironment: { Ref: "BatchComputeEnvironment" }
+                Order: 1
+            Name: { "Fn::Sub": "preprocessing-${Environment}-compute" }
+            Priority: 1
+
 Outputs:
     EfsId:
         Description: "The id of the Elastic File System"
         Value: { Ref: "EfsFileSystem" }
+
+    JobQueueArn:
+        Description: "The ARN of the Job Queue"
+        Value: { Ref: "BatchJobQueue" }
