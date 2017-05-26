@@ -1,0 +1,39 @@
+# A template that creates global infrastructure
+#
+# Copyright 2017 Melon Software Ltd (UK), all rights reserved
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates global infrastructure for the pre-processing pipeline"
+
+Resources:
+
+    ##########################################################################################################
+    ##  SERVICE ROLES
+    ##########################################################################################################
+
+    BatchServiceRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "batch.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
+            RoleName: { "Fn::Sub": "preprocessing-service-batch" }
+
+Outputs:
+
+    CodeBuildServiceRole:
+        Description: "Service role for CodeBuild"
+        Value: { Ref: "CodeBuildServiceRole" }
+        Export:
+            Name: "CodeBuildServiceRole"
+
+    BatchServiceRole:
+        Description: "Service role for Batch"
+        Value: { Ref: "BatchServiceRole" }
+        Export:
+            Name: "BatchServiceRole"

@@ -455,19 +455,6 @@ Resources:
     ##  BATCH
     ##########################################################################################################
 
-    BatchServiceRole:
-        Type: "AWS::IAM::Role"
-        Properties:
-            AssumeRolePolicyDocument:
-                Version: "2012-10-17"
-                Statement:
-                  - Effect: "Allow"
-                    Principal: { Service: [ "batch.amazonaws.com" ] }
-                    Action: "sts:AssumeRole"
-            ManagedPolicyArns:
-              - "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
-            RoleName: { "Fn::Sub": "preprocessing-${Environment}-compute" }
-
     BatchComputeEnvironment:
         Type: "Custom::Batch_ComputeEnvironment"
         Properties:
@@ -490,7 +477,7 @@ Resources:
                   - { Key: "Project", Value: "preprocessing" }
                   - { Key: "Environment", Value: { Ref: "Environment" } }
                 Type: "EC2"
-            ServiceRole: { Ref: "BatchServiceRole" }
+            ServiceRole: { "Fn::ImportValue": "BatchServiceRole" }
             State: "ENABLED"
             Type: "MANAGED"
 
