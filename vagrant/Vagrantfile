@@ -1,0 +1,52 @@
+# Vagrant configuration. For a complete reference, please see the 
+# online documentation at https://docs.vagrantup.com.
+
+# Parse command line parameters.  See http://stackoverflow.com/a/31070025
+# This allows you to run the command:
+#     vagrant --port-suffix=02 up
+# to map the SSH port to localhost:2202, web port to 8002, etc.  If no port
+# suffix is specified, it will bind to ports 2200 and 8000
+portSuffix=0
+
+require 'getoptlong'
+begin
+    opts = GetoptLong.new(
+      [ '--port-suffix', GetoptLong::OPTIONAL_ARGUMENT ]
+    )
+    opts.each do |opt, arg|
+        case opt
+            when '--port-suffix'
+                portSuffix = arg.to_i
+        end
+    end
+rescue GetoptLong::InvalidOption => e
+    # Ignore
+    #retry
+end
+
+Vagrant.configure(2) do |config|
+
+	# Every Vagrant development environment requires a box. You can search for
+	# boxes at https://atlas.hashicorp.com/search.
+	config.vm.box = "ubuntu/xenial64"
+
+	# Name the server in the list of Vagrant instances.  This is what vagrant
+	# thinks the server's hostname is, not what the server thinks its own
+	# hostname is.
+	config.vm.define :biometrix
+
+	# Create a forwarded port mapping which allows access to a specific port
+	# within the machine from a port on the host machine.
+	config.vm.network :forwarded_port, guest: 22, host: 2200 + portSuffix, id:'ssh'
+
+	# Share an additional folder to the guest VM. The first argument is
+	# the path on the host to the actual folder. The second argument is
+	# the path on the guest to mount the folder. And the optional third
+	# argument is a set of non-required options.
+	config.vm.synced_folder "../..", "/vagrant"
+
+	# Run Ansible to provision the server
+	config.vm.provision "ansible_local" do |ansible|
+		ansible.playbook = "/vagrant/Infrastructure/vagrant/ansible/main.yml"
+	end
+end

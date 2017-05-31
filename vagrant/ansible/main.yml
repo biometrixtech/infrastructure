@@ -1,0 +1,68 @@
+# This playbook configures an Ubuntu server to act as a development environment for the Airmee SDKs
+---
+-   name: 'Do basic startup and configuration tasks'
+    hosts: all
+    become: true
+    become_user: root
+    connection: local
+    vars:
+        infrastructure_directory: '/vagrant/infrastructure'
+        application_directory: '/vagrant'
+
+    tasks:
+
+    ##########################################################################################################
+    ## BASIC CONFIGURATION
+    ##########################################################################################################
+
+      - name: "Set the server's hostname"
+        hostname:
+            name: 'biometrix'
+
+    ##########################################################################################################
+    ## ADMIN USERS
+    ##########################################################################################################
+
+      - name: 'Create a group for the admin users'
+        group:
+            name: '{{item | basename | splitext | first}}'
+            state: present
+        with_fileglob:
+          - "{{infrastructure_directory}}/vagrant/ansible/authorized_keys/*.azk"
+
+      - name: 'Create admin users'
+        user:
+            name: '{{item | basename | splitext | first}}'
+            shell: '/bin/bash'
+            groups: '{{item | basename | splitext | first}}'
+            append: yes
+        with_fileglob:
+          - "{{infrastructure_directory}}/vagrant/ansible/authorized_keys/*.azk"
+
+      - name: 'Add admin users to sudoers file'
+        lineinfile:
+            dest: '/etc/sudoers'
+            state: present
+            line: '{{item | basename | splitext | first}} ALL=(ALL:ALL) NOPASSWD:ALL'
+        with_fileglob:
+          - "{{infrastructure_directory}}/vagrant/ansible/authorized_keys/*.azk"
+
+      - name: 'Create .ssh directory for admin users'
+        file:
+            path: '/home/{{item | basename | splitext | first}}/.ssh'
+            state: directory
+            owner: '{{item | basename | splitext | first}}'
+            group: '{{item | basename | splitext | first}}'
+            mode: 0700
+        with_fileglob:
+          - "{{infrastructure_directory}}/vagrant/ansible/authorized_keys/*.azk"
+
+      - name: 'Install SSH public key'
+        copy:
+            src: '{{item}}'
+            dest: '/home/{{item | basename | splitext | first}}/.ssh/authorized_keys'
+            owner: '{{item | basename | splitext | first}}'
+            group: '{{item | basename | splitext | first}}'
+            mode: '0700'
+        with_fileglob:
+          - "{{infrastructure_directory}}/vagrant/ansible/authorized_keys/*.azk"

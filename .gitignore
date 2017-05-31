@@ -1,0 +1,3 @@
+/vagrant/.vagrant
+/vagrant/*.log
+/vagrant/ansible/authorized_keys/*.azk
