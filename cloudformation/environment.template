@@ -51,6 +51,11 @@ Parameters:
         Type: "String"
         Default: "https://s3.amazonaws.com/biometrix-preprocessing-infrastructure/cloudformation/compute.template"
         Description: "Path to an S3 file containing the CloudFormation template for the EC2 Cluster"
+
+    PipelineTemplate:
+        Type: "String"
+        Default: "https://s3.amazonaws.com/biometrix-preprocessing-infrastructure/cloudformation/pipeline.template"
+        Description: "Path to an S3 file containing the CloudFormation template for the StepFunctions pipeline"
         
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -72,9 +77,11 @@ Metadata:
             ComputeEc2Ami: { default: "EC2 AMI" }
             ComputeEc2Keypair: { default: "EC2 Keypair" }
             ComputeTemplate: { default: "CF template: Compute Cluster" }
+            PipelineTemplate: { default: "CF template: Pipeline" }
 
 Conditions:
     CreateComputeCluster: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "ComputeTemplate" }, "" ] } ] }
+    CreatePipeline: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PipelineTemplate" }, "" ] } ] }
 
 Resources:
 
@@ -100,3 +107,22 @@ Resources:
             TemplateURL: { Ref: "ComputeTemplate" }
             TimeoutInMinutes: 10
         Condition: "CreateComputeCluster"
+
+    ##########################################################################################################
+    ##  PIPELINE
+    ##########################################################################################################
+
+    PipelineCluster:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "compute" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "public" }
+            TemplateURL: { Ref: "PipelineTemplate" }
+            TimeoutInMinutes: 10
+        Condition: "CreatePipeline"
