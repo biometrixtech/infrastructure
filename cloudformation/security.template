@@ -33,9 +33,53 @@ Resources:
                   - Effect: "Allow"
                     Principal: { Service: [ "codebuild.amazonaws.com" ] }
                     Action: "sts:AssumeRole"
-            ManagedPolicyArns:
-              - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+            Policies:
+              - PolicyName: "codebuild"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+
+                      - Action:
+                          - "logs:CreateLogGroup"
+                          - "logs:CreateLogStream"
+                          - "logs:PutLogEvents"
+                        Effect: "Allow"
+                        Resource: "*"
+
+                      - Action:
+                          - "codecommit:GitPull"
+                          - "codepipeline:GetPipelineState"
+                          - "ecr:BatchCheckLayerAvailability"
+                          - "ecr:BatchGetImage"
+                          - "ecr:CompleteLayerUpload"
+                          - "ecr:GetAuthorizationToken"
+                          - "ecr:GetDownloadUrlForLayer"
+                          - "ecr:InitiateLayerUpload"
+                          - "ecr:PutImage"
+                          - "ecr:UploadLayerPart"
+                        Effect: "Allow"
+                        Resource: "*"
             RoleName: "preprocessing-service-codebuild"
+
+    StepFunctionsServiceRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ { "Fn::Sub": "states.${AWS::Region}.amazonaws.com" } ] }
+                    Action: "sts:AssumeRole"
+            Policies:
+              - PolicyName: "lambda"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Effect: "Allow"
+                        Action:
+                          - "lambda:InvokeFunction"
+                        Resource: "*"
+            RoleName: { "Fn::Sub": "preprocessing-service-stepfunctions" }
 
 Outputs:
 
@@ -50,3 +94,9 @@ Outputs:
         Value: { Ref: "BatchServiceRole" }
         Export:
             Name: "BatchServiceRole"
+
+    StepFunctionsServiceRole:
+        Description: "Service role for Step Functions"
+        Value: { "Fn::GetAtt": [ "StepFunctionsServiceRole", "Arn" ] }
+        Export:
+            Name: "StepFunctionsServiceRole"
