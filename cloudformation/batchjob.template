@@ -94,7 +94,9 @@ Resources:
                 ComputeType: "BUILD_GENERAL1_SMALL"
                 Image: "aws/codebuild/docker:1.12.1"
                 EnvironmentVariables:
-                  - { Name: "REGISTRY_HOST", Value: { Ref: "EcrRepository" } }
+                  - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
+                  - { Name: "ECR_REGISTRY", Value: { "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com" } }
+                  - { Name: "ECR_REPOSITORY", Value: { Ref: "EcrRepository" } }
                   - { Name: "JOB_NAME", Value: { Ref: "JobName" } }
                   - { Name: "JOB_ROLE_ARN", Value: { "Fn::GetAtt": [ "JobRole", "Arn" ] } }
                   - { Name: "DEFAULT_CPU", Value: { Ref : "DefaultVcpus" } }
@@ -106,40 +108,39 @@ Resources:
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: "infra" }
             Source:
-                Location: { "Fn::Sub": 'https://${GithubUser}:${GithubToken}@github.com/biometrixtech/PreProcess.git' }
+                Location: { "Fn::Sub": 'https://${GithubUser}:${GithubToken}@github.com/biometrixtech/PreProcessing.git' }
                 Type: "GITHUB"
                 BuildSpec: |
-                    version: 0.1
+                    version: 0.2
                     phases:
                         pre_build:
                             commands:
+                              - GIT_COMMIT=$(git rev-parse --short HEAD)
+                              - IMAGE_NAME=$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT
+
                                 # Log in to the registry
-                              - aws ecr get-login | sh
+                              - $(aws ecr get-login --region $AWS_DEFAULT_REGION)
 
                         build:
                             commands:
                                 # Build the docker image
-                              - "docker build -t preprocessing/batchjob/$JOB_NAME:`git rev-parse --short HEAD` ."
-
-                                # Tag the image
-                              - "IMAGE_NAME=preprocessing/batchjob/:`git rev-parse --short HEAD` &&
-                                docker tag \"$IMAGE_NAME\" \"$REGISTRY_HOST/$IMAGE_NAME\""
+                              - docker build -f docker/preprocessing.docker -t $IMAGE_NAME .
 
                         post_build:
                             commands:
 
                                 # Push the image to the docker registry
-                              - "IMAGE=$REGISTRY_HOST/preprocessing/batchjob/$JOB_NAME:`git rev-parse --short HEAD` &&
-                                docker push \"$IMAGE\""
+                              - docker push $IMAGE_NAME
 
                                 # Create the job definition skeleton
-                              - 'IMAGE=$REGISTRY_HOST/preprocessing/batchjob/$JOB_NAME:`git rev-parse --short HEAD` && echo "{
-                                    \"jobDefinitionName\": \"preprocessing-batchjob-$JOB_NAME\",
+                              - JOB_DEFINITION_NAME=preprocessing-batchjob-$JOB_NAME
+                              - "echo '{
+                                    \"jobDefinitionName\": \"$JOB_DEFINITION_NAME\",
                                     \"type\": \"container\",
                                     \"parameters\": {},
                                     \"containerProperties\": {
-                                        \"command\": [ \"sleep", \"30\" ],
-                                        \"image\": \"$IMAGE\",
+                                        \"command\": [ \"sleep\", \"30\" ],
+                                        \"image\": \"$IMAGE_NAME\",
                                         \"jobRoleArn\": \"$JOB_ROLE_ARN\",
                                         \"memory\": 128,
                                         \"privileged\": true,
@@ -149,6 +150,6 @@ Resources:
                                     \"retryStrategy\": {
                                         \"attempts\": 2
                                     }
-                                }" > taskdefinition.tmp'
+                                }' > taskdefinition.tmp"
 
-                              - aws batch register-job-definition --job-definition-name preprocessing-batchjob-$SERVICE --cli-input-json file://taskdefinition.tmp
+                              - aws batch register-job-definition --job-definition-name $JOB_DEFINITION_NAME --cli-input-json file://taskdefinition.tmp
