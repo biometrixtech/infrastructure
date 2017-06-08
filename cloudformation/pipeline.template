@@ -1,0 +1,45 @@
+# A template that creates the processing pipeline for biometric data
+#
+# Copyright 2017 Melon Software Ltd (UK), all rights reserved
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates a pre-processing pipeline"
+
+Parameters:
+
+    Environment:
+        Type: "String"
+        Description: "The name of the Environment"
+
+Metadata:
+    "AWS::CloudFormation::Interface":
+        ParameterGroups:
+          - Label: { default: "Environment" }
+            Parameters:
+              - "Environment"
+
+        ParameterLabels:
+            Environment: { default: "Environment" }
+
+Resources:
+
+    ##########################################################################################################
+    ##  STEP FUNCTIONS
+    ##########################################################################################################
+
+    StateMachine:
+        Type: "AWS::StepFunctions::StateMachine"
+        Properties:
+            DefinitionString: !Sub |
+                {
+                   "StartAt": "Initialise",
+                   "States": {
+                       "Initialise": {
+                           "Type": "Task",
+                           "Resource": "arn:aws:lambda:us-east-1:887689817172:function:preprocessing-sfn-batch-schedule",
+                           "End": true
+                       }
+                   }
+                }
+
+            RoleArn: { "Fn::ImportValue" : "StepFunctionsServiceRole" }
