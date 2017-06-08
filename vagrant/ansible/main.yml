@@ -66,3 +66,33 @@
             mode: '0700'
         with_fileglob:
           - "{{infrastructure_directory}}/vagrant/ansible/authorized_keys/*.azk"
+
+    ##########################################################################################################
+    ## AWS
+    ##########################################################################################################
+
+      - name: 'Install AWS CLI and related tools'
+        apt:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'awscli'
+          - 'python-pip'
+
+      - name: 'Install aws-mfa tool'
+        pip:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'aws-mfa'
+
+    ##########################################################################################################
+    ## DOCKER
+    ##########################################################################################################
+
+      - name: 'Install Docker'
+        apt:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'docker.io'
