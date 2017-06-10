@@ -59,6 +59,16 @@ Resources:
                           - "ecr:UploadLayerPart"
                         Effect: "Allow"
                         Resource: "*"
+
+                      - Action:
+                          - "batch:RegisterJobDefinition"
+                        Effect: "Allow"
+                        Resource: "*"
+
+                      - Action:
+                          - "iam:PassRole"
+                        Effect: "Allow"
+                        Resource: { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/preprocessing-*" }
             RoleName: "preprocessing-service-codebuild"
 
     StepFunctionsServiceRole:
