@@ -113,6 +113,12 @@ Resources:
                 BuildSpec: |
                     version: 0.2
                     phases:
+                        install:
+                            commands:
+                                # Upgrade AWS CLI
+                              - pip install --upgrade --user awscli
+                              - aws --version
+
                         pre_build:
                             commands:
                               - GIT_COMMIT=$(git rev-parse --short HEAD)
