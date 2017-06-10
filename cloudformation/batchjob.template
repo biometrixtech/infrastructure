@@ -134,22 +134,23 @@ Resources:
 
                                 # Create the job definition skeleton
                               - JOB_DEFINITION_NAME=preprocessing-batchjob-$JOB_NAME
-                              - "echo '{
+                              - 'echo "{
                                     \"jobDefinitionName\": \"$JOB_DEFINITION_NAME\",
                                     \"type\": \"container\",
-                                    \"parameters\": {},
+                                    \"parameters\": { \"Meta\": \"{}\", \"Input\": \"{}\" },
                                     \"containerProperties\": {
-                                        \"command\": [ \"sleep\", \"30\" ],
+                                        \"command\": [ \"$JOB_NAME\", \"Ref::Input\", \"Ref::Meta\" ],
                                         \"image\": \"$IMAGE_NAME\",
                                         \"jobRoleArn\": \"$JOB_ROLE_ARN\",
                                         \"memory\": 128,
                                         \"privileged\": true,
-                                        \"readOnlyRootFilesystem\": true,
+                                        \"readonlyRootFilesystem\": false,
                                         \"vcpus\": 1
                                     },
                                     \"retryStrategy\": {
                                         \"attempts\": 2
                                     }
-                                }' > taskdefinition.tmp"
+                                }" > taskdefinition.json'
+                              - cat taskdefinition.json
 
-                              - aws batch register-job-definition --job-definition-name $JOB_DEFINITION_NAME --cli-input-json file://taskdefinition.tmp
+                              - aws batch register-job-definition --job-definition-name $JOB_DEFINITION_NAME --cli-input-json file://taskdefinition.json
