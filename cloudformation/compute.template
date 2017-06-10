@@ -462,7 +462,6 @@ Resources:
             ComputeEnvironmentName: { "Fn::Sub": "preprocessing-${Environment}-compute" }
             ComputeResources:
                 Ec2KeyPair: { Ref: "Keypair" }
-                ImageId: { Ref: "Ami" }
                 InstanceRole: { Ref: "Ec2InstanceStartupProfile" }
                 InstanceTypes: [ { Ref: "InstanceSize" } ]
                 MaxvCpus: 5
