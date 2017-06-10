@@ -75,6 +75,15 @@ Resources:
                   - Effect: "Allow"
                     Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
                     Action: "sts:AssumeRole"
+            Policies:
+              - PolicyName: "s3download"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Action:
+                          - "s3:GetObject"
+                        Effect: "Allow"
+                        Resource: "*"
             RoleName: { "Fn::Sub": "preprocessing-batchjob-${JobName}" }
 
     ##########################################################################################################

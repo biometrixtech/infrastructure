@@ -24,22 +24,129 @@ Metadata:
 Resources:
 
     ##########################################################################################################
+    ##  IAM
+    ##########################################################################################################
+
+    LambdaExecutionRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "lambda.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            Policies:
+              - PolicyName: "logs"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Action:
+                          - "logs:CreateLogGroup"
+                          - "logs:CreateLogStream"
+                          - "logs:PutLogEvents"
+                        Effect: "Allow"
+                        Resource: "*"
+            RoleName: { "Fn::Sub": "preprocessing-${Environment}-lambda" }
+
+    ##########################################################################################################
+    ##  LAMBDA
+    ##########################################################################################################
+
+    LambdaPrepareExecution:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "Environment": "${Environment}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-downloadandchunk:11"
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": event['SourceEvent']
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare" }
+
+    ##########################################################################################################
     ##  STEP FUNCTIONS
     ##########################################################################################################
+
+    StepFunctionsActivity:
+        Type: "AWS::StepFunctions::Activity"
+        Properties:
+            Name: { "Fn::Sub": "preprocessing-${Environment}" }
 
     StateMachine:
         Type: "AWS::StepFunctions::StateMachine"
         Properties:
             DefinitionString: !Sub |
                 {
-                   "StartAt": "Initialise",
-                   "States": {
-                       "Initialise": {
-                           "Type": "Task",
-                           "Resource": "arn:aws:lambda:us-east-1:887689817172:function:preprocessing-sfn-batch-schedule",
-                           "End": true
-                       }
-                   }
+                    "StartAt": "ParseInput",
+                    "States": {
+                        "ParseInput": {
+                            "Type": "Pass",
+                            "Result": {
+                                "Meta": {
+                                    "ExecutionArn": "abc123"
+                                },
+                                "SourceEvent": {
+                                    "S3Bucket": "biometrix-sessioncontainer2",
+                                    "S3Path": "015474d1-cbe4-4010-b1d3-b08bb6f6ed08"
+                                }
+                            },
+                            "ResultPath": "$",
+                            "Next": "BuildDownloadAndChunkContext"
+                        },
+                        "BuildDownloadAndChunkContext": {
+                            "Type": "Task",
+                            "Resource": "${LambdaPrepareExecution.Arn}",
+                            "ResultPath": "$.DownloadAndChunkContext",
+                            "Next": "DownloadAndChunk"
+                        },
+                        "DownloadAndChunk": {
+                            "Type": "Parallel",
+                            "Branches": [
+                                {
+                                    "StartAt": "Schedule",
+                                    "States": {
+                                        "Schedule": {
+                                            "Type": "Task",
+                                            "InputPath": "$.DownloadAndChunkContext",
+                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
+                                            "End": true
+                                        }
+                                    }
+                                },
+                                {
+                                    "StartAt": "Respond",
+                                    "States": {
+                                        "Respond": {
+                                            "Type": "Task",
+                                            "InputPath": "$.DownloadAndChunkContext",
+                                            "Resource": "${StepFunctionsActivity}",
+                                            "End": true
+                                        }
+                                    }
+                                }
+                            ],
+                            "End": true
+                        }
+                    }
                 }
 
             RoleArn: { "Fn::ImportValue" : "StepFunctionsServiceRole" }
