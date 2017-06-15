@@ -11,15 +11,23 @@ Parameters:
         Type: "String"
         Description: "The name of the Environment"
 
+    BatchJobVersionDownloadandchunk:
+        Type: "String"
+        Description: "The version of the downloadandchunk batch job to run"
+
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
           - Label: { default: "Environment" }
             Parameters:
               - "Environment"
+          - Label: { default: "Batch Jobs" }
+            Parameters:
+              - "BatchJobVersionDownloadandchunk"
 
         ParameterLabels:
             Environment: { default: "Environment" }
+            BatchJobVersionDownloadandchunk: { default: "downloadandchunk" }
 
 Resources:
 
@@ -69,7 +77,7 @@ Resources:
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-downloadandchunk:11"
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-downloadandchunk:${BatchJobVersionDownloadandchunk}"
                                     },
                                     "InputPath": "$"
                                 }

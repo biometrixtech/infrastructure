@@ -82,6 +82,9 @@ Resources:
                     Statement:
                       - Action:
                           - "s3:GetObject"
+                          - "states:SendTaskFailure"
+                          - "states:SendTaskHeartbeat"
+                          - "states:SendTaskSuccess"
                         Effect: "Allow"
                         Resource: "*"
             RoleName: { "Fn::Sub": "preprocessing-batchjob-${JobName}" }

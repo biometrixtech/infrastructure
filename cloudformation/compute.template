@@ -468,6 +468,7 @@ Resources:
                 MinvCpus: 1
                 SecurityGroupIds:
                   - { Ref: "Ec2SecurityGroup" }
+                  - { Ref: "EfsSecurityGroup" }
                 Subnets:
                   - { Ref: "PrivateSubnetAlpha" }
                 Tags:

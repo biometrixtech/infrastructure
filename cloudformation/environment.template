@@ -56,6 +56,10 @@ Parameters:
         Type: "String"
         Default: "https://s3.amazonaws.com/biometrix-preprocessing-infrastructure/cloudformation/pipeline.template"
         Description: "Path to an S3 file containing the CloudFormation template for the StepFunctions pipeline"
+
+    BatchJobVersionDownloadandchunk:
+        Type: "String"
+        Description: "The version of the downloadandchunk batch job to run"
         
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -69,6 +73,9 @@ Metadata:
               - "Ec2InstanceSize"
               - "Ec2Ami"
               - "Ec2Keypair"
+          - Label: { default: "Batch Jobs" }
+            Parameters:
+              - "BatchJobVersionDownloadandchunk"
             
         ParameterLabels:
             Environment: { default: "Environment" }
@@ -78,6 +85,7 @@ Metadata:
             ComputeEc2Keypair: { default: "EC2 Keypair" }
             ComputeTemplate: { default: "CF template: Compute Cluster" }
             PipelineTemplate: { default: "CF template: Pipeline" }
+            BatchJobVersionDownloadandchunk: { default: "downloadandchunk" }
 
 Conditions:
     CreateComputeCluster: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "ComputeTemplate" }, "" ] } ] }
@@ -117,6 +125,7 @@ Resources:
         Properties:
             Parameters:
                 Environment: { Ref: "Environment" }
+                BatchJobVersionDownloadandchunk: { Ref: "BatchJobVersionDownloadandchunk" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline" } }
               - { Key: "Management", Value: "managed" }
