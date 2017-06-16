@@ -402,6 +402,33 @@ Resources:
     ##  EC2
     ##########################################################################################################
 
+    ParameterStoreKey:
+        Type: "AWS::KMS::Key"
+        Properties:
+            Description: { "Fn::Sub": "Encryption for configuration parameters in the ${Environment} cluster" }
+            Enabled: true
+            EnableKeyRotation: false
+            KeyPolicy:
+                Version: "2012-10-17"
+                Id: "default"
+                Statement:
+                  - Sid: "Enable IAM User Permissions"
+                    Effect: "Allow"
+                    Principal:
+                        AWS: { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root" }
+                    Action: "kms:*"
+                    Resource: "*"
+
+    ParameterStoreKeyAlias:
+        Type: "AWS::KMS::Alias"
+        Properties:
+            AliasName: { "Fn::Sub": "alias/preprocessing/${Environment}" }
+            TargetKeyId: { Ref: "ParameterStoreKey" }
+
+    ##########################################################################################################
+    ##  KMS
+    ##########################################################################################################
+
     Ec2InstanceStartupRole:
         Type: "AWS::IAM::Role"
         Properties:

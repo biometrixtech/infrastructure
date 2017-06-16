@@ -87,6 +87,12 @@ Resources:
                           - "states:SendTaskSuccess"
                         Effect: "Allow"
                         Resource: "*"
+                      - Action:
+                          - "ssm:DescribeParameters"
+                          - "ssm:GetParameters"
+                          - "kms:Decrypt"
+                        Effect: "Allow"
+                        Resource: "*" # TODO this should be segregated by environment somehow
             RoleName: { "Fn::Sub": "preprocessing-batchjob-${JobName}" }
 
     ##########################################################################################################
