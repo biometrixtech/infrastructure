@@ -14,6 +14,9 @@ Parameters:
     BatchJobVersionDownloadandchunk:
         Type: "String"
         Description: "The version of the downloadandchunk batch job to run"
+    BatchJobVersionSessionprocess2:
+        Type: "String"
+        Description: "The version of the sessionprocess2 batch job to run"
 
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -24,10 +27,12 @@ Metadata:
           - Label: { default: "Batch Jobs" }
             Parameters:
               - "BatchJobVersionDownloadandchunk"
+              - "BatchJobVersionSessionprocess2"
 
         ParameterLabels:
             Environment: { default: "Environment" }
             BatchJobVersionDownloadandchunk: { default: "downloadandchunk" }
+            BatchJobVersionSessionprocess2: { default: "sessionprocess2" }
 
 Resources:
 
@@ -90,6 +95,37 @@ Resources:
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-downloadandchunk" }
 
+    LambdaPrepareSessionProcess2:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-noop:1"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-sessionprocess2:${BatchJobVersionSessionprocess2}"
+                                    },
+                                    "InputPath": "$[{}]".format(i)
+                                }
+                                for i in range(len(event['DownloadAndChunkOutput'][1]['Output']['Filenames']))
+                            ],
+                            "Input": [ {'Filename': f} for f in event['DownloadAndChunkOutput'][1]['Output']['Filenames']]
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-sessionprocess2" }
+
     ##########################################################################################################
     ##  STEP FUNCTIONS
     ##########################################################################################################
@@ -104,9 +140,9 @@ Resources:
         Properties:
             DefinitionString: !Sub |
                 {
-                    "StartAt": "ParseInput",
+                    "StartAt": "FakeInput",
                     "States": {
-                        "ParseInput": {
+                        "FakeInput": {
                             "Type": "Pass",
                             "Result": {
                                 "Meta": {
@@ -130,9 +166,9 @@ Resources:
                             "Type": "Parallel",
                             "Branches": [
                                 {
-                                    "StartAt": "Schedule",
+                                    "StartAt": "ScheduleDownloadAndChunk",
                                     "States": {
-                                        "Schedule": {
+                                        "ScheduleDownloadAndChunk": {
                                             "Type": "Task",
                                             "InputPath": "$.DownloadAndChunkContext",
                                             "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
@@ -141,9 +177,9 @@ Resources:
                                     }
                                 },
                                 {
-                                    "StartAt": "Respond",
+                                    "StartAt": "RespondDownloadAndChunk",
                                     "States": {
-                                        "Respond": {
+                                        "RespondDownloadAndChunk": {
                                             "Type": "Task",
                                             "InputPath": "$.DownloadAndChunkContext",
                                             "Resource": "${StepFunctionsActivity}",
@@ -152,6 +188,42 @@ Resources:
                                     }
                                 }
                             ],
+                            "ResultPath": "$.DownloadAndChunkOutput",
+                            "Next": "BuildSessionProcess2Context"
+                        },
+                        "BuildSessionProcess2Context": {
+                            "Type": "Task",
+                            "Resource": "${LambdaPrepareSessionProcess2.Arn}",
+                            "ResultPath": "$.SessionProcess2Context",
+                            "Next": "SessionProcess2"
+                        },
+                        "SessionProcess2": {
+                            "Type": "Parallel",
+                            "Branches": [
+                                {
+                                    "StartAt": "ScheduleSessionProcess2",
+                                    "States": {
+                                        "ScheduleSessionProcess2": {
+                                            "Type": "Task",
+                                            "InputPath": "$.SessionProcess2Context",
+                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
+                                            "End": true
+                                        }
+                                    }
+                                },
+                                {
+                                    "StartAt": "RespondSessionProcess2",
+                                    "States": {
+                                        "RespondSessionProcess2": {
+                                            "Type": "Task",
+                                            "InputPath": "$.SessionProcess2Context",
+                                            "Resource": "${StepFunctionsActivity}",
+                                            "End": true
+                                        }
+                                    }
+                                }
+                            ],
+                            "ResultPath": "$.SessionProcess2Output",
                             "End": true
                         }
                     }
