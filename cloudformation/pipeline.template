@@ -17,6 +17,12 @@ Parameters:
     BatchJobVersionSessionprocess2:
         Type: "String"
         Description: "The version of the sessionprocess2 batch job to run"
+    BatchJobVersionNoop:
+        Type: "String"
+        Description: "The version of the `noop` batch job to run"
+    BatchJobVersionScoring:
+        Type: "String"
+        Description: "The version of the `scoring` batch job to run"
 
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -28,11 +34,15 @@ Metadata:
             Parameters:
               - "BatchJobVersionDownloadandchunk"
               - "BatchJobVersionSessionprocess2"
+              - "BatchJobVersionNoop"
+              - "BatchJobVersionScoring"
 
         ParameterLabels:
             Environment: { default: "Environment" }
             BatchJobVersionDownloadandchunk: { default: "downloadandchunk" }
             BatchJobVersionSessionprocess2: { default: "sessionprocess2" }
+            BatchJobVersionNoop: { default: "noop" }
+            BatchJobVersionScoring: { default: "scoring" }
 
 Resources:
 
@@ -125,6 +135,36 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-sessionprocess2" }
+
+    LambdaPrepareScoring:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-noop:1"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-scoring:${BatchJobVersionScoring}"
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": { 'Filenames': event['DownloadAndChunkOutput'][1]['Output']['Filenames'] }
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-scoring" }
 
     ##########################################################################################################
     ##  STEP FUNCTIONS
@@ -224,6 +264,41 @@ Resources:
                                 }
                             ],
                             "ResultPath": "$.SessionProcess2Output",
+                            "Next": "BuildScoringContext"
+                        },
+                        "BuildScoringContext": {
+                            "Type": "Task",
+                            "Resource": "${LambdaPrepareScoring.Arn}",
+                            "ResultPath": "$.ScoringContext",
+                            "Next": "Scoring"
+                        },
+                        "Scoring": {
+                            "Type": "Parallel",
+                            "Branches": [
+                                {
+                                    "StartAt": "ScheduleScoring",
+                                    "States": {
+                                        "ScheduleScoring": {
+                                            "Type": "Task",
+                                            "InputPath": "$.ScoringContext",
+                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
+                                            "End": true
+                                        }
+                                    }
+                                },
+                                {
+                                    "StartAt": "RespondScoring",
+                                    "States": {
+                                        "RespondScoring": {
+                                            "Type": "Task",
+                                            "InputPath": "$.ScoringContext",
+                                            "Resource": "${StepFunctionsActivity}",
+                                            "End": true
+                                        }
+                                    }
+                                }
+                            ],
+                            "ResultPath": "$.ScoringOutput",
                             "End": true
                         }
                     }

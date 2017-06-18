@@ -76,12 +76,13 @@ Resources:
                     Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
                     Action: "sts:AssumeRole"
             Policies:
-              - PolicyName: "s3download"
+              - PolicyName: "default"
                 PolicyDocument:
                     Version: "2012-10-17"
                     Statement:
                       - Action:
                           - "s3:GetObject"
+                          - "s3:ListBucket"
                           - "states:SendTaskFailure"
                           - "states:SendTaskHeartbeat"
                           - "states:SendTaskSuccess"

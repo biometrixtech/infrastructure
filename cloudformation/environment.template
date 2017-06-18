@@ -66,6 +66,9 @@ Parameters:
     BatchJobVersionNoop:
         Type: "String"
         Description: "The version of the `noop` batch job to run"
+    BatchJobVersionScoring:
+        Type: "String"
+        Description: "The version of the `scoring` batch job to run"
 
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -84,6 +87,7 @@ Metadata:
               - "BatchJobVersionDownloadandchunk"
               - "BatchJobVersionSessionprocess2"
               - "BatchJobVersionNoop"
+              - "BatchJobVersionScoring"
 
         ParameterLabels:
             Environment: { default: "Environment" }
@@ -96,6 +100,7 @@ Metadata:
             BatchJobVersionDownloadandchunk: { default: "downloadandchunk" }
             BatchJobVersionSessionprocess2: { default: "sessionprocess2" }
             BatchJobVersionNoop: { default: "noop" }
+            BatchJobVersionScoring: { default: "scoring" }
 
 Conditions:
     CreateComputeCluster: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "ComputeTemplate" }, "" ] } ] }
@@ -138,6 +143,7 @@ Resources:
                 BatchJobVersionDownloadandchunk: { Ref: "BatchJobVersionDownloadandchunk" }
                 BatchJobVersionSessionprocess2: { Ref: "BatchJobVersionSessionprocess2" }
                 BatchJobVersionNoop: { Ref: "BatchJobVersionNoop" }
+                BatchJobVersionScoring: { Ref: "BatchJobVersionScoring" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline" } }
               - { Key: "Management", Value: "managed" }
