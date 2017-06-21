@@ -75,6 +75,10 @@ Resources:
                           - "logs:PutLogEvents"
                         Effect: "Allow"
                         Resource: "*"
+                      - Action:
+                          - "sns:Publish"
+                        Effect: "Allow"
+                        Resource: "*"
             RoleName: { "Fn::Sub": "preprocessing-${Environment}-lambda" }
 
     ##########################################################################################################
@@ -222,6 +226,37 @@ Resources:
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writedatabase" }
 
+    LambdaNotifySuccess:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        import boto3, os
+                        sns_client = boto3.client('sns')
+                        response = sns_client.publish(
+                            TopicArn=os.environ['SNS_TOPIC'],
+                            Message=event['SourceEvent'],
+                        )
+            Environment:
+                Variables:
+                    SNS_TOPIC: { Ref: "SnsSuccessTopic" }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-notifysuccess" }
+
+    ##########################################################################################################
+    ##  LAMBDA
+    ##########################################################################################################
+
+    SnsSuccessTopic:
+        Type: "AWS::SNS::Topic"
+        Properties:
+            DisplayName: "Heaps Drinks CodePipeline failure notification"
+            TopicName: { "Fn::Sub": "preprocessing-${Environment}-success" }
+
     ##########################################################################################################
     ##  STEP FUNCTIONS
     ##########################################################################################################
@@ -367,6 +402,11 @@ Resources:
                             "Type": "Task",
                             "Resource": "${LambdaWriteDatabaseValues.Arn}",
                             "ResultPath": "$.WriteDatabaseOutput",
+                            "Next": "Notify"
+                        },
+                        "Notify": {
+                            "Type": "Task",
+                            "Resource": "${LambdaNotifySuccess.Arn}",
                             "End": true
                         }
                     }
