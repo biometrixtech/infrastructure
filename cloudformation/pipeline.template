@@ -23,6 +23,9 @@ Parameters:
     BatchJobVersionScoring:
         Type: "String"
         Description: "The version of the `scoring` batch job to run"
+    BatchJobVersionDatabaseupload:
+        Type: "String"
+        Description: "The version of the `databaseupload` batch job to run"
 
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -36,6 +39,7 @@ Metadata:
               - "BatchJobVersionSessionprocess2"
               - "BatchJobVersionNoop"
               - "BatchJobVersionScoring"
+              - "BatchJobVersionDatabaseupload"
 
         ParameterLabels:
             Environment: { default: "Environment" }
@@ -43,6 +47,7 @@ Metadata:
             BatchJobVersionSessionprocess2: { default: "sessionprocess2" }
             BatchJobVersionNoop: { default: "noop" }
             BatchJobVersionScoring: { default: "scoring" }
+            BatchJobVersionDatabaseupload: { default: "databaseupload" }
 
 Resources:
 
