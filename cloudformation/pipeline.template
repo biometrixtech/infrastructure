@@ -116,6 +116,7 @@ Resources:
             Code:
                 ZipFile: !Sub |
                     def handler(event, context):
+                        user_id = event['DownloadAndChunkOutput'][1]['Output']['UserId']
                         # select weight from users where id=%s # gives value in lb
                         return {
                             "Meta": {
@@ -124,6 +125,7 @@ Resources:
                                 "Environment": "${Environment}"
                             },
                             "Data": {
+                                "UserId": user_id,
                                 "UserMass": 70
                             }
                         }
@@ -156,7 +158,10 @@ Resources:
                                 }
                                 for i in range(len(event['DownloadAndChunkOutput'][1]['Output']['Filenames']))
                             ],
-                            "Input": [ {'Filename': f} for f in event['DownloadAndChunkOutput'][1]['Output']['Filenames']]
+                            "Input": [
+                                {"Filename": f, "Data": event["ReadDatabaseOutput"]["Data"]}
+                                for f in event['DownloadAndChunkOutput'][1]['Output']['Filenames']
+                            ]
                         }
             Handler: "index.handler"
             Runtime: "python3.6"
@@ -186,7 +191,10 @@ Resources:
                                     "InputPath": "$"
                                 }
                             ],
-                            "Input": { 'Filenames': event['DownloadAndChunkOutput'][1]['Output']['Filenames'] }
+                            "Input": {
+                                "Filenames": event['DownloadAndChunkOutput'][1]['Output']['Filenames'],
+                                "Data": event["ReadDatabaseOutput"]["Data"]
+                            }
                         }
             Handler: "index.handler"
             Runtime: "python3.6"
@@ -194,7 +202,7 @@ Resources:
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-scoring" }
 
-    LambdaReadDatabaseValues:
+    LambdaWriteDatabaseValues:
         Type: "AWS::Lambda::Function"
         Properties:
             Code:
@@ -277,6 +285,12 @@ Resources:
                                 }
                             ],
                             "ResultPath": "$.DownloadAndChunkOutput",
+                            "Next": "ReadDatabase"
+                        },
+                        "ReadDatabase": {
+                            "Type": "Task",
+                            "Resource": "${LambdaReadDatabaseValues.Arn}",
+                            "ResultPath": "$.ReadDatabaseOutput",
                             "Next": "BuildSessionProcess2Context"
                         },
                         "BuildSessionProcess2Context": {
@@ -347,6 +361,12 @@ Resources:
                                 }
                             ],
                             "ResultPath": "$.ScoringOutput",
+                            "Next": "WriteDatabase"
+                        },
+                        "WriteDatabase": {
+                            "Type": "Task",
+                            "Resource": "${LambdaWriteDatabaseValues.Arn}",
+                            "ResultPath": "$.WriteDatabaseOutput",
                             "End": true
                         }
                     }
