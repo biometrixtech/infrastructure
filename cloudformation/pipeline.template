@@ -110,6 +110,29 @@ Resources:
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-downloadandchunk" }
 
+    LambdaReadDatabaseValues:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        # select weight from users where id=%s # gives value in lb
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "Environment": "${Environment}"
+                            },
+                            "Data": {
+                                "UserMass": 70
+                            }
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-readdatabase" }
+
     LambdaPrepareSessionProcess2:
         Type: "AWS::Lambda::Function"
         Properties:
@@ -170,6 +193,26 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-scoring" }
+
+    LambdaReadDatabaseValues:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        # quer_update_session_events = """update session_events set session_success=True, updated_at = now() where id = (%s)"""
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "Environment": "${Environment}"
+                            }
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writedatabase" }
 
     ##########################################################################################################
     ##  STEP FUNCTIONS
