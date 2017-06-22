@@ -76,7 +76,7 @@
             name: '{{item}}'
             state: latest
         with_items:
-          - 'awscli'
+          - 'jq'
           - 'python-pip'
 
       - name: 'Install aws-mfa tool'
@@ -85,6 +85,7 @@
             state: latest
         with_items:
           - 'aws-mfa'
+          - 'aws-cli'
 
     ##########################################################################################################
     ## DOCKER
