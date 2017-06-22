@@ -15,9 +15,6 @@ def get_boto3_resource(resource):
     return boto3.resource(
         resource,
         region_name=aws_region,
-        # aws_access_key_id=session_token.access_key_id,
-        # aws_secret_access_key=session_token.secret_access_key,
-        # aws_session_token=session_token.session_token
     )
 
 
@@ -26,7 +23,7 @@ def upload_cf_stack(template):
     s3_resource = get_boto3_resource('s3')
     data = open(template, 'rb')
     s3_path = template_s3_path + os.path.basename(template)
-    s3_resource.Bucket(template_s3_bucket).put_object(Key=s3_path, Body=data)
+    s3_resource.Bucket(template_s3_bucket + '-' + aws_region).put_object(Key=s3_path, Body=data)
     return s3_path
 
 
@@ -38,7 +35,7 @@ def update_cf_stack(stack_name, uploaded_path):
     stack.update(
         TemplateURL='https://s3.amazonaws.com/{bucket}/{template}'.format(
             region=aws_region,
-            bucket=template_s3_bucket,
+            bucket=template_s3_bucket + '-' + aws_region,
             template=uploaded_path,
         ),
         Parameters=[{'ParameterKey': p['ParameterKey'], 'UsePreviousValue': True} for p in stack.parameters or {}],

@@ -14,7 +14,7 @@ Resources:
     S3Bucket:
         Type: "AWS::S3::Bucket"
         Properties:
-            BucketName: { "Fn::Sub": "biometrix-preprocessing-infrastructure" }
+            BucketName: { "Fn::Sub": "biometrix-preprocessing-infrastructure-${AWS::Region}" }
             Tags:
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "preprocessing" }

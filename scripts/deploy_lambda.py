@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Zip and upload a Lambda bundle
-import zipfile
+import shutil
 
 import boto3
 import argparse
@@ -22,16 +22,14 @@ def upload_bundle(bundle, bucket):
     print('Uploading bundle')
     s3_resource = get_boto3_resource('s3')
     data = open(bundle, 'rb')
-    s3_resource.Bucket(bucket).put_object(Key=template_s3_path + os.path.basename(bundle), Body=data)
+    s3_resource.Bucket(bucket + '-' + aws_region).put_object(Key=template_s3_path + os.path.basename(bundle), Body=data)
 
 
 def zip_bundle(filename):
     print('Zipping bundle')
-    zip_filename = filename.replace('.py', '.zip')
-    zipf = zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED)
-    zipf.write(filename)
-    zipf.close()
-    return zip_filename
+    output_filename = filename.replace('.py', '')
+    shutil.make_archive(output_filename, 'zip', filename)
+    return output_filename + '.zip'
 
 
 if __name__ == '__main__':
