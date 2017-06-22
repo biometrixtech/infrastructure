@@ -64,8 +64,10 @@ Resources:
                   - Effect: "Allow"
                     Principal: { Service: [ "lambda.amazonaws.com" ] }
                     Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
             Policies:
-              - PolicyName: "logs"
+              - PolicyName: "default"
                 PolicyDocument:
                     Version: "2012-10-17"
                     Statement:
@@ -75,10 +77,20 @@ Resources:
                           - "logs:PutLogEvents"
                         Effect: "Allow"
                         Resource: "*"
+
                       - Action:
                           - "sns:Publish"
                         Effect: "Allow"
                         Resource: "*"
+
+                      - Action:
+                          - "ssm:DescribeParameters"
+                          - "ssm:GetParameters"
+                          - "kms:Decrypt"
+                          - "lambda:InvokeFunction"
+                        Effect: "Allow"
+                        Resource:
+                          - "*" # TODO this should be segregated by environment somehow
             RoleName: { "Fn::Sub": "preprocessing-${Environment}-lambda" }
 
     ##########################################################################################################
@@ -114,30 +126,27 @@ Resources:
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-downloadandchunk" }
 
-    LambdaReadDatabaseValues:
+    LambdaReadPostgres:
         Type: "AWS::Lambda::Function"
         Properties:
             Code:
                 ZipFile: !Sub |
+                    import boto3, json
                     def handler(event, context):
-                        user_id = event['DownloadAndChunkOutput'][1]['Output']['UserId']
-                        # select weight from users where id=%s # gives value in lb
-                        return {
-                            "Meta": {
-                                "ActivityArn": "${StepFunctionsActivity}",
-                                "ExecutionArn": event['Meta']['ExecutionArn'],
-                                "Environment": "${Environment}"
-                            },
-                            "Data": {
-                                "UserId": user_id,
-                                "UserMass": 70
-                            }
-                        }
+                        lambda_client = boto3.client('lambda', region_name='us-west-2')
+                        res = json.loads(lambda_client.invoke(
+                            FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
+                            Payload=json.dumps({"Queries": [{
+                                "Query": "SELECT weight FROM users WHERE id=%s",
+                                "Parameters": [event['DownloadAndChunkOutput'][1]['Output']['UserId']]
+                            }]}),
+                        )['Payload'].read())['Results'][0][0]
+                        return {"UserMass": res['weight']}
             Handler: "index.handler"
             Runtime: "python3.6"
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
-            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-readdatabase" }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-readpostgres" }
 
     LambdaPrepareSessionProcess2:
         Type: "AWS::Lambda::Function"
@@ -163,7 +172,7 @@ Resources:
                                 for i in range(len(event['DownloadAndChunkOutput'][1]['Output']['Filenames']))
                             ],
                             "Input": [
-                                {"Filename": f, "Data": event["ReadDatabaseOutput"]["Data"]}
+                                event["ReadDatabaseOutput"]["Data"]
                                 for f in event['DownloadAndChunkOutput'][1]['Output']['Filenames']
                             ]
                         }
@@ -206,25 +215,27 @@ Resources:
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-scoring" }
 
-    LambdaWriteDatabaseValues:
+    LambdaWritePostgres:
         Type: "AWS::Lambda::Function"
         Properties:
             Code:
                 ZipFile: !Sub |
+                    import boto3, json
                     def handler(event, context):
-                        # quer_update_session_events = """update session_events set session_success=True, updated_at = now() where id = (%s)"""
-                        return {
-                            "Meta": {
-                                "ActivityArn": "${StepFunctionsActivity}",
-                                "ExecutionArn": event['Meta']['ExecutionArn'],
-                                "Environment": "${Environment}"
-                            }
-                        }
+                        lambda_client = boto3.client('lambda', region_name='us-west-2')
+                        res = json.loads(lambda_client.invoke(
+                            FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
+                            Payload=json.dumps({"Queries": [{
+                                "Query": "UPDATE session_events SET session_success=True, updated_at = now() WHERE id = %s",
+                                "Parameters": [event['DownloadAndChunkOutput'][1]['Output']['SessionEventId']]
+                            }]}),
+                        )['Payload'].read())['Results'][0][0]
+                        return {}
             Handler: "index.handler"
             Runtime: "python3.6"
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
-            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writedatabase" }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writepostgres" }
 
     LambdaNotifySuccess:
         Type: "AWS::Lambda::Function"
@@ -324,7 +335,7 @@ Resources:
                         },
                         "ReadDatabase": {
                             "Type": "Task",
-                            "Resource": "${LambdaReadDatabaseValues.Arn}",
+                            "Resource": "${LambdaReadPostgres.Arn}",
                             "ResultPath": "$.ReadDatabaseOutput",
                             "Next": "BuildSessionProcess2Context"
                         },
@@ -396,12 +407,23 @@ Resources:
                                 }
                             ],
                             "ResultPath": "$.ScoringOutput",
-                            "Next": "WriteDatabase"
+                            "Next": "Upload"
                         },
-                        "WriteDatabase": {
-                            "Type": "Task",
-                            "Resource": "${LambdaWriteDatabaseValues.Arn}",
-                            "ResultPath": "$.WriteDatabaseOutput",
+                        "Upload": {
+                            "Type": "Parallel",
+                            "Branches": [
+                                {
+                                    "StartAt": "WritePostgres",
+                                    "States": {
+                                        "WritePostgres": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaWritePostgres.Arn}",
+                                            "ResultPath": "$.WriteDatabaseOutput",
+                                            "End": true
+                                        }
+                                    }
+                                }
+                            ],
                             "Next": "Notify"
                         },
                         "Notify": {
