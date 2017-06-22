@@ -172,7 +172,7 @@ Resources:
                                 for i in range(len(event['DownloadAndChunkOutput'][1]['Output']['Filenames']))
                             ],
                             "Input": [
-                                event["ReadDatabaseOutput"]["Data"]
+                                {**event["ReadDatabaseOutput"], **{"Filename": f}}
                                 for f in event['DownloadAndChunkOutput'][1]['Output']['Filenames']
                             ]
                         }
@@ -205,8 +205,8 @@ Resources:
                                 }
                             ],
                             "Input": {
-                                "Filenames": event['DownloadAndChunkOutput'][1]['Output']['Filenames'],
-                                "Data": event["ReadDatabaseOutput"]["Data"]
+                                **event["ReadDatabaseOutput"],
+                                **{"Filenames": event['DownloadAndChunkOutput'][1]['Output']['Filenames']}
                             }
                         }
             Handler: "index.handler"
@@ -236,6 +236,38 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writepostgres" }
+
+    LambdaPrepareWriteMongo:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "Environment": "${Environment}",
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-writemongo:${BatchJobVersionDatabaseupload}"
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": {
+                                "Filename": event['ScoringOutput'][1]['Output']['Filename'],
+                                "Data": event["ReadDatabaseOutput"]["Data"]
+                            }
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-writemongo" }
 
     LambdaNotifySuccess:
         Type: "AWS::Lambda::Function"
@@ -419,6 +451,46 @@ Resources:
                                             "Type": "Task",
                                             "Resource": "${LambdaWritePostgres.Arn}",
                                             "ResultPath": "$.WriteDatabaseOutput",
+                                            "End": true
+                                        }
+                                    }
+                                },
+                                {
+                                    "StartAt": "BuildWriteMongoContext",
+                                    "States": {
+                                        "BuildWriteMongoContext": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaPrepareWriteMongo.Arn}",
+                                            "ResultPath": "$.WriteMongoContext",
+                                            "Next": "WriteMongo"
+                                        },
+                                        "WriteMongo": {
+                                            "Type": "Parallel",
+                                            "Branches": [
+                                                {
+                                                    "StartAt": "ScheduleWriteMongo",
+                                                    "States": {
+                                                        "ScheduleWriteMongo": {
+                                                            "Type": "Task",
+                                                            "InputPath": "$.WriteMongoContext",
+                                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
+                                                            "End": true
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    "StartAt": "RespondWriteMongo",
+                                                    "States": {
+                                                        "RespondWriteMongo": {
+                                                            "Type": "Task",
+                                                            "InputPath": "$.WriteMongoContext",
+                                                            "Resource": "${StepFunctionsActivity}",
+                                                            "End": true
+                                                        }
+                                                    }
+                                                }
+                                            ],
+                                            "ResultPath": "$.WriteMongoOutput",
                                             "End": true
                                         }
                                     }
