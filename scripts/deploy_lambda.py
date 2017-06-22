@@ -14,15 +14,15 @@ template_s3_path = 'lambdas/'
 def get_boto3_resource(resource):
     return boto3.resource(
         resource,
-        region_name=aws_region,
+        region_name=args.region,
     )
 
 
-def upload_bundle(bundle, bucket):
+def upload_bundle(bundle):
     print('Uploading bundle')
     s3_resource = get_boto3_resource('s3')
     data = open(bundle, 'rb')
-    s3_resource.Bucket(bucket + '-' + aws_region).put_object(Key=template_s3_path + os.path.basename(bundle), Body=data)
+    s3_resource.Bucket(args.bucket + '-' + args.region).put_object(Key=template_s3_path + os.path.basename(bundle), Body=data)
 
 
 def zip_bundle(filename):
@@ -41,9 +41,13 @@ if __name__ == '__main__':
                         type=str,
                         default=template_s3_bucket,
                         help='S3 Bucket')
+    parser.add_argument('--region', '-r',
+                        type=str,
+                        default=aws_region,
+                        help='AWS Region')
 
     args = parser.parse_args()
 
     zip_filename = zip_bundle(args.bundle)
-    upload_bundle(zip_filename, bucket=args.bucket)
+    upload_bundle(zip_filename)
 

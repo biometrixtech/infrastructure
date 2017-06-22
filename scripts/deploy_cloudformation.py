@@ -14,7 +14,7 @@ template_s3_path = 'cloudformation/'
 def get_boto3_resource(resource):
     return boto3.resource(
         resource,
-        region_name=aws_region,
+        region_name=args.region,
     )
 
 
@@ -34,8 +34,8 @@ def update_cf_stack(stack_name, uploaded_path):
 
     stack.update(
         TemplateURL='https://s3.amazonaws.com/{bucket}/{template}'.format(
-            region=aws_region,
-            bucket=template_s3_bucket + '-' + aws_region,
+            region=args.region,
+            bucket=template_s3_bucket + '-' + args.region,
             template=uploaded_path,
         ),
         Parameters=[{'ParameterKey': p['ParameterKey'], 'UsePreviousValue': True} for p in stack.parameters or {}],
@@ -53,10 +53,10 @@ if __name__ == '__main__':
                         nargs='?',
                         default='',
                         help='the name of a CF stack')
-    # parser.add_argument('--mfatoken', '-t',
-    #                     type=str,
-    #                     default='',
-    #                     help='MFA token value')
+    parser.add_argument('--region', '-r',
+                        type=str,
+                        default=aws_region,
+                        help='AWS Region')
 
     args = parser.parse_args()
 
