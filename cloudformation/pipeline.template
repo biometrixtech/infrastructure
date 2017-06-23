@@ -259,8 +259,8 @@ Resources:
                                 }
                             ],
                             "Input": {
-                                "Filename": event['ScoringOutput'][1]['Output']['Filename'],
-                                "Data": event["ReadDatabaseOutput"]["Data"]
+                                **event["ReadDatabaseOutput"],
+                                **{"Filename": event['ScoringOutput'][1]['Output']['Filename']}
                             }
                         }
             Handler: "index.handler"
@@ -279,7 +279,7 @@ Resources:
                         sns_client = boto3.client('sns')
                         response = sns_client.publish(
                             TopicArn=os.environ['SNS_TOPIC'],
-                            Message=event['SourceEvent'],
+                            Message=event['SourceEvent']['S3Path'],
                         )
             Environment:
                 Variables:
@@ -297,7 +297,7 @@ Resources:
     SnsSuccessTopic:
         Type: "AWS::SNS::Topic"
         Properties:
-            DisplayName: "Heaps Drinks CodePipeline failure notification"
+            DisplayName: "Biometrix preprocessing success notification"
             TopicName: { "Fn::Sub": "preprocessing-${Environment}-success" }
 
     ##########################################################################################################
