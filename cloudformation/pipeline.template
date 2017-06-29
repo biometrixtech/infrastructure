@@ -137,11 +137,35 @@ Resources:
                         res = json.loads(lambda_client.invoke(
                             FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
                             Payload=json.dumps({"Queries": [{
-                                "Query": "SELECT weight FROM users WHERE id=%s",
-                                "Parameters": [event['DownloadAndChunkOutput'][1]['Output']['UserId']]
+                                "Query": """SELECT
+                                      session_events.id AS session_event_id,
+                                      session_events.training_session_log_id,
+                                      session_events.hip_n_transform,
+                                      training_session_logs.training_group_id,
+                                      session_events.user_id,
+                                      users.weight,
+                                      training_groups.team_id,
+                                      session_events.session_type
+                                    FROM session_events
+                                    LEFT JOIN training_session_logs ON session_events.training_session_log_id=training_session_logs.id
+                                    LEFT JOIN users ON session_events.user_id=users.id
+                                    LEFT JOIN training_groups ON training_session_logs.training_group_id=training_groups.id
+                                    WHERE session_events.sensor_data_filename = %s""",
+                                "Parameters": [event['SourceEvent']['S3Path']]
                             }]}),
-                        )['Payload'].read())['Results'][0][0]
-                        return {"UserMass": res['weight']}
+                        )['Payload'].read())['Results']
+                        query_results = res[0][0] if len(res[0]) else {}
+                        return {
+                            "SessionEventId": query_results.get('session_event_id', None),
+                            "TrainingSessionLogId": query_results.get('training_session_log_id', None),
+                            "HipNTransform": query_results.get('hip_n_transform', None),
+                            "TrainingGroupId": query_results.get('training_group_id', None),
+                            "UserId": query_results.get('user_id', None),
+                            "UserWeight": query_results.get('weight', None),
+                            "TeamId": query_results.get('team_id', None),
+                            "SessionType": query_results.get('session_type', None),
+                        }
+
             Handler: "index.handler"
             Runtime: "python3.6"
             Timeout: "30"
@@ -227,10 +251,13 @@ Resources:
                             FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
                             Payload=json.dumps({"Queries": [{
                                 "Query": "UPDATE session_events SET session_success=True, updated_at = now() WHERE id = %s",
-                                "Parameters": [event['DownloadAndChunkOutput'][1]['Output']['SessionEventId']]
+                                "Parameters": [event['ReadDatabaseOutput']['SessionEventId']]
                             }]}),
-                        )['Payload'].read())['Results'][0][0]
+                        )['Payload'].read())
+                        if res['Errors'][0] is not None:
+                            raise Exception(res['Errors'][0])
                         return {}
+
             Handler: "index.handler"
             Runtime: "python3.6"
             Timeout: "30"
