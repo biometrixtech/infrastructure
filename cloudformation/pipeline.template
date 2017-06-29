@@ -342,22 +342,8 @@ Resources:
         Properties:
             DefinitionString: !Sub |
                 {
-                    "StartAt": "FakeInput",
+                    "StartAt": "BuildDownloadAndChunkContext",
                     "States": {
-                        "FakeInput": {
-                            "Type": "Pass",
-                            "Result": {
-                                "Meta": {
-                                    "ExecutionArn": "abc123"
-                                },
-                                "SourceEvent": {
-                                    "S3Bucket": "biometrix-sessioncontainer2",
-                                    "S3Path": "015474d1-cbe4-4010-b1d3-b08bb6f6ed08"
-                                }
-                            },
-                            "ResultPath": "$",
-                            "Next": "BuildDownloadAndChunkContext"
-                        },
                         "BuildDownloadAndChunkContext": {
                             "Type": "Task",
                             "Resource": "${LambdaPrepareDownloadAndChunk.Arn}",
