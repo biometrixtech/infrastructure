@@ -80,6 +80,8 @@ Resources:
 
                       - Action:
                           - "sns:Publish"
+                          - "lambda:InvokeFunction"
+                          - "states:StartExecution"
                         Effect: "Allow"
                         Resource: "*"
 
@@ -87,7 +89,6 @@ Resources:
                           - "ssm:DescribeParameters"
                           - "ssm:GetParameters"
                           - "kms:Decrypt"
-                          - "lambda:InvokeFunction"
                         Effect: "Allow"
                         Resource:
                           - "*" # TODO this should be segregated by environment somehow
@@ -523,6 +524,7 @@ Resources:
                                     }
                                 }
                             ],
+                            "ResultPath": "$.UploadOutput",
                             "Next": "Notify"
                         },
                         "Notify": {
