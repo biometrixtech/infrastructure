@@ -167,10 +167,10 @@ Resources:
                                         \"command\": [ \"$JOB_NAME\", \"Ref::Input\", \"Ref::Meta\" ],
                                         \"image\": \"$IMAGE_NAME\",
                                         \"jobRoleArn\": \"$JOB_ROLE_ARN\",
-                                        \"memory\": 128,
+                                        \"memory\": $DEFAULT_MEMORY,
                                         \"privileged\": true,
                                         \"readonlyRootFilesystem\": false,
-                                        \"vcpus\": 1
+                                        \"vcpus\": $DEFAULT_CPU
                                     },
                                     \"retryStrategy\": {
                                         \"attempts\": 2
