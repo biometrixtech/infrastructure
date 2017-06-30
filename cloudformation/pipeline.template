@@ -134,30 +134,37 @@ Resources:
             Code:
                 ZipFile: !Sub |
                     import boto3, json
-                    def handler(event, context):
-                        lambda_client = boto3.client('lambda', region_name='us-west-2')
+                    lambda_client = boto3.client('lambda', region_name='us-west-2')
+                    def invoke(query, parameters):
                         res = json.loads(lambda_client.invoke(
                             FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
-                            Payload=json.dumps({"Queries": [{
-                                "Query": """SELECT
-                                      session_events.id AS session_event_id,
-                                      session_events.training_session_log_id,
-                                      session_events.hip_n_transform,
-                                      training_session_logs.training_group_id,
-                                      session_events.user_id,
-                                      users.weight,
-                                      training_groups.team_id,
-                                      session_events.session_type
-                                    FROM session_events
-                                    LEFT JOIN training_session_logs ON session_events.training_session_log_id=training_session_logs.id
-                                    LEFT JOIN users ON session_events.user_id=users.id
-                                    LEFT JOIN training_groups ON training_session_logs.training_group_id=training_groups.id
-                                    WHERE session_events.sensor_data_filename = %s""",
-                                "Parameters": [event['SourceEvent']['S3Path']]
-                            }]}),
-                        )['Payload'].read())['Results']
-                        query_results = res[0][0] if len(res[0]) else {}
-                        return {
+                            Payload=json.dumps({"Queries": [{"Query": query, "Parameters": parameters}]}),
+                        )['Payload'].read())
+                        result, error = res['Results'][0], res['Errors'][0]
+                        if error is not None:
+                            raise Exception(error)
+                        else:
+                            return result[0] if len(result) else {}
+
+                    def handler(event, context):
+                        query_results = query(
+                            """SELECT
+                              session_events.id AS session_event_id,
+                              session_events.training_session_log_id,
+                              session_events.hip_n_transform,
+                              training_session_logs.training_group_id,
+                              session_events.user_id,
+                              users.weight,
+                              training_groups.team_id,
+                              session_events.session_type
+                            FROM session_events
+                            LEFT JOIN training_session_logs ON session_events.training_session_log_id=training_session_logs.id
+                            LEFT JOIN users ON session_events.user_id=users.id
+                            LEFT JOIN training_groups ON training_session_logs.training_group_id=training_groups.id
+                            WHERE session_events.sensor_data_filename = %s""",
+                            [event['SourceEvent']['S3Path']]
+                        )
+                        ret = {
                             "SessionEventId": query_results.get('session_event_id', None),
                             "TrainingSessionLogId": query_results.get('training_session_log_id', None),
                             "HipNTransform": query_results.get('hip_n_transform', None),
@@ -167,6 +174,16 @@ Resources:
                             "TeamId": query_results.get('team_id', None),
                             "SessionType": query_results.get('session_type', None),
                         }
+                        res = json.loads(lambda_client.invoke(
+                            FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
+                            Payload=json.dumps({"Queries": [{
+                                "Query": "select * from fn_get_sensor_data_filename_hist((%s))",
+                                "Parameters": [res['UserId']]
+                            }]}),
+                        )['Payload'].read())['Results']
+                        query_results = res[0][0] if len(res[0]) else {}
+                        res["HistoricalFiles"] = query_results
+                        return res
 
             Handler: "index.handler"
             Runtime: "python3.6"
