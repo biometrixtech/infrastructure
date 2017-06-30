@@ -114,7 +114,8 @@ Resources:
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-downloadandchunk:${BatchJobVersionDownloadandchunk}"
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDownloadandchunk}",
+                                        "BatchJob": "downloadandchunk"
                                     },
                                     "InputPath": "$"
                                 }
@@ -184,13 +185,14 @@ Resources:
                                 "ActivityArn": "${StepFunctionsActivity}",
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-noop:1"
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-sessionprocess2:${BatchJobVersionSessionprocess2}"
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionSessionprocess2}",
+                                        "BatchJob": "sessionprocess2"
                                     },
                                     "InputPath": "$[{}]".format(i)
                                 }
@@ -218,13 +220,14 @@ Resources:
                                 "ActivityArn": "${StepFunctionsActivity}",
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-noop:1"
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-scoring:${BatchJobVersionScoring}"
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJob": "scoring"
                                     },
                                     "InputPath": "$"
                                 }
@@ -281,7 +284,8 @@ Resources:
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob-writemongo:${BatchJobVersionDatabaseupload}"
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDatabaseupload}",
+                                        "BatchJob": "writemongo"
                                     },
                                     "InputPath": "$"
                                 }

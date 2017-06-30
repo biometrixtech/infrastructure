@@ -7,10 +7,6 @@ Description: "Creates a Code Pipeline to create a Job Definition with a new Dock
 
 Parameters:
 
-    JobName:
-        Type: "String"
-        Description: "The name of the job"
-
     GithubUser:
         Type: "String"
         Description: "Use an automation user rather than a personal user"
@@ -34,14 +30,10 @@ Metadata:
             Parameters:
               - "GithubUser"
               - "GithubToken"
-          - Label: { default: "Configuration" }
-            Parameters:
-              - "JobName"
 
         ParameterLabels:
             GithubUser: { default: "Username" }
             GithubToken: { default: "Access Token" }
-            JobName: { default: "Job Name" }
 
 Mappings:
     ServiceConfiguration:
@@ -60,7 +52,7 @@ Resources:
     EcrRepository:
         Type: "AWS::ECR::Repository"
         Properties:
-            RepositoryName: { "Fn::Sub": "preprocessing/${JobName}" }
+            RepositoryName: { "Fn::Sub": "preprocessing/batchjob" }
 
     ##########################################################################################################
     ##  IAM
@@ -94,7 +86,7 @@ Resources:
                           - "kms:Decrypt"
                         Effect: "Allow"
                         Resource: "*" # TODO this should be segregated by environment somehow
-            RoleName: { "Fn::Sub": "preprocessing-batchjob-${JobName}" }
+            RoleName: { "Fn::Sub": "preprocessing-batchjob" }
 
     ##########################################################################################################
     ##  CODEBUILD
@@ -103,8 +95,8 @@ Resources:
     CodeBuildProject:
         Type: "AWS::CodeBuild::Project"
         Properties:
-            Name: { "Fn::Sub": 'preprocessing-codebuild-${JobName}' }
-            Description: { "Fn::Sub": 'Builds a new Docker image for the ${JobName} service and registers it to ECR' }
+            Name: { "Fn::Sub": 'preprocessing-batchjob' }
+            Description: { "Fn::Sub": 'Builds a new Docker image for the Batch services and registers it to ECR' }
             ServiceRole: { "Fn::ImportValue": "CodeBuildServiceRole" }
             Artifacts:
                 Type: "no_artifacts"
@@ -116,13 +108,12 @@ Resources:
                   - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
                   - { Name: "ECR_REGISTRY", Value: { "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com" } }
                   - { Name: "ECR_REPOSITORY", Value: { Ref: "EcrRepository" } }
-                  - { Name: "JOB_NAME", Value: { Ref: "JobName" } }
                   - { Name: "JOB_ROLE_ARN", Value: { "Fn::GetAtt": [ "JobRole", "Arn" ] } }
                   - { Name: "DEFAULT_CPU", Value: { Ref : "DefaultVcpus" } }
                   - { Name: "DEFAULT_MEMORY", Value: { Ref : "DefaultMemory" } }
             TimeoutInMinutes: 30
             Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-codebuild-${JobName}" } }
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-batchjob" } }
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: "infra" }
@@ -158,13 +149,13 @@ Resources:
                               - docker push $IMAGE_NAME
 
                                 # Create the job definition skeleton
-                              - JOB_DEFINITION_NAME=preprocessing-batchjob-$JOB_NAME
+                              - JOB_DEFINITION_NAME=preprocessing-batchjob
                               - 'echo "{
                                     \"jobDefinitionName\": \"$JOB_DEFINITION_NAME\",
                                     \"type\": \"container\",
                                     \"parameters\": { \"Meta\": \"{}\", \"Input\": \"{}\" },
                                     \"containerProperties\": {
-                                        \"command\": [ \"$JOB_NAME\", \"Ref::Input\", \"Ref::Meta\" ],
+                                        \"command\": [ \"Ref::Job\", \"Ref::Input\", \"Ref::Meta\" ],
                                         \"image\": \"$IMAGE_NAME\",
                                         \"jobRoleArn\": \"$JOB_ROLE_ARN\",
                                         \"memory\": $DEFAULT_MEMORY,
