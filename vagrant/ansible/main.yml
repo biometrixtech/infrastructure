@@ -85,7 +85,18 @@
             state: latest
         with_items:
           - 'aws-mfa'
-          - 'aws-cli'
+          - 'awscli'
+
+      - name: 'Install AWS config files'
+        copy:
+            src: '{{item}}'
+            dest: '/root/aws/{{item}}'
+            owner: 'root'
+            group: 'root'
+            mode: '0600'
+        with_items:
+          - "{{infrastructure_directory}}/vagrant/ansible/files/aws/config"
+          - "{{infrastructure_directory}}/vagrant/ansible/files/aws/credentials"
 
     ##########################################################################################################
     ## DOCKER
