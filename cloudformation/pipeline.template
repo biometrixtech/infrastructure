@@ -171,7 +171,7 @@ Resources:
                 ZipFile: !Sub |
                     import boto3, json
                     lambda_client = boto3.client('lambda', region_name='us-west-2')
-                    def invoke(query, parameters):
+                    def query(query, parameters):
                         res = json.loads(lambda_client.invoke(
                             FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
                             Payload=json.dumps({"Queries": [{"Query": query, "Parameters": parameters}]}),
@@ -210,16 +210,12 @@ Resources:
                             "TeamId": query_results.get('team_id', None),
                             "SessionType": query_results.get('session_type', None),
                         }
-                        res = json.loads(lambda_client.invoke(
-                            FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
-                            Payload=json.dumps({"Queries": [{
-                                "Query": "select * from fn_get_sensor_data_filename_hist((%s))",
-                                "Parameters": [res['UserId']]
-                            }]}),
-                        )['Payload'].read())['Results']
-                        query_results = res[0][0] if len(res[0]) else {}
-                        res["HistoricalFiles"] = query_results
-                        return res
+                        query_result = query(
+                            "SELECT * FROM fn_get_sensor_data_filename_hist((%s))",
+                            [ret['UserId']]
+                        )
+                        ret["HistoricalFiles"] = query_result
+                        return ret
 
             Handler: "index.handler"
             Runtime: "python3.6"
