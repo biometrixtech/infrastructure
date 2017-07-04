@@ -37,3 +37,36 @@ getconfig db_host
 
 TODO
 
+## Installing a new model file
+
+```shell    
+cat <<EOF > install-globalmodels.json
+{
+    "jobDefinitionName": "install-globalmodels",
+    "type": "container",
+    "containerProperties": {
+        "image": "faisyl/alpine-nfs",
+        "vcpus": 1,
+        "memory": 128,
+        "jobRoleArn": "arn:aws:iam::887689817172:role/preprocessing-batchjob-us-west-2",
+        "command": [
+            "/bin/sh", "-c", 
+            " \
+                mkdir /net /net/efs ; \
+                mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=10,retrans=2 efs.internal:/ /net/efs 2>&1 ; \
+                apk -v --update add python py-pip && pip install awscli ; \
+                aws s3 cp s3://biometrix-globalmodels/dev/grf_model_v2_0.h5 /net/efs/globalmodels/grf_model_v2_0.h5 ; \
+                aws s3 cp s3://biometrix-globalmodels/dev/scaler_model_v2_0.pkl /net/efs/globalscalers/scaler_model_v2_0.pkl ; \
+            "
+        ],
+        "readonlyRootFilesystem": false,
+        "privileged": true
+    }
+}
+EOF
+aws batch register-job-definition --cli-input-json file://install-globalmodels.json
+aws batch submit-job \
+    --job-name install-globalmodels \
+    --job-queue preprocessing-dev-compute \
+    --job-definition arn:aws:batch:us-west-2:887689817172:job-definition/install-globalmodels:4
+```

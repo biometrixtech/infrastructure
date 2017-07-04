@@ -76,37 +76,46 @@ aws cloudformation create-stack \
 ```
 
 The Elastic File System in the environment needs to be initialised with a directory structure.  This can be
-achieved by registering a Batch Job as follows:
+achieved by registering a Batch Job and then running it on the compute cluster:
 
-```shell
-# TODO test this
-aws batch register-job-definition \
-    --job-definition-name initialise-efs \
-    --type container \
-    --container-properties '{ \
-        "image": "python:2.7", \
-        "vcpus": 1, \
-        "memory": 128, \
-        "command": [ \
-            "/bin/bash", "-c", \
+```shell    
+cat <<EOF > initialise-efs.json
+{
+    "jobDefinitionName": "initialise-efs",
+    "type": "container",
+    "containerProperties": {
+        "image": "faisyl/alpine-nfs",
+        "vcpus": 1,
+        "memory": 128,
+        "command": [
+            "/bin/sh", "-c", 
             " \
-                apt-get update && apt-get install -y nfs-common ; \
+                mkdir /net /net/efs ; \
                 mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=10,retrans=2 efs.internal:/ /net/efs 2>&1 ; \
                 mkdir \
                     /net/efs/downloadandchunk \
-                    /net/efs/downloadandchunk\output \
+                    /net/efs/downloadandchunk/output \
                     /net/efs/sessionprocess2 \
-                    /net/efs/sessionprocess2\output \
+                    /net/efs/sessionprocess2/output \
                     /net/efs/scoring \
-                    /net/efs/scoring\output \
+                    /net/efs/scoring/output \
                     /net/efs/writemongo \
+                    /net/efs/globalmodels \
+                    /net/efs/globalscalers \
                 ; \
                 ln -s ../downloadandchunk/output /net/efs/sessionprocess2/input ; \
                 ln -s ../sessionprocess2/output /net/efs/scoring/input ; \
                 ln -s ../scoring/output /net/efs/writemongo/input ; \
-            " \
-        ] \
-    }'
+            "
+        ],
+        "readonlyRootFilesystem": false,
+        "privileged": true
+    }
+}
+EOF
+aws batch register-job-definition --cli-input-json file://initialise-efs.json
+aws batch submit-job \
+    --job-name initialise-efs \
+    --job-queue preprocessing-dev-compute \
+    --job-definition arn:aws:batch:us-west-2:887689817172:job-definition/initialise-efs:1
 ```
-
-and then running the job on the compute cluster.
