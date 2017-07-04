@@ -89,6 +89,8 @@ Resources:
                           - "ssm:DescribeParameters"
                           - "ssm:GetParameters"
                           - "kms:Decrypt"
+                          - "lambda:InvokeFunction"
+                          - "states:StartExecution"
                         Effect: "Allow"
                         Resource:
                           - "*" # TODO this should be segregated by environment somehow
@@ -97,6 +99,40 @@ Resources:
     ##########################################################################################################
     ##  LAMBDA
     ##########################################################################################################
+
+    LambdaTrigger:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    import boto3, json, time
+                    def handler(event, context):
+                        print(event)
+                        s3_object = event['Records'][0]['s3']
+                        s3_bucket = s3_object['bucket']['name']
+                        s3_key = s3_object['object']['key'].split('/')[-1]
+                        execution_name = '{}-{}-{}-{}'.format(s3_bucket, 'dev', s3_key, int(time.time()))
+                        sfn_client = boto3.client('stepfunctions')
+                        res = sfn_client.start_execution(
+                            stateMachineArn="${StateMachine}",
+                            name=execution_name,
+                            input=json.dumps({
+                                "Meta": {
+                                    "ExecutionArn": "arn:aws:states:${AWS::Region}:887689817172:execution:${StateMachine.Name}:{}".format(execution_name)
+                                },
+                                "SourceEvent": {
+                                    "S3Bucket": s3_bucket,
+                                    "S3Path": s3_key,
+                                }
+                            })
+                        )
+
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-trigger" }
+
 
     LambdaPrepareDownloadAndChunk:
         Type: "AWS::Lambda::Function"
