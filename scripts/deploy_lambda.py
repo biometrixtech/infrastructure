@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # Zip and upload a Lambda bundle
 import shutil
+import zipfile
 
 import boto3
 import argparse
 import os
 
-aws_region = 'us-east-1'
 template_s3_bucket = 'biometrix-preprocessing-infrastructure'
 template_s3_path = 'lambdas/'
 
@@ -27,8 +27,13 @@ def upload_bundle(bundle):
 
 def zip_bundle(filename):
     print('Zipping bundle')
-    output_filename = filename.replace('.py', '')
-    shutil.make_archive(output_filename, 'zip', filename)
+    if filename[-3:] == '.py':
+        # Zipping one file
+        output_filename = filename.replace('.py', '')
+        zipfile.ZipFile(output_filename + '.zip', mode='w').write(filename)
+    else:
+        output_filename = filename
+        shutil.make_archive(output_filename, 'zip', filename)
     return output_filename + '.zip'
 
 
@@ -43,7 +48,6 @@ if __name__ == '__main__':
                         help='S3 Bucket')
     parser.add_argument('--region', '-r',
                         type=str,
-                        default=aws_region,
                         help='AWS Region')
 
     args = parser.parse_args()

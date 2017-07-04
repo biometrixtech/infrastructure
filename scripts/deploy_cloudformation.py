@@ -5,7 +5,6 @@ import boto3
 import argparse
 import os
 
-aws_region = 'us-east-1'
 template_local_dir = os.path.abspath('../cloudformation')
 template_s3_bucket = 'biometrix-preprocessing-infrastructure'
 template_s3_path = 'cloudformation/'
@@ -23,7 +22,7 @@ def upload_cf_stack(template):
     s3_resource = get_boto3_resource('s3')
     data = open(template, 'rb')
     s3_path = template_s3_path + os.path.basename(template)
-    s3_resource.Bucket(template_s3_bucket + '-' + aws_region).put_object(Key=s3_path, Body=data)
+    s3_resource.Bucket(template_s3_bucket + '-' + args.region).put_object(Key=s3_path, Body=data)
     return s3_path
 
 
@@ -55,7 +54,6 @@ if __name__ == '__main__':
                         help='the name of a CF stack')
     parser.add_argument('--region', '-r',
                         type=str,
-                        default=aws_region,
                         help='AWS Region')
 
     args = parser.parse_args()

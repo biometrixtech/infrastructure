@@ -92,7 +92,7 @@ Resources:
                         Effect: "Allow"
                         Resource:
                           - "*" # TODO this should be segregated by environment somehow
-            RoleName: { "Fn::Sub": "preprocessing-${Environment}-lambda" }
+            RoleName: { "Fn::Sub": "preprocessing-${Environment}-lambda-${AWS::Region}" }
 
     ##########################################################################################################
     ##  LAMBDA

@@ -446,7 +446,7 @@ Resources:
                     Action: "sts:AssumeRole"
             ManagedPolicyArns:
               - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
-            RoleName: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2" }
+            RoleName: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2-${AWS::Region}" }
 
     Ec2InstanceStartupProfile:
         Type: "AWS::IAM::InstanceProfile"

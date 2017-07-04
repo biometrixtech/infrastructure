@@ -22,7 +22,7 @@ Resources:
                     Action: "sts:AssumeRole"
             ManagedPolicyArns:
               - "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
-            RoleName: { "Fn::Sub": "preprocessing-service-batch" }
+            RoleName: { "Fn::Sub": "preprocessing-service-batch-${AWS::Region}" }
 
     CodeBuildServiceRole:
         Type: "AWS::IAM::Role"
@@ -69,7 +69,7 @@ Resources:
                           - "iam:PassRole"
                         Effect: "Allow"
                         Resource: { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/preprocessing-*" }
-            RoleName: "preprocessing-service-codebuild"
+            RoleName: { "Fn::Sub": "preprocessing-service-codebuild-${AWS::Region}" }
 
     StepFunctionsServiceRole:
         Type: "AWS::IAM::Role"
@@ -89,7 +89,7 @@ Resources:
                         Action:
                           - "lambda:InvokeFunction"
                         Resource: "*"
-            RoleName: { "Fn::Sub": "preprocessing-service-stepfunctions" }
+            RoleName: { "Fn::Sub": "preprocessing-service-stepfunctions-${AWS::Region}" }
 
 Outputs:
 
