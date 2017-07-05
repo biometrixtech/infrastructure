@@ -517,7 +517,6 @@ Resources:
                                         "WritePostgres": {
                                             "Type": "Task",
                                             "Resource": "${LambdaWritePostgres.Arn}",
-                                            "ResultPath": "$.WriteDatabaseOutput",
                                             "End": true
                                         }
                                     }
