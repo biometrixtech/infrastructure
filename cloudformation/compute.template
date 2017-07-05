@@ -46,6 +46,19 @@ Parameters:
         Type: "String"
         Default: ""
         Description: "A SSH keypair to grant access to instances"
+
+    MongoDbPeeringVpc:
+        Type: "String"
+        Default: ""
+        Description: "MongoDB VPC ID"
+
+    MongoDbPeeringCidr:
+        Type: "String"
+        Description: "MongoDB VPC CIDR range"
+        Default: ""
+        MaxLength: "18"
+        AllowedPattern: "^((\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2}))|$"
+        ConstraintDescription: "Must be a valid IP CIDR range of the form x.x.x.x/x."
         
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -59,6 +72,8 @@ Metadata:
               - "Ec2InstanceSize"
               - "Ec2Ami"
               - "Ec2Keypair"
+              - "MongoDbPeeringVpc"
+              - "MongoDbPeeringCidr"
             
         ParameterLabels:
             Environment: { default: "Environment" }
@@ -67,10 +82,17 @@ Metadata:
             InstanceSize: { default: "EC2 Instance Size" }
             Ami: { default: "EC2 AMI" }
             Keypair: { default: "EC2 Keypair" }
+            MongoDbPeeringVpc: { default: "MongoDB VPN ID" }
+            MongoDbPeeringCidr: { default: "MongoDB VPN CIDR" }
 
 Conditions:
     MultiAz: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MultiAz" }, "false" ] } ] }
     AllowSsh: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "Keypair" }, "" ] } ] }
+    CreateMongoDbPeeringConnection: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MongoDbPeeringVpc" }, "" ] } ] }
+    MultiAzAndCreateMongoDbPeeringConnection: { "Fn::And": [
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MongoDbPeeringVpc" }, "" ] } ] },
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MultiAz" }, "false" ] } ] }
+    ] }
 
 Resources:
 
@@ -105,6 +127,17 @@ Resources:
         Properties:
             VpcId: { Ref: "Vpc" }
             InternetGatewayId: { Ref: "InternetGateway" }
+
+    MongoDbPeeringConnection:
+        Type: "AWS::EC2::VPCPeeringConnection"
+        Properties:
+            PeerVpcId: { Ref: "MongoDbPeeringVpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-peering" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            VpcId: { Ref: "Vpc" }
 
     ##########################################################################################################
     ##  PUBLIC AZ ALPHA
@@ -145,6 +178,14 @@ Resources:
             RouteTableId: { Ref: "PublicRouteTableAlpha" }
             GatewayId: { Ref: "InternetGateway" }
             DestinationCidrBlock: "0.0.0.0/0"
+
+    PublicAlphaMongoDbPeeringRoute:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PublicRouteTableAlpha" }
+            VpcPeeringConnectionId: { Ref: "MongoDbPeeringConnection" }
+            DestinationCidrBlock: { Ref: "MongoDbPeeringCidr" }
+        Condition: "CreateMongoDbPeeringConnection"
 
     NatGatewayEipAlpha:
         Type: "AWS::EC2::EIP"
@@ -202,6 +243,14 @@ Resources:
             DestinationCidrBlock: "0.0.0.0/0"
         Condition: "MultiAz"
 
+    PublicBetaMongoDbPeeringRoute:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PublicRouteTableBeta" }
+            VpcPeeringConnectionId: { Ref: "MongoDbPeeringConnection" }
+            DestinationCidrBlock: { Ref: "MongoDbPeeringCidr" }
+        Condition: "MultiAzAndCreateMongoDbPeeringConnection"
+
     NatGatewayEipBeta:
         Type: "AWS::EC2::EIP"
         Properties:
@@ -255,6 +304,14 @@ Resources:
             NatGatewayId: { Ref: "NatGatewayAlpha" }
             DestinationCidrBlock: "0.0.0.0/0"
 
+    PrivateAlphaMongoDbPeeringRoute:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
+            VpcPeeringConnectionId: { Ref: "MongoDbPeeringConnection" }
+            DestinationCidrBlock: { Ref: "MongoDbPeeringCidr" }
+        Condition: "CreateMongoDbPeeringConnection"
+
     ##########################################################################################################
     ##  PRIVATE AZ BETA
     ##########################################################################################################
@@ -297,6 +354,14 @@ Resources:
             NatGatewayId: { Ref: "NatGatewayBeta" }
             DestinationCidrBlock: "0.0.0.0/0"
         Condition: "MultiAz"
+
+    PrivateBetaMongoDbPeeringRoute:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PrivateRouteTableBeta" }
+            VpcPeeringConnectionId: { Ref: "MongoDbPeeringConnection" }
+            DestinationCidrBlock: { Ref: "MongoDbPeeringCidr" }
+        Condition: "MultiAzAndCreateMongoDbPeeringConnection"
 
     ##########################################################################################################
     ##  ENDPOINTS

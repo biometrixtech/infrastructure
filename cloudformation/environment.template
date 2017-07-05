@@ -17,6 +17,19 @@ Parameters:
         AllowedValues: [ "true", "false" ]
         Description: "Whether to create instances in multiple AZs.  This has an additional cost."
 
+    MongoDbPeeringVpc:
+        Type: "String"
+        Default: ""
+        Description: "MongoDB VPC ID"
+
+    MongoDbPeeringCidr:
+        Type: "String"
+        Description: "MongoDB VPC CIDR range"
+        Default: ""
+        MaxLength: "18"
+        AllowedPattern: "^((\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2}))|$"
+        ConstraintDescription: "Must be a valid IP CIDR range of the form x.x.x.x/x."
+
     ComputeEc2InstanceSize:
         Type: "String"
         AllowedValues: [
@@ -82,6 +95,8 @@ Metadata:
           - Label: { default: "Configuration" }
             Parameters:
               - "MultiAz"
+              - "MongoDbPeeringVpc"
+              - "MongoDbPeeringCidr"
               - "Ec2InstanceSize"
               - "Ec2Ami"
               - "Ec2Keypair"
@@ -106,6 +121,8 @@ Metadata:
             BatchJobVersionNoop: { default: "noop" }
             BatchJobVersionScoring: { default: "scoring" }
             BatchJobVersionDatabaseupload: { default: "databaseupload" }
+            MongoDbPeeringVpc: { default: "MongoDB VPN ID" }
+            MongoDbPeeringCidr: { default: "MongoDB VPN CIDR" }
 
 Conditions:
     CreateComputeCluster: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "ComputeTemplate" }, "" ] } ] }
@@ -126,6 +143,9 @@ Resources:
                 InstanceSize: { Ref: "ComputeEc2InstanceSize" }
                 Ami: { Ref: "ComputeEc2Ami" }
                 Keypair: { Ref: "ComputeEc2Keypair" }
+                MongoDbPeeringVpc: { Ref: "MongoDbPeeringVpc" }
+                MongoDbPeeringCidr: { Ref: "MongoDbPeeringCidr" }
+
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute" } }
               - { Key: "Management", Value: "managed" }

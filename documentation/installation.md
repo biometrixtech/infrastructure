@@ -119,3 +119,5 @@ aws batch submit-job \
     --job-queue preprocessing-dev-compute \
     --job-definition arn:aws:batch:us-west-2:887689817172:job-definition/initialise-efs:1
 ```
+
+Setting the `MongoDbPeeringVpc` parameters in the template will set up the peering connection and create the necessary routes in the _environment's_ VPC, but you need to create the corresponding routes in the peered VPC manually.
