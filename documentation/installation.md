@@ -100,12 +100,12 @@ cat <<EOF > initialise-efs.json
                     /net/efs/scoring \
                     /net/efs/scoring/output \
                     /net/efs/writemongo \
+                    /net/efs/writemongo/input \
                     /net/efs/globalmodels \
                     /net/efs/globalscalers \
                 ; \
                 ln -s ../downloadandchunk/output /net/efs/sessionprocess2/input ; \
                 ln -s ../sessionprocess2/output /net/efs/scoring/input ; \
-                ln -s ../scoring/output /net/efs/writemongo/input ; \
             "
         ],
         "readonlyRootFilesystem": false,

@@ -328,6 +328,7 @@ Resources:
                                 "ActivityArn": "${StepFunctionsActivity}",
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
                             },
                             "Branches": [
                                 {
@@ -336,13 +337,14 @@ Resources:
                                         "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDatabaseupload}",
                                         "BatchJob": "writemongo"
                                     },
-                                    "InputPath": "$"
+                                    "InputPath": "$[{}]".format(i)
                                 }
+                                for i in range(len(event['ScoringOutput'][1]['Output']['Filenames']))
                             ],
-                            "Input": {
-                                **event["ReadDatabaseOutput"],
-                                **{"Filename": event['ScoringOutput'][1]['Output']['Filename']}
-                            }
+                            "Input": [
+                                {**event["ReadDatabaseOutput"], **{"Filename": f}}
+                                for f in event['ScoringOutput'][1]['Output']['Filenames']
+                            ]
                         }
             Handler: "index.handler"
             Runtime: "python3.6"
