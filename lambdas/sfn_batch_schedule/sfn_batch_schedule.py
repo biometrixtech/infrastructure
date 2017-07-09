@@ -9,6 +9,7 @@ import copy
 import json
 import os
 import re
+import signal
 import time
 from hashlib import md5
 from time import sleep
@@ -23,6 +24,20 @@ batch_client = boto3.client('batch')
 Arn = namedtuple('Arn', ['partition', 'service', 'region', 'account', 'resourcetype', 'resource'])
 BatchJob = namedtuple('BatchJob', ['id', 'name'])
 BatchRecord = namedtuple('BatchRecord', ['execution_id', 'batch_job', 'task_token', 'status'])
+
+
+class TimeoutException(Exception):
+    """
+    A custom exception for timeouts
+    """
+    pass
+
+
+def timeout_handler(signum, frame):
+    """
+    A function that gets signalled when timeout happens
+    """
+    raise TimeoutException
 
 
 def handler_schedule(event, context):
@@ -65,47 +80,58 @@ def handler_schedule(event, context):
     execution_id = str(event['Meta']['ExecutionArn'])
     activity_arn = str(event['Meta']['ActivityArn'])
 
-    while context.get_remaining_time_in_millis() > 90000:
-        # We have time to go for another pass
-        logger.info('{}ms remaining'.format(context.get_remaining_time_in_millis()))
+    # Change the behavior of SIGALRM
+    signal.signal(signal.SIGALRM, timeout_handler)
 
-        if event.get('_Debug', {}).get('_ActivityTaskToken', None) is not None:
-            logger.debug('Getting task_token from debug parameters')
-            (task_token, task_event) = event['_Debug']['_ActivityTaskToken'], event['_Debug']['_ActivityTaskEvent']
-        else:
-            logger.info('Polling for task_token')
-            response = sfn_client.get_activity_task(
-                activityArn=activity_arn,
-                workerName=context.log_stream_name[-80:]
-            )
-            (task_token, task_event) = (response['taskToken'], json.loads(response['input']))
-        logger.info('task_token={}, task_event={}'.format(task_token, json.dumps(task_event)))
+    # Request a signal alarm after 180 seconds
+    signal.alarm(45)
 
-        if task_token == '':
-            # There are no tasks waiting to be scheduled.  We're too early (and the Activity hasn't been
-            # processed by SFN yet)
-            logger.info('No task waiting, sleeping')
-            sleep(10)
+    try:
+        while True:
+            # We have time to go for another pass
+            logger.info('{}ms remaining'.format(context.get_remaining_time_in_millis()))
+
+            if event.get('_Debug', {}).get('_ActivityTaskToken', None) is not None:
+                logger.debug('Getting task_token from debug parameters')
+                (task_token, task_event) = event['_Debug']['_ActivityTaskToken'], event['_Debug']['_ActivityTaskEvent']
+            else:
+                logger.info('Polling for task_token')
+                response = sfn_client.get_activity_task(
+                    activityArn=activity_arn,
+                    workerName=context.log_stream_name[-80:]
+                )
+                print(response)
+                (task_token, task_event) = (response.get('taskToken', ''), json.loads(response.get('input','""')))
+            logger.info('task_token={}, task_event={}'.format(task_token, json.dumps(task_event)))
+
+            if task_token == '':
+                # There are no tasks waiting to be scheduled.  We're too early (and the Activity hasn't been
+                # processed by SFN yet)
+                logger.info('No task waiting, sleeping')
+                sleep(10)
+                continue
+
+            # Otherwise we have scheduling work to do
+            scheduled_execution_id = schedule_batch_jobs(task_event, task_token)
+            logger.info('Scheduled batch jobs, scheduled_execution_id={}'.format(scheduled_execution_id))
+
+            if scheduled_execution_id == execution_id:
+                # We just scheduled our job.  Let's be selfish and not wait for any others
+                logger.info('Batch jobs successfully scheduled')
+                break
+
+            # Otherwise we go round again
+            logger.info('Going round for another pass')
             continue
 
-        # Otherwise we have scheduling work to do
-        scheduled_execution_id = schedule_batch_jobs(task_event, task_token)
-        logger.info('Scheduled batch jobs, scheduled_execution_id={}'.format(scheduled_execution_id))
+    except TimeoutException:
+        # When we get here, we have too little time left to be sure of managing a full cycle.  So if our job hasn't come up,
+        # we need to fail the invocation so that SFN retries this task and starts a new invocation
+        print("Our activity did not come up for scheduling before the time ran out")
 
-        if scheduled_execution_id == execution_id:
-            # We just scheduled our job.  Let's be selfish and not wait for any others
-            logger.info('Batch jobs successfully scheduled')
-            return
-
-        # Otherwise we go round again
-        logger.info('Going round for another pass')
-        continue
-
-    # When we get here, we have too little time left to be sure of managing a full cycle.  So if our job hasn't come up,
-    # we need to fail the invocation so that SFN retries this task and starts a new invocation
-    raise Exception("Our activity did not come up for scheduling before the time ran out")
-
-    pass
+    else:
+        # Reset the alarm
+        signal.alarm(0)
 
 
 def schedule_batch_jobs(event, task_token):
