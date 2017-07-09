@@ -131,13 +131,13 @@ def schedule_batch_jobs(event, task_token):
         # Only one branch, can return immediately
         meta['TaskToken'] = task_token
 
-    execution_name = md5(meta['ExecutionArn'].encode('utf-8')).hexdigest()[:32]
+    execution_name = md5(meta['ExecutionArn'].encode('utf-8')).hexdigest()[:16]
 
     # Submit the jobs!
     jobs = []
     for branch in branches:
         input_datum = get_json_path(input_data, branch['InputPath'])
-        branch_name = md5(json.dumps(input_datum, default=json_serial).encode('utf-8')).hexdigest()[:32]
+        branch_name = md5(json.dumps(input_datum, default=json_serial).encode('utf-8')).hexdigest()[:16]
         job_name = "{}-{}-{}".format(
             execution_name,
             branch['Resource']['BatchJob'],
@@ -176,7 +176,6 @@ def schedule_batch_jobs(event, task_token):
     if len(branches) > 1:
         # Submit a blank job that depends on all the others that signals SFN
         meta['TaskToken'] = task_token
-        print([{'jobId': job.batch_job.id} for job in jobs])
         response = batch_client.submit_job(
             jobName="{}-{}".format(
                 execution_name,
