@@ -89,8 +89,6 @@ Resources:
                           - "ssm:DescribeParameters"
                           - "ssm:GetParameters"
                           - "kms:Decrypt"
-                          - "lambda:InvokeFunction"
-                          - "states:StartExecution"
                         Effect: "Allow"
                         Resource:
                           - "*" # TODO this should be segregated by environment somehow
@@ -151,7 +149,9 @@ Resources:
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
                                         "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDownloadandchunk}",
-                                        "BatchJob": "downloadandchunk"
+                                        "BatchJob": "downloadandchunk",
+                                        "Memory": 2048,
+                                        "Vcpus": 2,
                                     },
                                     "InputPath": "$"
                                 }
@@ -241,7 +241,9 @@ Resources:
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
                                         "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionSessionprocess2}",
-                                        "BatchJob": "sessionprocess2"
+                                        "BatchJob": "sessionprocess2",
+                                        "Memory": 1024,
+                                        "Vcpus": 2,
                                     },
                                     "InputPath": "$[{}]".format(i)
                                 }
@@ -276,7 +278,9 @@ Resources:
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
                                         "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
-                                        "BatchJob": "scoring"
+                                        "BatchJob": "scoring",
+                                        "Memory": 4096,
+                                        "Vcpus": 4,
                                     },
                                     "InputPath": "$"
                                 }
@@ -335,7 +339,9 @@ Resources:
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
                                         "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDatabaseupload}",
-                                        "BatchJob": "writemongo"
+                                        "BatchJob": "writemongo",
+                                        "Memory": 2048,
+                                        "Vcpus": 2,
                                     },
                                     "InputPath": "$[{}]".format(i)
                                 }
