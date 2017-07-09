@@ -669,3 +669,7 @@ Outputs:
     JobQueueArn:
         Description: "The ARN of the Job Queue"
         Value: { Ref: "BatchJobQueue" }
+
+    ComputeEnvironmentArn:
+        Description: "The ARN of the ComputeEnvironment"
+        Value: { Ref: "BatchComputeEnvironment" }
