@@ -86,6 +86,10 @@ Resources:
                           - "kms:Decrypt"
                         Effect: "Allow"
                         Resource: "*" # TODO this should be segregated by environment somehow
+                      - Action:
+                          - "cloudwatch:PutMetricData"
+                        Effect: "Allow"
+                        Resource: "*"
             RoleName: { "Fn::Sub": "preprocessing-batchjob-${AWS::Region}" }
 
     ##########################################################################################################
