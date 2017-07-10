@@ -179,3 +179,121 @@ Resources:
             TemplateURL: { Ref: "PipelineTemplate" }
             TimeoutInMinutes: 10
         Condition: "CreatePipeline"
+
+    ##########################################################################################################
+    ##  MONITORING
+    ##########################################################################################################
+
+    CloudWatchDashboard:
+        Type: "AWS::CloudWatch::Dashboard"
+        Properties:
+            DashboardName: { "Fn::Sub": "preprocessing-${Environment}" }
+            DashboardBody: !Sub |
+                { "widgets":[
+                    {
+                        "type": "metric",
+                        "x": 0,
+                        "y": 0,
+                        "width": 12,
+                        "height": 6,
+                        "properties": {
+                            "metrics": [
+                                [
+                                    "Preprocessing",
+                                    "BatchComputeEnvironmentDesiredCpus",
+                                    "ComputeEnvironment", "${ComputeCluster.Outputs.ComputeEnvironmentArn}",
+                                    "Environment", "${Environment}"
+                                ],
+                                [ ".", "BatchComputeEnvironmentActualCpus", ".", ".", ".", "." ]
+                            ],
+                            "period": 60,
+                            "stat": "Average",
+                            "region": "${AWS::Region}",
+                            "title": "ComputeCluster CPUs",
+                            "yAxis": {
+                                "left": {
+                                    "min": 0
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "type":"metric",
+                        "x": 12,
+                        "y": 0,
+                        "width": 12,
+                        "height": 6,
+                        "properties": {
+                            "metrics": [
+                                [
+                                    "Preprocessing",
+                                    "BatchJobQueueCountSubmitted",
+                                    "JobQueue", "${ComputeCluster.Outputs.JobQueueArn}",
+                                    "Environment", "${Environment}"
+                                ],
+                                [ ".", "BatchJobQueueCountPending", ".", ".", ".", "." ],
+                                [ ".", "BatchJobQueueCountRunnable", ".", ".", ".", "." ],
+                                [ ".", "BatchJobQueueCountStarting", ".", ".", ".", "." ],
+                                [ ".", "BatchJobQueueCountRunning", ".", ".", ".", "." ]
+                            ],
+                            "period": 60,
+                            "stacked": true,
+                            "stat": "Average",
+                            "region": "${AWS::Region}",
+                            "title": "JobQueue Job count",
+                            "yAxis": {
+                                "left": {
+                                    "min": 0
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "type":"metric",
+                        "x": 0,
+                        "y": 6,
+                        "width": 12,
+                        "height": 6,
+                        "properties": {
+                            "metrics": [
+                                [
+                                    "Preprocessing",
+                                    "BatchJobScheduleLatency",
+                                    "Environment", "${Environment}",
+                                    "Job", "downloadandchunk"
+                                ],
+                                [ ".", ".", ".", ".", ".", "sessionprocess2" ],
+                                [ ".", ".", ".", ".", ".", "scoring" ],
+                                [ ".", ".", ".", ".", ".", "writemongo" ]
+                            ],
+                            "period": 60,
+                            "stat": "Average",
+                            "region": "${AWS::Region}",
+                            "title": "Batch Latency"
+                        }
+                    },
+                    {
+                        "type":"metric",
+                        "x": 12,
+                        "y": 6,
+                        "width": 12,
+                        "height": 6,
+                        "properties": {
+                            "metrics": [
+                                [
+                                    "Preprocessing",
+                                    "BatchJobProcessTime",
+                                    "Environment", "${Environment}",
+                                    "Job", "downloadandchunk"
+                                ],
+                                [ ".", ".", ".", ".", ".", "sessionprocess2" ],
+                                [ ".", ".", ".", ".", ".", "scoring" ],
+                                [ ".", ".", ".", ".", ".", "writemongo" ]
+                            ],
+                            "period": 60,
+                            "stat": "Average",
+                            "region": "${AWS::Region}",
+                            "title": "Batch Process Time"
+                        }
+                    }
+                ] }
