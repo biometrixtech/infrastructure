@@ -190,15 +190,14 @@ Resources:
                               session_events.id AS session_event_id,
                               session_events.training_session_log_id,
                               session_events.hip_n_transform,
-                              training_session_logs.training_group_id,
+                              session_events.training_group_ids,
                               session_events.user_id,
                               users.weight,
                               training_groups.team_id,
                               session_events.session_type
                             FROM session_events
-                            LEFT JOIN training_session_logs ON session_events.training_session_log_id=training_session_logs.id
                             LEFT JOIN users ON session_events.user_id=users.id
-                            LEFT JOIN training_groups ON training_session_logs.training_group_id=training_groups.id
+                            LEFT JOIN training_groups ON training_groups.id = session_events.training_group_ids[1]
                             WHERE session_events.sensor_data_filename = %s""",
                             [event['SourceEvent']['S3Path']]
                         )
