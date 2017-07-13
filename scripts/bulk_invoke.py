@@ -12,7 +12,7 @@ def invoke_sfn(s3_bucket, s3_key):
     )
 
 ALL_FILES = [
-    '04fb647b-e563-480c-a70c-a80c0436602f',
+    '04fb647b-e563-480c-a70c-a80c0436602f',  # 0
     '0505130a-6a97-4e09-a5b3-eec56d7d400c',
     '05a6d065-c7b9-494d-877e-93dbf19169bb',
     '0ad5e871-2ad6-4d5f-9ecf-e8a3fe81f25f',
@@ -22,7 +22,7 @@ ALL_FILES = [
     '0d9157c9-dbf2-45dc-aa83-e3049302794b',
     '0de22f02-0ef1-4b99-88cf-c21c6e13cb9c',
     '0f35c03e-d623-4b31-aedf-c467a81cbfbe',
-    '164588ca-bfe8-4b78-b824-362602a5cecb',
+    '164588ca-bfe8-4b78-b824-362602a5cecb',  # 10
     '1cd80644-234e-437e-ba87-10838ce2e651',
     '1cf4acd5-a2bb-4e4c-9565-7785204bfd29',
     '1e15208a-252d-42ac-b0c9-fef4249e204d',
@@ -32,7 +32,7 @@ ALL_FILES = [
     '26fd3629-5877-4f43-bf15-2fe7ba42623c',
     '2746c4b7-f56f-4635-be37-2d46b264ed51',
     '2854341b-becd-48a3-9f21-db887d093443',
-    '28cda022-a4c3-4457-84ed-370265f7e43d',
+    '28cda022-a4c3-4457-84ed-370265f7e43d',  # 20
     '2b2c635f-ace8-429e-bd85-8f539bfb7092',
     '2f850365-c525-4960-b0d8-e38824bc3cae',
     '31a145ee-ed8e-47f3-89e3-b175b025a0bf',
@@ -42,7 +42,7 @@ ALL_FILES = [
     '3956adf3-0446-4ad7-97b5-6442d3ceef90',
     '395e2eb4-df14-4f44-9a40-9f5f6b9ea65b',
     '3a181d0d-64f9-4287-9a64-28c054aeb087',
-    '3cc56e2b-9b17-42cc-9028-6ca44674bd0c',
+    '3cc56e2b-9b17-42cc-9028-6ca44674bd0c',  # 30
     '3d911945-0eaf-441e-a309-f052cb27236d',
     '3ffac6af-b7a3-4354-b6c0-c33accc3855a',
     '41a5aa49-0390-467f-9da7-cc900d881767',
