@@ -87,16 +87,25 @@
           - 'aws-mfa'
           - 'awscli'
 
+      - name: 'Create AWS config directory'
+        file:
+            path: '/root/.aws'
+            state: directory
+            owner: root
+            group: root
+            mode: 0700
+
       - name: 'Install AWS config files'
         copy:
-            src: '{{item}}'
-            dest: '/root/aws/{{item}}'
+            src: '{{infrastructure_directory}}/vagrant/ansible/files/aws/{{item}}'
+            dest: '/root/.aws/{{item}}'
             owner: 'root'
             group: 'root'
             mode: '0600'
+            force: No
         with_items:
-          - "{{infrastructure_directory}}/vagrant/ansible/files/aws/config"
-          - "{{infrastructure_directory}}/vagrant/ansible/files/aws/credentials"
+          - "config"
+          - "credentials"
 
     ##########################################################################################################
     ## DOCKER
@@ -108,3 +117,52 @@
             state: latest
         with_items:
           - 'docker.io'
+
+    ##########################################################################################################
+    ## DOCKER-ECR CREDENTIAL HELPER
+    ##########################################################################################################
+
+      - name: "Clone the git repository"
+        git:
+            depth: 1
+            dest: "/tmp/amazon-ecr-credential-helper"
+            repo: "https://github.com/awslabs/amazon-ecr-credential-helper.git"
+
+      - name: "Check if the binary has already been built"
+        stat:
+            path: "/tmp/amazon-ecr-credential-helper/bin/local/docker-credential-ecr-login"
+        register: "docker_credential_ect_login"
+
+      - name: "Ensure make is installed to build the binary"
+        apt:
+            name: "make"
+            state: "installed"
+
+      - name: "Build the binary inside a docker container"
+        make:
+            chdir: "/tmp/amazon-ecr-credential-helper"
+            target: "docker"
+        when: "docker_credential_ect_login.stat.exists == False"
+
+      - name: "Move the binary into position"
+        copy:
+            remote_src: True
+            dest: "/usr/bin/docker-credential-ecr-login"
+            group: "root"
+            mode: "0755"
+            owner: "root"
+            src: "/tmp/amazon-ecr-credential-helper/bin/local/docker-credential-ecr-login"
+
+      - name: "Create root's .docker directory"
+        file:
+            dest: "/root/.docker"
+            group: "root"
+            owner: "root"
+            state: "directory"
+
+      - name: "Create root's docker config file"
+        copy:
+            content: '{"credsStore": "ecr-login"}'
+            dest: "/root/.docker/config.json"
+            group: "root"
+            owner: "root"
