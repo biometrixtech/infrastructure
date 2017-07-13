@@ -31,6 +31,8 @@ def do_compute_cluster_actual_cpus():
     ec2_instance_data = [instance for reservation in ec2_reservation_data for instance in reservation['Instances']]
     instance_counts = {}
     for instance in ec2_instance_data:
+        if instance['State']['Name'] != 'running':
+            continue
         instance_type = instance['InstanceType']
         if instance_type not in instance_counts:
             instance_counts[instance_type] = 0
