@@ -295,5 +295,23 @@ Resources:
                             "region": "${AWS::Region}",
                             "title": "Batch Process Time"
                         }
+                    },
+                    {
+                        "type": "metric",
+                        "x": 0,
+                        "y": 12,
+                        "width": 12,
+                        "height": 6,
+                        "properties": {
+                            "metrics": [
+                                [ "AWS/States", "ExecutionsStarted", "StateMachineArn", "arn:aws:states:us-west-2:887689817172:stateMachine:StateMachine-4ENQYJODFNYT" ],
+                                [ ".", "ExecutionsFailed", ".", "." ],
+                                [ ".", "ExecutionsSucceeded", ".", "." ]
+                            ],
+                            "region": "${AWS::Region}",
+                            "stacked": true,
+                            "title": "StepFunctions executions",
+                            "view": "timeSeries"
+                        }
                     }
                 ] }
