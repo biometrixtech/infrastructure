@@ -6,16 +6,17 @@ import json
 from datetime import datetime
 
 
-def load_parameters(keys):
+def load_parameters(keys, environment):
     """
     Load configuration from SSM
     :param keys: A list of configuration variables
+    :param environment: The environment to load config for
     :return: A dictionary of variables to values
     """
     print('Retrieving configuration from SSM')
-    ssm_client = boto3.client('ssm', region_name='us-east-1')
+    ssm_client = boto3.client('ssm')
     response = ssm_client.get_parameters(
-        Names=['preprocessing.{}.{}'.format(os.environ.get('ENVIRONMENT', 'dev'), key.lower()) for key in keys],
+        Names=['preprocessing.{}.{}'.format(environment, key.lower()) for key in keys],
         WithDecryption=True
     )
     params = {p['Name'].split('.')[-1].upper(): p['Value'] for p in response['Parameters']}
@@ -28,7 +29,10 @@ def handler(event, context):
         {
             "Queries": [
                 { "Query": <STRING>, "Parameters": <OBJECT> }
-             ]
+             ],
+            "Config": {
+                "ENVIRONMENT": <STRING>
+            }
         }
     And will return:
         {
@@ -39,7 +43,9 @@ def handler(event, context):
     :return:
     """
     try:
-        config = load_parameters(['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'])
+        environment = event.get('Config', {}).get('ENVIRONMENT')
+        config = load_parameters(['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'], environment)
+        print("Connecting to '{}'".format(config['DB_HOST']))
         connection_string = "dbname='{name}' user='{user}' host='{host}' password='{password}'".format(
             host=config['DB_HOST'],
             user=config['DB_USER'],

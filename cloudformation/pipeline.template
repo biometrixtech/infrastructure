@@ -171,12 +171,15 @@ Resources:
         Properties:
             Code:
                 ZipFile: !Sub |
-                    import boto3, json
+                    import boto3, json, os
                     lambda_client = boto3.client('lambda', region_name='us-west-2')
                     def query(query, parameters):
                         res = json.loads(lambda_client.invoke(
                             FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
-                            Payload=json.dumps({"Queries": [{"Query": query, "Parameters": parameters}]}),
+                            Payload=json.dumps({
+                                "Queries": [{"Query": query, "Parameters": parameters}],
+                                "Config": {"ENVIRONMENT": os.environ['ENVIRONMENT']}
+                            }),
                         )['Payload'].read())
                         result, error = res['Results'][0], res['Errors'][0]
                         if error is not None:
@@ -218,6 +221,9 @@ Resources:
                         ret["HistoricalFiles"] = query_result
                         return ret
 
+            Environment:
+                Variables:
+                    ENVIRONMENT: { Ref: "Environment" }
             Handler: "index.handler"
             Runtime: "python3.6"
             Timeout: "30"
@@ -304,20 +310,26 @@ Resources:
         Properties:
             Code:
                 ZipFile: !Sub |
-                    import boto3, json
+                    import boto3, json, os
                     def handler(event, context):
                         lambda_client = boto3.client('lambda', region_name='us-west-2')
                         res = json.loads(lambda_client.invoke(
                             FunctionName='arn:aws:lambda:us-west-2:887689817172:function:preprocessing-dev-pipeline-querypostgres',
-                            Payload=json.dumps({"Queries": [{
-                                "Query": "UPDATE session_events SET session_success=True, updated_at = now() WHERE id = %s",
-                                "Parameters": [event['ReadDatabase']['SessionEventId']]
-                            }]}),
+                            Payload=json.dumps({
+                                "Queries": [{
+                                    "Query": "UPDATE session_events SET session_success=True, updated_at = now() WHERE id = %s",
+                                    "Parameters": [event['ReadDatabase']['SessionEventId']]
+                                }],
+                                "Config": {"ENVIRONMENT": os.environ['ENVIRONMENT']}
+                            }),
                         )['Payload'].read())
                         if res['Errors'][0] is not None:
                             raise Exception(res['Errors'][0])
                         return {}
 
+            Environment:
+                Variables:
+                    ENVIRONMENT: { Ref: "Environment" }
             Handler: "index.handler"
             Runtime: "python3.6"
             Timeout: "30"
