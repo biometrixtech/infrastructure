@@ -205,7 +205,7 @@ Resources:
                             "SessionEventId": query_results.get('session_event_id', None),
                             "TrainingSessionLogId": query_results.get('training_session_log_id', None),
                             "HipNTransform": query_results.get('hip_n_transform', None),
-                            "TrainingGroupId": query_results.get('training_group_id', None),
+                            "TrainingGroupId": query_results.get('training_group_ids', None),
                             "UserId": query_results.get('user_id', None),
                             "UserWeight": query_results.get('weight', None),
                             "TeamId": query_results.get('team_id', None),
