@@ -671,6 +671,17 @@ Resources:
             SourceArn: { "Fn::GetAtt": [ "MonitoringLambdaScheduledRule", "Arn" ] }
 
 Outputs:
+    VpcId:
+        Description: "The id of the VPC"
+        Value: { Ref: "Vpc" }
+
+    PrivateSubnetIds:
+        Description: "The ids of the private subnets"
+        Value: { "Fn::If": [ "MultiAz",
+            { "Fn::Sub": "${PrivateSubnetAlpha},${PrivateSubnetBeta}" },
+            { Ref: "PrivateSubnetAlpha" }
+        ]}
+
     EfsId:
         Description: "The id of the Elastic File System"
         Value: { Ref: "EfsFileSystem" }

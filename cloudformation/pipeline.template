@@ -586,3 +586,7 @@ Resources:
                 }
 
             RoleArn: { "Fn::ImportValue" : "StepFunctionsServiceRole" }
+Outputs:
+    ActivityArn:
+        Description: "The ARN of the Batch Activity"
+        Value: { Ref: "StepFunctionsActivity" }
