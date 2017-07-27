@@ -6,7 +6,7 @@
     become_user: root
     connection: local
     vars:
-        infrastructure_directory: '/vagrant/infrastructure'
+        infrastructure_directory: '/vagrant/Infrastructure'
         application_directory: '/vagrant'
 
     tasks:
