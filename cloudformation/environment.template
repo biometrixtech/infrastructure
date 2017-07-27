@@ -141,6 +141,21 @@ Conditions:
 Resources:
 
     ##########################################################################################################
+    ##  S3
+    ##########################################################################################################
+
+    S3Bucket:
+        Type: "AWS::S3::Bucket"
+        Properties:
+            BucketName: { "Fn::Sub": "biometrix-preprocessing-${Environment}-${AWS::Region}" }
+            Tags:
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+        # Don't delete this if we accidentally delete the stack (which would fail anyway unless the bucket is empty)
+        DeletionPolicy : "Retain"
+
+    ##########################################################################################################
     ##  COMPUTE CLUSTER
     ##########################################################################################################
 
