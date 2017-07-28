@@ -602,3 +602,6 @@ Outputs:
     ActivityArn:
         Description: "The ARN of the Batch Activity"
         Value: { Ref: "StepFunctionsActivity" }
+    TriggerLambdaArn:
+        Description: "The ARN of the trigger lambda"
+        Value: { "Fn::GetAtt": [ "LambdaTrigger", "Arn" ] }
