@@ -17,6 +17,13 @@ Parameters:
         AllowedValues: [ "true", "false" ]
         Description: "Whether to create instances in multiple AZs.  This has an additional cost."
 
+    # The second part of the CIDR block for the VPN (10.NN.0.0/24).
+    VpnCidr:
+        Type: "Number"
+        MinValue: 0
+        MaxValue: 255
+        Description: "The second digit in the IP range (10.xx.0.0/16).  VPNs with overlapping address spaces cannot be peered."
+
     InstanceSize:
         Type: "String"
         AllowedValues: [
@@ -69,6 +76,7 @@ Metadata:
           - Label: { default: "Configuration" }
             Parameters:
               - "MultiAz"
+              - "VpnCidr"
               - "Ec2InstanceSize"
               - "Ec2Ami"
               - "Ec2Keypair"
@@ -78,6 +86,7 @@ Metadata:
         ParameterLabels:
             Environment: { default: "Environment" }
             MultiAz: { default: "Multi AZ?" }
+            VpnCidr: { default: "VPN CIDR block" }
             HostedZoneId: { default: "Hosted Zone" }
             InstanceSize: { default: "EC2 Instance Size" }
             Ami: { default: "EC2 AMI" }
@@ -103,7 +112,7 @@ Resources:
     Vpc:
         Type: "AWS::EC2::VPC"
         Properties:
-            CidrBlock: { "Fn::Sub": "10.0.0.0/16" }
+            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.0.0/16" }
             EnableDnsSupport: "true"
             EnableDnsHostnames: "true"
             InstanceTenancy: "default"
@@ -148,7 +157,7 @@ Resources:
         Type: "AWS::EC2::Subnet"
         Properties:
             VpcId: { Ref: "Vpc" }
-            CidrBlock: { "Fn::Sub": "10.0.0.0/24" }
+            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.0.0/24" }
             MapPublicIpOnLaunch: true
             AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
             Tags:
@@ -210,7 +219,7 @@ Resources:
         Type: "AWS::EC2::Subnet"
         Properties:
             VpcId: { Ref: "Vpc" }
-            CidrBlock:  { "Fn::Sub": "10.0.100.0/24" }
+            CidrBlock:  { "Fn::Sub": "10.${VpnCidr}.100.0/24" }
             AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
             MapPublicIpOnLaunch: true
             Tags:
@@ -278,7 +287,7 @@ Resources:
         Type: "AWS::EC2::Subnet"
         Properties:
             VpcId: { Ref: "Vpc" }
-            CidrBlock: { "Fn::Sub": "10.0.1.0/24" }
+            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.1.0/24" }
             AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-alpha" } }
@@ -327,7 +336,7 @@ Resources:
         Type: "AWS::EC2::Subnet"
         Properties:
             VpcId: { Ref: "Vpc" }
-            CidrBlock: { "Fn::Sub": "10.0.101.0/24" }
+            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.101.0/24" }
             AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-beta" } }
@@ -538,7 +547,7 @@ Resources:
               - IpProtocol: "tcp"
                 FromPort: "0"
                 ToPort: "65535"
-                CidrIp: { "Fn::Sub": "10.0.0.0/16" }
+                CidrIp: { "Fn::Sub": "10.${VpnCidr}.0.0/16" }
 
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2" } }

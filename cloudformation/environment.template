@@ -12,6 +12,13 @@ Parameters:
         Type: "String"
         Description: "The name of the environment"
 
+    # The second part of the CIDR block for the VPN (10.NN.0.0/24).
+    VpnCidr:
+        Type: "Number"
+        MinValue: 0
+        MaxValue: 255
+        Description: "The second digit in the IP range (10.xx.0.0/16).  VPNs with overlapping address spaces cannot be peered."
+
     MultiAz:
         Type: "String"
         AllowedValues: [ "true", "false" ]
@@ -103,6 +110,7 @@ Metadata:
           - Label: { default: "Configuration" }
             Parameters:
               - "MultiAz"
+              - "VpnCidr"
               - "MongoDbPeeringVpc"
               - "MongoDbPeeringCidr"
               - "Ec2InstanceSize"
@@ -178,6 +186,7 @@ Resources:
             Parameters:
                 Environment: { Ref: "Environment" }
                 MultiAz: { Ref: "MultiAz" }
+                VpnCidr: { Ref: "VpnCidr" }
                 InstanceSize: { Ref: "ComputeEc2InstanceSize" }
                 Ami: { Ref: "ComputeEc2Ami" }
                 Keypair: { Ref: "ComputeEc2Keypair" }
