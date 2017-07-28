@@ -419,7 +419,7 @@ Resources:
                         sns_client = boto3.client('sns')
                         response = sns_client.publish(
                             TopicArn=os.environ['SNS_TOPIC'],
-                            Message=event['SourceEvent']['S3Path'],
+                            Message=event['ReadDatabase']['SessionEventId'],
                         )
             Environment:
                 Variables:
