@@ -131,6 +131,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-trigger" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-trigger" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
 
     LambdaPrepareDownloadAndChunk:
@@ -165,6 +170,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-downloadandchunk" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-downloadandchunk" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
     LambdaReadPostgres:
         Type: "AWS::Lambda::Function"
@@ -229,6 +239,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-readpostgres" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-readpostgres" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
     LambdaPrepareSessionProcess2:
         Type: "AWS::Lambda::Function"
@@ -267,6 +282,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-sessionprocess2" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-sessionprocess2" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
     LambdaPrepareScoring:
         Type: "AWS::Lambda::Function"
@@ -304,6 +324,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-scoring" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-scoring" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
     LambdaWritePostgres:
         Type: "AWS::Lambda::Function"
@@ -335,6 +360,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writepostgres" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writepostgres" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
     LambdaPrepareWriteMongo:
         Type: "AWS::Lambda::Function"
@@ -373,6 +403,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-writemongo" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writemongo" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
     LambdaNotifySuccess:
         Type: "AWS::Lambda::Function"
@@ -394,6 +429,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-notifysuccess" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-notifysuccess" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
     ##########################################################################################################
     ##  LAMBDA

@@ -548,7 +548,6 @@ Resources:
                 FromPort: "0"
                 ToPort: "65535"
                 CidrIp: { "Fn::Sub": "10.${VpnCidr}.0.0/16" }
-
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2" } }
               - { Key: "Management", Value: "managed" }
@@ -560,7 +559,6 @@ Resources:
         Properties:
             GroupDescription: "Security group allowing external SSH access"
             VpcId: { Ref: "Vpc" }
-
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2-ssh" } }
               - { Key: "Management", Value: "managed" }
@@ -660,6 +658,11 @@ Resources:
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaMonitoringRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-monitor" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-monitor" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
 
     MonitoringLambdaScheduledRule:
         Type: "AWS::Events::Rule"
