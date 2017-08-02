@@ -17,7 +17,7 @@ Parameters:
         AllowedValues: [ "true", "false" ]
         Description: "Whether to create instances in multiple AZs.  This has an additional cost."
 
-    # The second part of the CIDR block for the VPN (10.NN.0.0/24).
+    # The second part of the CIDR block for the VPN (10.xx.0.0/24).
     VpnCidr:
         Type: "Number"
         MinValue: 0

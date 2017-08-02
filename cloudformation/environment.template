@@ -3,7 +3,7 @@
 # Copyright 2017 Melon Software Ltd (UK), all rights reserved.  Used under license.
 #
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Creates an preprocessing environment"
+Description: "Creates an environment for preprocessing Accessory data"
 
 Parameters:
 
@@ -12,7 +12,7 @@ Parameters:
         Type: "String"
         Description: "The name of the environment"
 
-    # The second part of the CIDR block for the VPN (10.NN.0.0/24).
+    # The second part of the CIDR block for the VPN (10.xx.0.0/24).
     VpnCidr:
         Type: "Number"
         MinValue: 0
