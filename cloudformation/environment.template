@@ -384,5 +384,25 @@ Resources:
                             "title": "StepFunctions executions",
                             "view": "timeSeries"
                         }
+                    },
+                    {
+                        "type": "metric",
+                        "x": 12,
+                        "y": 12,
+                        "width": 12,
+                        "height": 6,
+                        "properties": {
+                            "metrics": [
+                                [
+                                    "Preprocessing",
+                                    "BatchEfsSize",
+                                    "ComputeEnvironment", "${ComputeCluster.Outputs.ComputeEnvironmentArn}",
+                                    "Environment", "${Environment}"
+                                ]
+                            ],
+                            "region": "${AWS::Region}",
+                            "title": "EFS filesystem size",
+                            "view": "timeSeries"
+                        }
                     }
                 ] }

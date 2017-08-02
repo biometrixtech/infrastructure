@@ -637,6 +637,7 @@ Resources:
                           - "batch:ListJobs"
                           - "cloudwatch:PutMetricData"
                           - "ec2:DescribeInstances"
+                          - "elasticfilesystem:DescribeFileSystems"
                         Effect: "Allow"
                         Resource: "*"
             RoleName: { "Fn::Sub": "preprocessing-${Environment}-monitor-lambda-${AWS::Region}" }
@@ -653,6 +654,7 @@ Resources:
                     ENVIRONMENT: { Ref: "Environment" }
                     BATCH_COMPUTE_ENVIRONMENT: { Ref: "BatchComputeEnvironment" }
                     BATCH_JOB_QUEUE: { Ref: "BatchJobQueue" }
+                    BATCH_EFS_ID: { Ref: "EfsFileSystem" }
             Handler: "pipeline_monitor.handler"
             Runtime: "python3.6"
             Timeout: "30"

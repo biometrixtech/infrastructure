@@ -5,12 +5,14 @@ import os
 cloudwatch_client = boto3.client('cloudwatch')
 batch_client = boto3.client('batch')
 ec2_client = boto3.client('ec2')
+efs_client = boto3.client('efs')
 
 
 def handler(event, context):
     do_compute_cluster_desired_cpus()
     do_compute_cluster_actual_cpus()
     do_job_queue_jobs()
+    do_efs_size()
 
 
 def do_compute_cluster_desired_cpus():
@@ -74,6 +76,11 @@ def do_job_queue_jobs():
     for status in ['SUBMITTED', 'PENDING', 'RUNNABLE', 'STARTING', 'RUNNING', 'SUCCEEDED', 'FAILED']:
         count = count_all_jobs(status)
         put_cloudwatch_metric('BatchJobQueueCount{}'.format(status.title()), count, 'None', job_queue=True)
+
+
+def do_efs_size():
+    efs = efs_client.describe_file_systems(FileSystemId=os.environ['BATCH_EFS_ID'])['FileSystems'][0]
+    put_cloudwatch_metric('BatchEfsSize', efs['SizeInBytes']['Value'], 'Bytes', compute_environment=True)
 
 
 def put_cloudwatch_metric(metric_name, value, unit, job_queue=False, compute_environment=False):
