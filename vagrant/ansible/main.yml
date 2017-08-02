@@ -78,6 +78,7 @@
         with_items:
           - 'jq'
           - 'python-pip'
+          - 'python3-pip'
 
       - name: 'Install aws-mfa tool'
         pip:
