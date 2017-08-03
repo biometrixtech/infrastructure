@@ -435,6 +435,45 @@ Resources:
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
 
+    LambdaPrepareCleanup:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "ExecutionName": event['Meta']['ExecutionName'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJob": "cleanup",
+                                        "Memory": 256,
+                                        "Vcpus": 2,
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": event['SourceEvent']
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-cleanup" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-cleanup" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
     ##########################################################################################################
     ##  LAMBDA
     ##########################################################################################################
@@ -627,11 +666,63 @@ Resources:
                                 }
                             ],
                             "ResultPath": "$.Upload",
-                            "Next": "Notify"
+                            "Next": "Post"
                         },
-                        "Notify": {
-                            "Type": "Task",
-                            "Resource": "${LambdaNotifySuccess.Arn}",
+                        "Post": {
+                            "Type": "Parallel",
+                            "Branches": [
+                                {
+                                    "StartAt": "Notify",
+                                    "States": {
+                                        "Notify": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaNotifySuccess.Arn}",
+                                            "End": true
+                                        }
+                                    }
+                                },
+                                {
+                                    "StartAt": "BuildCleanupContext",
+                                    "States": {
+                                        "BuildCleanupContext": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaPrepareCleanup.Arn}",
+                                            "ResultPath": "$.Cleanup",
+                                            "Next": "Cleanup"
+                                        },
+                                        "Cleanup": {
+                                            "Type": "Parallel",
+                                            "Branches": [
+                                                {
+                                                    "StartAt": "ScheduleCleanup",
+                                                    "States": {
+                                                        "ScheduleCleanup": {
+                                                            "Type": "Task",
+                                                            "InputPath": "$.Cleanup",
+                                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
+                                                            "End": true
+                                                        }
+                                                    }
+                                                },
+                                                {
+                                                    "StartAt": "RespondCleanup",
+                                                    "States": {
+                                                        "RespondCleanup": {
+                                                            "Type": "Task",
+                                                            "InputPath": "$.Cleanup",
+                                                            "Resource": "${StepFunctionsActivity}",
+                                                            "End": true
+                                                        }
+                                                    }
+                                                }
+                                            ],
+                                            "ResultPath": "$.Cleanup",
+                                            "End": true
+                                        }
+                                    }
+                                }
+                            ],
+                            "ResultPath": "$.Cleanup",
                             "End": true
                         }
                     }
