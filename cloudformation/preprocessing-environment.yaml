@@ -113,9 +113,9 @@ Metadata:
               - "VpnCidr"
               - "MongoDbPeeringVpc"
               - "MongoDbPeeringCidr"
-              - "Ec2InstanceSize"
-              - "Ec2Ami"
-              - "Ec2Keypair"
+              - "ComputeEc2InstanceSize"
+              - "ComputeEc2Ami"
+              - "ComputeEc2Keypair"
           - Label: { default: "Batch Jobs" }
             Parameters:
               - "BatchJobVersionDownloadandchunk"
@@ -166,6 +166,7 @@ Resources:
               - { Key: "Environment", Value: { Ref: "Environment" } }
         # Don't delete this if we accidentally delete the stack (which would fail anyway unless the bucket is empty)
         DeletionPolicy : "Retain"
+        Condition: "CreatePipeline"
 
     LambdaTriggerPermission:
         Type: "AWS::Lambda::Permission"
@@ -175,6 +176,7 @@ Resources:
             Principal: "s3.amazonaws.com"
             SourceArn: { "Fn::Sub": "arn:aws:s3:::biometrix-preprocessing-${Environment}-${AWS::Region}" }
             SourceAccount: { Ref : "AWS::AccountId" }
+        Condition: "CreatePipeline"
 
     ##########################################################################################################
     ##  COMPUTE CLUSTER
@@ -258,7 +260,7 @@ Resources:
     CloudWatchDashboard:
         Type: "AWS::CloudWatch::Dashboard"
         Properties:
-            DashboardName: { "Fn::Sub": "preprocessing-${Environment}" }
+            DashboardName: { "Fn::Sub": "preprocessing-${Environment}-${AWS::Region}" }
             DashboardBody: !Sub |
                 { "widgets":[
                     {
@@ -406,3 +408,4 @@ Resources:
                         }
                     }
                 ] }
+        Condition: "CreateComputeCluster"

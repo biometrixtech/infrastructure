@@ -646,7 +646,7 @@ Resources:
         Type: "AWS::Lambda::Function"
         Properties:
             Code:
-                S3Bucket: { "Fn::Sub": "biometrix-preprocessing-infrastructure-${AWS::Region}" }
+                S3Bucket: { "Fn::Sub": "biometrix-infrastructure-${AWS::Region}" }
                 S3Key: "lambdas/pipeline_monitor.zip"
 
             Environment:

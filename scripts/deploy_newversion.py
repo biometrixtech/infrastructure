@@ -8,10 +8,6 @@ import os
 import subprocess
 import time
 
-template_local_dir = os.path.abspath('../cloudformation')
-template_s3_bucket = 'biometrix-preprocessing-infrastructure'
-template_s3_path = 'cloudformation/'
-
 
 def trigger_codebuild():
     git_revision = args.version if args.version != 'HEAD' else subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()

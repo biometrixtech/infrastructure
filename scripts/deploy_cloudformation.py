@@ -6,7 +6,7 @@ import argparse
 import os
 
 template_local_dir = os.path.abspath('../cloudformation')
-template_s3_bucket = 'biometrix-preprocessing-infrastructure'
+template_s3_bucket = 'biometrix-infrastructure'
 template_s3_path = 'cloudformation/'
 
 

@@ -7,7 +7,7 @@ import boto3
 import argparse
 import os
 
-template_s3_bucket = 'biometrix-preprocessing-infrastructure'
+template_s3_bucket = 'biometrix-infrastructure'
 template_s3_path = 'lambdas/'
 
 

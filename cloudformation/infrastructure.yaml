@@ -14,10 +14,10 @@ Resources:
     S3Bucket:
         Type: "AWS::S3::Bucket"
         Properties:
-            BucketName: { "Fn::Sub": "biometrix-preprocessing-infrastructure-${AWS::Region}" }
+            BucketName: { "Fn::Sub": "biometrix-infrastructure-${AWS::Region}" }
             Tags:
               - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Project", Value: "infra" }
               - { Key: "Environment", Value: "infra" }
         # Don't delete this if we accidentally delete the stack (which would fail anyway unless the bucket is empty)
         DeletionPolicy : "Retain"
