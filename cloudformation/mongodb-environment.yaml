@@ -188,12 +188,22 @@ Resources:
                     Version: '2012-10-17'
                     Statement:
                       - Action:
+                          - "cloudwatch:GetMetricStatistics"
+                          - "cloudwatch:ListMetrics"
+                          - "cloudwatch:PutMetricData"
                           - "ec2:AttachNetworkInterface"
                           - "ec2:AttachVolume"
                           - "ec2:DescribeInstances"
                           - "ec2:DescribeNetworkInterfaces"
                           - "ec2:DescribeTags"
                           - "ec2:DescribeVolumes"
+                          - "logs:CreateLogGroup"
+                          - "logs:CreateLogStream"
+                          - "logs:DescribeLogGroups"
+                          - "logs:DescribeLogStreams"
+                          - "logs:PutLogEvents"
+                          - "logs:GetLogEvents"
+                          - "logs:FilterLogEvents"
                         Resource: "*"
                         Effect: "Allow"
             RoleName: { "Fn::Sub": "mongodb-${Environment}-mongodb-ec2-${AWS::Region}" }
@@ -275,6 +285,15 @@ Resources:
         Metadata:
             AWS::CloudFormation::Init:
                 config:
+                    packages:
+                        yum:
+                            awslogs: []
+                            curl: []
+                            jq: []
+                            ntp: []
+                        python:
+                            boto3: []
+                            aws-cfn-bootstrap: []
                     files:
                         /jet/etc/mongodb/mongodb.conf:
                             content: |
@@ -299,7 +318,8 @@ Resources:
                                             )
                                             break
                                         except Exception as e:
-                                            raise
+                                            print e
+                                            time.sleep(10)
 
                                 def attach_ebs(volume_id):
                                     while True:
@@ -310,7 +330,8 @@ Resources:
                                             )
                                             break
                                         except Exception as e:
-                                            raise
+                                            print e
+                                            time.sleep(10)
 
                                 if __name__ == '__main__':
                                     ec2_resource = boto3.resource('ec2', region_name='us-east-1')
@@ -352,11 +373,6 @@ Resources:
 
                     # Fail on any errors, including inside piped functions
                     set -euo pipefail
-
-                    # Install aws cli, latest version
-                    yum update -y
-                    yum install -y python2.7 python-pip curl jq ntp
-                    pip install boto3 https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
 
 
                     # Install the files referenced in the metadata above
