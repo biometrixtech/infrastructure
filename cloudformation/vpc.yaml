@@ -1,0 +1,442 @@
+# A template that creates a VPC and networking
+#
+# Copyright 2017 Melon Software Ltd (UK), all rights reserved.  Used under license.
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates a VPC and networking resources"
+
+Parameters:
+
+    Project:
+        Type: "String"
+        Description: "The name of the Project"
+
+    Environment:
+        Type: "String"
+        Description: "The name of the environment"
+
+    Service:
+        Type: "String"
+        Description: "The name of the service"
+
+    MultiAz:
+        Type: "String"
+        AllowedValues: [ "true", "false" ]
+        Description: "Whether to create instances in multiple AZs.  This has an additional cost."
+
+    # The second part of the CIDR block for the VPN (10.xx.0.0/24).
+    VpnCidr:
+        Type: "Number"
+        MinValue: 0
+        MaxValue: 255
+        Description: "The second digit in the IP range (10.xx.0.0/16).  VPNs with overlapping address spaces cannot be peered."
+
+    PeeringVpc:
+        Type: "String"
+        Default: ""
+        Description: "Peering VPC ID"
+
+    PeeringCidr:
+        Type: "String"
+        Description: "Peering VPC CIDR range"
+        Default: ""
+        MaxLength: "18"
+        AllowedPattern: "^((\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2}))|$"
+        ConstraintDescription: "Must be a valid IP CIDR range of the form x.x.x.x/x."
+
+Metadata:
+    "AWS::CloudFormation::Interface":
+        ParameterGroups:
+          - Label: { default: "Definition" }
+            Parameters:
+              - "Project"
+              - "Environment"
+              - "Service"
+          - Label: { default: "Configuration" }
+            Parameters:
+              - "MultiAz"
+              - "VpnCidr"
+              - "PeeringVpc"
+              - "PeeringCidr"
+
+        ParameterLabels:
+            Project: { default: "Project" }
+            Environment: { default: "Environment" }
+            Service: { default: "Service" }
+            MultiAz: { default: "Multi AZ?" }
+            VpnCidr: { default: "VPN CIDR block" }
+            PeeringVpc: { default: " VPN ID" }
+            PeeringCidr: { default: " VPN CIDR" }
+
+Conditions:
+    MultiAz: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MultiAz" }, "false" ] } ] }
+    CreatePeeringConnection: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringVpc" }, "" ] } ] }
+    MultiAzAndCreatePeeringConnection: { "Fn::And": [
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringVpc" }, "" ] } ] },
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MultiAz" }, "false" ] } ] }
+    ] }
+
+Resources:
+    Vpc:
+        Type: "AWS::EC2::VPC"
+        Properties:
+            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.0.0/16" }
+            EnableDnsSupport: "true"
+            EnableDnsHostnames: "true"
+            InstanceTenancy: "default"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+
+    InternetGateway:
+        Type: "AWS::EC2::InternetGateway"
+        Properties :
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+
+    InternetGatewayVpcAttachment:
+        Type: "AWS::EC2::VPCGatewayAttachment"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            InternetGatewayId: { Ref: "InternetGateway" }
+
+    PeeringConnection:
+        Type: "AWS::EC2::VPCPeeringConnection"
+        Properties:
+            PeerVpcId: { Ref: "PeeringVpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-peering" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+            VpcId: { Ref: "Vpc" }
+        Condition: "CreatePeeringConnection"
+
+    ##########################################################################################################
+    ##  PUBLIC AZ ALPHA
+    ##########################################################################################################
+
+    PublicSubnetAlpha:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.0.0/24" }
+            MapPublicIpOnLaunch: true
+            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-public-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+
+    PublicRouteTableAlpha:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-public-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+
+    PublicSubnetAlphaRouteTableAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            SubnetId: { Ref: "PublicSubnetAlpha" }
+            RouteTableId: { Ref: "PublicRouteTableAlpha" }
+
+    PublicRouteAlpha:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PublicRouteTableAlpha" }
+            GatewayId: { Ref: "InternetGateway" }
+            DestinationCidrBlock: "0.0.0.0/0"
+        DependsOn: "InternetGatewayVpcAttachment"
+
+    PublicAlphaPeeringRoute:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PublicRouteTableAlpha" }
+            VpcPeeringConnectionId: { Ref: "PeeringConnection" }
+            DestinationCidrBlock: { Ref: "PeeringCidr" }
+        Condition: "CreatePeeringConnection"
+        DependsOn: "InternetGatewayVpcAttachment"
+
+    NatGatewayEipAlpha:
+        Type: "AWS::EC2::EIP"
+        Properties:
+            Domain: "vpc"
+
+    NatGatewayAlpha:
+        DependsOn: "InternetGatewayVpcAttachment"
+        Type: "AWS::EC2::NatGateway"
+        Properties:
+            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipAlpha", "AllocationId" ] }
+            SubnetId: { Ref: "PublicSubnetAlpha" }
+
+    ##########################################################################################################
+    ##  PUBLIC AZ BETA
+    ##########################################################################################################
+
+    PublicSubnetBeta:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            CidrBlock:  { "Fn::Sub": "10.${VpnCidr}.100.0/24" }
+            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
+            MapPublicIpOnLaunch: true
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-public-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+        Condition: "MultiAz"
+
+    PublicRouteTableBeta:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-public-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+        Condition: "MultiAz"
+
+    PublicSubnetBetaRouteTableAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            SubnetId: { Ref: "PublicSubnetBeta" }
+            RouteTableId: { Ref: "PublicRouteTableBeta" }
+        Condition: "MultiAz"
+
+    PublicRouteBeta:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PublicRouteTableBeta" }
+            GatewayId: { Ref: "InternetGateway" }
+            DestinationCidrBlock: "0.0.0.0/0"
+        Condition: "MultiAz"
+        DependsOn: "InternetGatewayVpcAttachment"
+
+    PublicBetaPeeringRoute:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PublicRouteTableBeta" }
+            VpcPeeringConnectionId: { Ref: "PeeringConnection" }
+            DestinationCidrBlock: { Ref: "PeeringCidr" }
+        Condition: "MultiAzAndCreatePeeringConnection"
+        DependsOn: "InternetGatewayVpcAttachment"
+
+    NatGatewayEipBeta:
+        Type: "AWS::EC2::EIP"
+        Properties:
+            Domain: "vpc"
+        Condition: "MultiAz"
+
+    NatGatewayBeta:
+        DependsOn: "InternetGatewayVpcAttachment"
+        Type: "AWS::EC2::NatGateway"
+        Properties:
+            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipBeta", "AllocationId" ] }
+            SubnetId: { Ref: "PublicSubnetBeta" }
+        Condition: "MultiAz"
+
+    ##########################################################################################################
+    ##  PRIVATE AZ ALPHA
+    ##########################################################################################################
+
+    PrivateSubnetAlpha:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.1.0/24" }
+            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-private-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+
+    PrivateRouteTableAlpha:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-private-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+
+    PrivateSubnetAlphaRouteTableAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            SubnetId: { Ref: "PrivateSubnetAlpha" }
+            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
+
+    PrivateRouteAlpha:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
+            NatGatewayId: { Ref: "NatGatewayAlpha" }
+            DestinationCidrBlock: "0.0.0.0/0"
+        DependsOn: "InternetGatewayVpcAttachment"
+
+    PrivateAlphaPeeringRoute:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
+            VpcPeeringConnectionId: { Ref: "PeeringConnection" }
+            DestinationCidrBlock: { Ref: "PeeringCidr" }
+        Condition: "CreatePeeringConnection"
+        DependsOn: "InternetGatewayVpcAttachment"
+
+    ##########################################################################################################
+    ##  PRIVATE AZ BETA
+    ##########################################################################################################
+
+    PrivateSubnetBeta:
+        Type: "AWS::EC2::Subnet"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.101.0/24" }
+            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-private-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+        Condition: "MultiAz"
+
+    PrivateRouteTableBeta:
+        Type: "AWS::EC2::RouteTable"
+        Properties:
+            VpcId: { Ref: "Vpc" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-private-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+        Condition: "MultiAz"
+
+    PrivateSubnetBetaRouteTableAssociation:
+        Type: "AWS::EC2::SubnetRouteTableAssociation"
+        Properties:
+            SubnetId: { Ref: "PrivateSubnetBeta" }
+            RouteTableId: { Ref: "PrivateRouteTableBeta" }
+        Condition: "MultiAz"
+
+    PrivateRouteBeta:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PrivateRouteTableBeta" }
+            NatGatewayId: { Ref: "NatGatewayBeta" }
+            DestinationCidrBlock: "0.0.0.0/0"
+        Condition: "MultiAz"
+        DependsOn: "InternetGatewayVpcAttachment"
+
+    PrivateBetaPeeringRoute:
+        Type: "AWS::EC2::Route"
+        Properties:
+            RouteTableId: { Ref: "PrivateRouteTableBeta" }
+            VpcPeeringConnectionId: { Ref: "PeeringConnection" }
+            DestinationCidrBlock: { Ref: "PeeringCidr" }
+        Condition: "MultiAzAndCreatePeeringConnection"
+        DependsOn: "InternetGatewayVpcAttachment"
+
+    ##########################################################################################################
+    ##  ENDPOINTS
+    ##########################################################################################################
+
+    # An S3 endpoint provides a direct connection from the EC2 instances to S3; providing lower latency
+    # and without incurring network bandwidth charges.  Note that currently they don't support commands like
+    # sync between S3 buckets in different regions :(
+    S3Endpoint:
+        Type: "AWS::EC2::VPCEndpoint"
+        Properties:
+            RouteTableIds: { "Fn::If": [
+                "MultiAz",
+                [
+                    { Ref: "PublicRouteTableAlpha" },
+                    { Ref: "PrivateRouteTableAlpha" },
+                    { Ref: "PublicRouteTableBeta" },
+                    { Ref: "PrivateRouteTableBeta" }
+                ],
+                [
+                    { Ref: "PublicRouteTableAlpha" },
+                    { Ref: "PrivateRouteTableAlpha" }
+                ]
+            ] }
+            ServiceName: { "Fn::Sub": "com.amazonaws.${AWS::Region}.s3" }
+            VpcId: { Ref: "Vpc" }
+
+    ##########################################################################################################
+    ##  ROUTE53
+    ##########################################################################################################
+
+    PrivateHostedZone:
+        Type: "AWS::Route53::HostedZone"
+        Properties:
+            Name: "internal"
+            HostedZoneConfig:
+                Comment: { "Fn::Sub": "Hosted zone created by the '${AWS::StackName}' CloudFormation stack" }
+            HostedZoneTags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-private" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+            VPCs:
+              - VPCId: { Ref: "Vpc" }
+                VPCRegion: { Ref: "AWS::Region" }
+
+Outputs:
+    VpcId:
+        Description: "The id of the VPC"
+        Value: { Ref: "Vpc" }
+
+    AvailabilityZoneAlpha:
+        Description: "The availability zone used for AZ alpha"
+        Value: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
+
+    AvailabilityZoneBeta:
+        Description: "The availability zone used for AZ beta"
+        Value: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
+
+    PrivateSubnetAlphaId:
+        Description: "The id of private subnet alpha"
+        Value: { Ref: "PrivateSubnetAlpha" }
+
+    PrivateSubnetBetaId:
+        Description: "The id of private subnet beta"
+        Value: { "Fn::If": [ "MultiAz",
+            { Ref: "PrivateSubnetBeta" },
+            ""
+        ]}
+
+    PrivateSubnetIds:
+        Description: "The ids of the private subnets"
+        Value: { "Fn::If": [ "MultiAz",
+            { "Fn::Sub": "${PrivateSubnetAlpha},${PrivateSubnetBeta}" },
+            { Ref: "PrivateSubnetAlpha" }
+        ]}
+
+    PrivateHostedZoneId:
+        Description: "The id of private hosted zone"
+        Value: { Ref: "PrivateHostedZone" }

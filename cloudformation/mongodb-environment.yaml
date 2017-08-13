@@ -1,0 +1,447 @@
+# A template that creates a compute environment
+#
+# Copyright 2017 Melon Software Ltd (UK), all rights reserved.  Used under license.
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates a Batch Compute Environment for the pre-processing pipeline"
+
+Parameters:
+
+    Environment:
+        Type: "String"
+        Description: "The name of the environment"
+
+    MultiAz:
+        Type: "String"
+        AllowedValues: [ "true", "false" ]
+        Description: "Whether to create instances in multiple AZs.  This has an additional cost."
+
+    # The second part of the CIDR block for the VPN (10.xx.0.0/24).
+    VpnCidr:
+        Type: "Number"
+        MinValue: 0
+        MaxValue: 255
+        Description: "The second digit in the IP range (10.xx.0.0/16).  VPNs with overlapping address spaces cannot be peered."
+
+    MongoDbVersion:
+        Type: "String"
+        AllowedValues: [ "3point4" ]
+        Default: "3point4"
+        Description: "The version of Mongodb to run"
+
+    Keypair:
+        Type: "String"
+        Default: ""
+        Description: "A SSH keypair to grant access to instances"
+
+    VolumeSize:
+        Type: "Number"
+        MinValue: 8
+        MaxValue: 16384
+        Description: "The size of the database volumes"
+
+    VolumeType:
+        Type: "String"
+        Default: "gp2"
+        AllowedValues: [ "gp2", "io1", "st1", "sc1" ]
+        Description: "The type of EBS volume to use"
+
+    VolumeProvisionedIops:
+        Type: "Number"
+        Default: 0
+        MaxValue: 20000
+        Description: "The number of IOPS to provision"
+
+    AlphaInstanceSize:
+        Type: "String"
+        Default: "none"
+        AllowedValues: [
+            "none",
+            "t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "t2.xlarge", "t2.2xlarge",
+            "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
+            "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
+            "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge",
+            "f1.2xlarge", "f1.16xlarge",
+            "g2.2xlarge", "g2.8xlarge",
+            "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge",
+            "i3.xlarge", "i3.2xlarge", "i3.4xlarge", "i3.8xlarge", "i3.16xlarge",
+            "m4", "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge", "m4.16xlarge",
+            "p2", "p2.xlarge", "p2.8xlarge", "p2.16xlarge",
+            "r3", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
+            "r4", "r4.large", "r4.xlarge", "r4.2xlarge", "r4.4xlarge", "r4.8xlarge", "r4.16xlarge",
+            "x1", "x1.16xlarge", "x1.32xlarge"
+        ]
+        Description: "What type the instance should be"
+
+    AlphaInstanceType:
+        Type: "String"
+        Default: "live"
+        AllowedValues: [ "live", "arbiter" ]
+
+
+    VpcTemplate:
+        Type: "String"
+        Default: "https://s3.amazonaws.com/biometrix-infrastructure-us-east-1/cloudformation/vpc.yaml"
+        Description: "Path to an S3 file containing the CloudFormation template for the VPC Stack"
+
+Metadata:
+    "AWS::CloudFormation::Interface":
+        ParameterGroups:
+          - Label: { default: "Definition" }
+            Parameters:
+              - "Environment"
+          - Label: { default: "Volumes" }
+            Parameters:
+              - "VolumeSize"
+              - "VolumeType"
+              - "VolumeProvisionedIops"
+          - Label: { default: "Instances" }
+            Parameters:
+              - "MongoDbVersion"
+              - "Keypair"
+              - "AlphaInstanceSize"
+              - "AlphaInstanceType"
+          - Label: { default: "Network" }
+            Parameters:
+              - "MultiAz"
+              - "VpnCidr"
+              - "VpcTemplate"
+
+        ParameterLabels:
+            Environment: { default: "Environment" }
+            VolumeSize: { default: "EBS size" }
+            VolumeType: { default: "EBS type" }
+            VolumeProvisionedIops: { default: "EBS IOPS" }
+            MongoDbVersion: { default: "MongoDb Version" }
+            Keypair: { default: "EC2 Keypair" }
+            MultiAz: { default: "Multi AZ?" }
+            VpnCidr: { default: "VPN CIDR block" }
+
+Mappings:
+    MongoVersionRegionAmi:
+        ap-northeast-1: { "3point4": "ami-1f4f7d78" }
+        ap-northeast-2: { "3point4": "ami-8ef02de0" }
+        ap-south-1: { "3point4": "ami-821469ed" }
+        ap-southeast-1: { "3point4": "ami-770c89142" }
+        ap-southeast-2: { "3point4": "ami-97757ff4" }
+        ca-central-1: { "3point4": "ami-18813d7c" }
+        eu-central-1: { "3point4": "ami-4d09d722" }
+        eu-west-1: { "3point4": "ami-0ebbb468" }
+        eu-west-2: { "3point4": "ami-155d4a71" }
+        sa-east-1: { "3point4": "ami-3339565f" }
+        us-east-1: { "3point4": "ami-3fe99d29" }
+        us-east-2: { "3point4": "ami-50fcdb35" }
+        us-west-1: { "3point4": "ami-daf1d7ba" }
+        us-west-2: { "3point4": "ami-c60d68a6" }
+
+Conditions:
+    AllowSsh: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "Keypair" }, "" ] } ] }
+    SpecifyIops: { "Fn::Or": [
+        { "Fn::Equals": [ { Ref: "VolumeType" }, "io1" ] },
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "VolumeProvisionedIops" }, "0" ] } ] }
+    ]}
+    CreateInstanceAlpha: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "AlphaInstanceSize" }, "none" ] } ] }
+
+Resources:
+
+    ##########################################################################################################
+    ## VPC & NETWORKING
+    ##########################################################################################################
+
+    VpcStack:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Project: "mongodb"
+                Environment: { Ref: "Environment" }
+                Service: "mongodb"
+                MultiAz: { Ref: "MultiAz" }
+                VpnCidr: { Ref: "VpnCidr" }
+                PeeringVpc: ""
+                PeeringCidr: ""
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "mongodb" }
+            TemplateURL: { Ref: "VpcTemplate" }
+            TimeoutInMinutes: 10
+
+    ##########################################################################################################
+    ## SECURITY
+    ##########################################################################################################
+
+    InstanceRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "ec2.amazonaws.com" ] }
+                    Action: [ "sts:AssumeRole" ]
+            Path: "/"
+            Policies:
+              - PolicyName: "initialise"
+                PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Action:
+                          - "ec2:AttachNetworkInterface"
+                          - "ec2:AttachVolume"
+                          - "ec2:DescribeInstances"
+                          - "ec2:DescribeNetworkInterfaces"
+                          - "ec2:DescribeTags"
+                          - "ec2:DescribeVolumes"
+                        Resource: "*"
+                        Effect: "Allow"
+            RoleName: { "Fn::Sub": "mongodb-${Environment}-mongodb-ec2-${AWS::Region}" }
+
+    InstanceProfile:
+        Type: "AWS::IAM::InstanceProfile"
+        Properties:
+            Path: "/"
+            Roles: [ { Ref: "InstanceRole" } ]
+
+    PublicSshSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Enable external SSH access"
+            VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
+            SecurityGroupIngress:
+              - IpProtocol: "tcp"
+                FromPort: "22"
+                ToPort: "22"
+                CidrIp: "0.0.0.0/0"
+        Condition: "AllowSsh"
+
+    InstanceSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Enable Mongodb access"
+            VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
+            SecurityGroupIngress:
+              - IpProtocol: "tcp"
+                FromPort: "27017"
+                ToPort: "27017"
+                CidrIp: "0.0.0.0/0"
+
+    ##########################################################################################################
+    ## EBS AND ENI
+    ##########################################################################################################
+
+    InstanceAlphaNetworkInterface:
+        Type: "AWS::EC2::NetworkInterface"
+        Properties:
+            Description: "ENI for instance Alpha"
+            GroupSet: { "Fn::If": [
+                "AllowSsh",
+                [ { Ref: "PublicSshSecurityGroup" }, { Ref: "InstanceSecurityGroup" }],
+                [ { Ref: "InstanceSecurityGroup" }]
+            ]}
+            SubnetId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetAlphaId" ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "mongodb" }
+        Condition: "CreateInstanceAlpha"
+
+    InstanceAlphaVolume:
+        Type: "AWS::EC2::Volume"
+        Properties:
+            AvailabilityZone: { "Fn::GetAtt": [ "VpcStack", "Outputs.AvailabilityZoneAlpha" ] }
+            Iops: { "Fn::If": [ "SpecifyIops", { Ref: "VolumeProvisionedIops" }, { Ref: "AWS::NoValue" } ]}
+            Size: { Ref: "VolumeSize" }
+            VolumeType: { Ref: "VolumeType" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "mongodb" }
+        Condition: "CreateInstanceAlpha"
+
+    ##########################################################################################################
+    ## AUTOSCALING
+    ##########################################################################################################
+
+    LaunchConfiguration:
+        Type: "AWS::AutoScaling::LaunchConfiguration"
+        DependsOn:
+          - "InstanceAlphaNetworkInterface"
+        Metadata:
+            AWS::CloudFormation::Init:
+                config:
+                    files:
+                        /jet/etc/mongodb/mongodb.conf:
+                            content: |
+                                storage:
+                                    journal:
+                                        enabled: true
+                            mode: "000644"
+                            owner: "root"
+                            group: "root"
+                        /opt/biometrix/init_stateful_server.py:
+                            content: |
+                                #!/usr/bin/env python
+                                import boto3, requests
+
+                                def attach_eni(eni_id):
+                                    while True:
+                                        try:
+                                            ec2_client.attach_network_interface(
+                                                NetworkInterfaceId=eni_id,
+                                                InstanceId=instance_id,
+                                                DeviceIndex=1
+                                            )
+                                            break
+                                        except Exception as e:
+                                            raise
+
+                                def attach_ebs(volume_id):
+                                    while True:
+                                        try:
+                                            instance.attach_volume(
+                                                VolumeId=volume_id,
+                                                Device="/dev/xvdb"
+                                            )
+                                            break
+                                        except Exception as e:
+                                            raise
+
+                                if __name__ == '__main__':
+                                    ec2_resource = boto3.resource('ec2', region_name='us-east-1')
+                                    ec2_client = boto3.client('ec2', region_name='us-east-1')
+
+                                    instance_id = requests.get('http://169.254.169.254/latest/meta-data/instance-id').text
+                                    instance = ec2_resource.Instance(instance_id)
+
+                                    tags = {tag['Key']:tag['Value'] for tag in instance.tags}
+                                    eni_id, volume_id, asg_name = tags.get('InstanceEniId', None), tags.get('InstanceVolumeId', None), tags.get('aws:cloudformation:logical-id', '')
+
+                                    attach_eni(eni_id)
+                                    attach_ebs(volume_id)
+
+                                    with open('/tmp/aws_asg_name', 'w') as f:
+                                        f.write(asg_name)
+
+                            mode: "000755"
+                            owner: "root"
+                            group: "root"
+        Properties:
+            AssociatePublicIpAddress: "false"
+            IamInstanceProfile: { Ref: "InstanceProfile" }
+            ImageId: { "Fn::FindInMap": [ "MongoVersionRegionAmi", { Ref: "AWS::Region" }, { Ref: "MongoDbVersion" } ] }
+            InstanceType: { Ref: "AlphaInstanceSize" }
+            SecurityGroups: { "Fn::If": [
+                "AllowSsh",
+                [ { Ref: "PublicSshSecurityGroup" }, { Ref: "InstanceSecurityGroup" }],
+                [ { Ref: "InstanceSecurityGroup" }]
+            ]}
+            KeyName: { "Fn::If": [
+                "AllowSsh",
+                { Ref: "Keypair" },
+                { Ref: "AWS::NoValue" }
+            ]}
+            UserData:
+                Fn::Base64: !Sub |
+                    #!/bin/bash
+
+                    # Fail on any errors, including inside piped functions
+                    set -euo pipefail
+
+                    # Install aws cli, latest version
+                    yum update -y
+                    yum install -y python2.7 python-pip curl jq ntp
+                    pip install boto3 https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz
+
+
+                    # Install the files referenced in the metadata above
+                    /opt/aws/bin/cfn-init \
+                        --resource LaunchConfiguration \
+                        --stack ${AWS::StackName} \
+                        --region ${AWS::Region}
+
+
+                    # Set the hostname
+                    INSTANCE_ID=$( curl -s http://169.254.169.254/latest/meta-data/instance-id )
+                    echo $INSTANCE_ID > /etc/hostname
+                    hostname $INSTANCE_ID
+
+
+                    # Attach ENI and EBS
+                    /opt/biometrix/init_stateful_server.py
+                    sleep 30s
+
+
+                    # Mount the EBS volume as a new filesystem
+                    set +e
+                    blkid -L mongodatastore
+                    FILESYSTEM_EXISTS=$?
+                    set -e
+                    if [[ $FILESYSTEM_EXISTS -ne 0 ]]; then
+                        mkfs -t ext4 -L mongodatastore /dev/xvdb
+                    fi
+                    mkdir -p /ext /ext/ebs1
+                    mount /dev/xvdb /ext/ebs1
+                    echo "LABEL=mongodatastore /ext/ebs1 ext4 nofail 0 0" >> /etc/fstab
+                    chown -R ec2-user:ec2-user /ext/ebs1
+
+
+                    # If the filesystem hasn't been initialised before, do so; then mount the data directory
+                    if [ ! -d /ext/ebs1/db ]; then
+                        echo "Initialising EBS volume"
+                        mkdir /ext/ebs1/db
+                        cp /jet/prs/mongodb/db/* /ext/ebs1/db -R
+                    fi
+                    echo "Mounting MongoDb data volume"
+                    mount -o bind /ext/ebs1/db /jet/prs/mongodb/db
+
+
+                    # Signal to the autoscaling group that the instance is configured successfully
+                    /opt/aws/bin/cfn-signal \
+                        --success true \
+                        --stack ${AWS::StackName} \
+                        --resource `cat /tmp/aws_asg_name` \
+                        --region ${AWS::Region}
+
+    InstanceAlphaAsg:
+        Type: "AWS::AutoScaling::AutoScalingGroup"
+        DependsOn:
+          - "InstanceAlphaNetworkInterface"
+          - "InstanceAlphaVolume"
+        Properties:
+            VPCZoneIdentifier: [ { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetAlphaId" ] } ]
+            LaunchConfigurationName: { Ref: "LaunchConfiguration" }
+            DesiredCapacity: 1
+            MinSize: 0
+            MaxSize: 1
+            HealthCheckGracePeriod: "30"
+            HealthCheckType: "EC2"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-alpha" }, PropagateAtLaunch: "true" }
+              - { Key: "Management", Value: "managed", PropagateAtLaunch: "true" }
+              - { Key: "Project", Value: "mongodb", PropagateAtLaunch: "true" }
+              - { Key: "Environment", Value: { Ref: "Environment" }, PropagateAtLaunch: "true" }
+              - { Key: "Service", Value: "mongodb", PropagateAtLaunch: "true" }
+              - { Key: "InstanceEniId", Value: { Ref: "InstanceAlphaNetworkInterface" }, PropagateAtLaunch: "true" }
+              - { Key: "InstanceVolumeId", Value: { Ref: "InstanceAlphaVolume" }, PropagateAtLaunch: "true" }
+        CreationPolicy:
+            ResourceSignal:
+                Count: 1
+                Timeout: PT3M
+        UpdatePolicy:
+            AutoScalingRollingUpdate:
+                MaxBatchSize: 1
+                MinInstancesInService: 0
+                PauseTime: PT3M
+                WaitOnResourceSignals: "true"
+        Condition: "CreateInstanceAlpha"
+
+Outputs:
+    VpcId:
+        Description: "The id of the VPC"
+        Value: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
