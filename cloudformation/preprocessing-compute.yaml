@@ -570,9 +570,8 @@ Resources:
     ##########################################################################################################
 
     BatchComputeEnvironment:
-        Type: "Custom::Batch_ComputeEnvironment"
+        Type: "AWS::Batch::ComputeEnvironment"
         Properties:
-            ServiceToken: { "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:aws-cloudformation-polyfill" }
             ComputeEnvironmentName: { "Fn::Sub": "preprocessing-${Environment}-compute" }
             ComputeResources:
                 Ec2KeyPair: { Ref: "Keypair" }
@@ -586,24 +585,25 @@ Resources:
                 Subnets:
                   - { Ref: "PrivateSubnetAlpha" }
                 Tags:
-                  - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute" } }
-                  - { Key: "Management", Value: "managed" }
-                  - { Key: "Project", Value: "preprocessing" }
-                  - { Key: "Environment", Value: { Ref: "Environment" } }
+                    Name: { "Fn::Sub": "preprocessing-${Environment}-compute" }
+                    Management: "managed"
+                    Project: "preprocessing"
+                    Environment: { Ref: "Environment" }
+                    Service: "batch"
                 Type: "EC2"
             ServiceRole: { "Fn::ImportValue": "BatchServiceRole" }
             State: "ENABLED"
             Type: "MANAGED"
 
     BatchJobQueue:
-        Type: "Custom::Batch_JobQueue"
+        Type: "AWS::Batch::JobQueue"
         Properties:
-            ServiceToken: { "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:aws-cloudformation-polyfill" }
-            ComputeEnvironments:
+            ComputeEnvironmentOrder:
               - ComputeEnvironment: { Ref: "BatchComputeEnvironment" }
                 Order: 1
-            Name: { "Fn::Sub": "preprocessing-${Environment}-compute" }
+            JobQueueName: { "Fn::Sub": "preprocessing-${Environment}-compute" }
             Priority: 1
+            State: "ENABLED"
 
     ##########################################################################################################
     ##  MONITORING
