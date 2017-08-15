@@ -188,6 +188,7 @@ Resources:
                     Version: '2012-10-17'
                     Statement:
                       - Action:
+                          - "autoscaling:DescribeAutoScalingInstances"
                           - "cloudwatch:GetMetricStatistics"
                           - "cloudwatch:ListMetrics"
                           - "cloudwatch:PutMetricData"
@@ -201,9 +202,9 @@ Resources:
                           - "logs:CreateLogStream"
                           - "logs:DescribeLogGroups"
                           - "logs:DescribeLogStreams"
-                          - "logs:PutLogEvents"
-                          - "logs:GetLogEvents"
                           - "logs:FilterLogEvents"
+                          - "logs:GetLogEvents"
+                          - "logs:PutLogEvents"
                         Resource: "*"
                         Effect: "Allow"
             RoleName: { "Fn::Sub": "mongodb-${Environment}-mongodb-ec2-${AWS::Region}" }
@@ -287,13 +288,14 @@ Resources:
                 config:
                     packages:
                         yum:
-                            awslogs: []
                             curl: []
                             jq: []
                             ntp: []
                         python:
-                            boto3: []
+                            awscli: []
                             aws-cfn-bootstrap: []
+                            boto3: []
+                            cloudwatchmon: []
                     files:
                         /jet/etc/mongodb/mongodb.conf:
                             content: |
@@ -303,8 +305,9 @@ Resources:
                             mode: "000644"
                             owner: "root"
                             group: "root"
+
                         /opt/biometrix/init_stateful_server.py:
-                            content: |
+                            content: !Sub |
                                 #!/usr/bin/env python
                                 import boto3, requests
 
@@ -334,8 +337,8 @@ Resources:
                                             time.sleep(10)
 
                                 if __name__ == '__main__':
-                                    ec2_resource = boto3.resource('ec2', region_name='us-east-1')
-                                    ec2_client = boto3.client('ec2', region_name='us-east-1')
+                                    ec2_resource = boto3.resource('ec2', region_name='${AWS::Region}')
+                                    ec2_client = boto3.client('ec2', region_name='${AWS::Region}')
 
                                     instance_id = requests.get('http://169.254.169.254/latest/meta-data/instance-id').text
                                     instance = ec2_resource.Instance(instance_id)
@@ -352,6 +355,37 @@ Resources:
                             mode: "000755"
                             owner: "root"
                             group: "root"
+
+                        /etc/awslogs/awscli.conf:
+                            content: !Sub |
+                                [default]
+                                region=${AWS::Region}
+                            mode: "000644"
+                            owner: "root"
+                            group: "root"
+
+                        /etc/awslogs/awslogs.conf:
+                            content: !Sub |
+                                [general]
+                                state_file = /var/awslogs/state/agent-state
+                                use_gzip_http_content_encoding = true
+
+                                [mongodb]
+                                log_group_name = application/mongodb/${Environment}
+                                log_stream_name = {hostname}
+                                datetime_format = %a %b %d %H:%M:%S.%f
+                                time_zone = UTC
+                                file = /jet/log/mongodb/mongodb.log
+                                batch_count = 100
+                            mode: "000644"
+                            owner: "root"
+                            group: "root"
+
+                    commands:
+                        cron_cloudwatchmon:
+                            command: 'echo "* /5 * * * * /usr/local/bin/mon-put-instance-stats.py --mem-util --disk-space-util --disk-path=/ --disk-path=/ext/ebs1 --disk-inode-util --auto-scaling" >> /etc/crontab'
+                        install_awslogs:
+                            command: { "Fn::Sub": 'curl https://s3.amazonaws.com//aws-cloudwatch/downloads/latest/awslogs-agent-setup.py -O && chmod +x ./awslogs-agent-setup.py && ./awslogs-agent-setup.py -n -r ${AWS::Region} -c /etc/awslogs/awslogs.conf' }
         Properties:
             AssociatePublicIpAddress: "false"
             IamInstanceProfile: { Ref: "InstanceProfile" }
@@ -456,6 +490,153 @@ Resources:
                 PauseTime: PT3M
                 WaitOnResourceSignals: "true"
         Condition: "CreateInstanceAlpha"
+
+    ##########################################################################################################
+    ##  MONITORING
+    ##########################################################################################################
+
+    CloudWatchDashboard:
+        Type: "AWS::CloudWatch::Dashboard"
+        Properties:
+            DashboardName: { "Fn::Sub": "mongodb-${Environment}-${AWS::Region}" }
+            DashboardBody: !Sub |
+                {
+                    "widgets": [
+                        {
+                            "type": "metric",
+                            "x": 0,
+                            "y": 0,
+                            "width": 12,
+                            "height": 6,
+                            "properties": {
+                                "view": "timeSeries",
+                                "stacked": false,
+                                "metrics": [
+                                    [ "AWS/EC2", "CPUUtilization", "AutoScalingGroupName", "${InstanceAlphaAsg}", { "period": 60 } ]
+                                ],
+                                "region": "${AWS::Region}",
+                                "title": "CPU Utilisation",
+                                "period": 300,
+                                "yAxis": {
+                                    "left": {
+                                        "min": 0,
+                                        "max": 100
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "type": "metric",
+                            "x": 12,
+                            "y": 0,
+                            "width": 12,
+                            "height": 6,
+                            "properties": {
+                                "view": "timeSeries",
+                                "stacked": false,
+                                "metrics": [
+                                    [ "AWS/EBS", "VolumeReadOps", "VolumeId", "vol-0014428c6755b0cc0" ],
+                                    [ ".", "VolumeWriteOps", ".", "." ]
+                                ],
+                                "region": "${AWS::Region}",
+                                "title": "Read/Write IOPS"
+                            }
+                        },
+                        {
+                            "type": "metric",
+                            "x": 0,
+                            "y": 6,
+                            "width": 12,
+                            "height": 6,
+                            "properties": {
+                                "view": "timeSeries",
+                                "stacked": false,
+                                "metrics": [
+                                    [ "System/Linux", "MemoryUtilization", "AutoScalingGroupName", "${InstanceAlphaAsg}", { "period": 60 } ]
+                                ],
+                                "region": "${AWS::Region}",
+                                "title": "Memory Utilisation",
+                                "period": 300,
+                                "yAxis": {
+                                    "left": {
+                                        "min": 0,
+                                        "max": 100
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "type": "metric",
+                            "x": 12,
+                            "y": 6,
+                            "width": 12,
+                            "height": 6,
+                            "properties": {
+                                "view": "timeSeries",
+                                "stacked": false,
+                                "metrics": [
+                                    [ "AWS/EBS", "BurstBalance", "VolumeId", "${InstanceAlphaVolume}", { "yAxis": "right" } ],
+                                    [ ".", "VolumeQueueLength", ".", ".", { "period": 300 } ]
+                                ],
+                                "region": "${AWS::Region}",
+                                "period": 300,
+                                "title": "Write Queue Length / Burst Balance",
+                                "yAxis": {
+                                    "right": {
+                                        "min": 0,
+                                        "max": 100
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "type": "metric",
+                            "x": 0,
+                            "y": 12,
+                            "width": 3,
+                            "height": 9,
+                            "properties": {
+                                "metrics": [
+                                    [ "System/Linux", "DiskSpaceUtilization", "MountPath", "/ext/ebs1", "AutoScalingGroupName", "${InstanceAlphaAsg}", "Filesystem", "/dev/xvdb" ]
+                                ],
+                                "period": 60,
+                                "stat": "Average",
+                                "region": "${AWS::Region}",
+                                "title": "Data EBS Utilisation",
+                                "yAxis": {
+                                    "left": {
+                                        "min": 0
+                                    }
+                                },
+                                "view": "singleValue",
+                                "stacked": false
+                            }
+                        },
+                        {
+                            "type": "metric",
+                            "x": 3,
+                            "y": 12,
+                            "width": 3,
+                            "height": 9,
+                            "properties": {
+                                "metrics": [
+                                    [ "System/Linux", "DiskSpaceUtilization", "MountPath", "/", "AutoScalingGroupName", "${InstanceAlphaAsg}", "Filesystem", "/dev/xvda1" ]
+                                ],
+                                "period": 60,
+                                "stat": "Average",
+                                "region": "${AWS::Region}",
+                                "title": "Root EBS Uutilisation",
+                                "yAxis": {
+                                    "left": {
+                                        "min": 0
+                                    }
+                                },
+                                "view": "singleValue",
+                                "stacked": false
+                            }
+                        }
+                    ]
+                }
 
 Outputs:
     VpcId:
