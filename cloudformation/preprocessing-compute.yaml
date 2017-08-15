@@ -577,8 +577,8 @@ Resources:
                 Ec2KeyPair: { Ref: "Keypair" }
                 InstanceRole: { Ref: "Ec2InstanceStartupProfile" }
                 InstanceTypes: [ { Ref: "InstanceSize" } ]
-                MaxvCpus: 5
-                MinvCpus: 1
+                MaxvCpus: 16
+                MinvCpus: 0
                 SecurityGroupIds:
                   - { Ref: "Ec2SecurityGroup" }
                   - { Ref: "EfsSecurityGroup" }
