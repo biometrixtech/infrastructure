@@ -118,21 +118,21 @@ Metadata:
             VpnCidr: { default: "VPN CIDR block" }
 
 Mappings:
-    MongoVersionRegionAmi:
+    RegionAmiMappings:
         ap-northeast-1: { "3point4": "ami-1f4f7d78" }
         ap-northeast-2: { "3point4": "ami-8ef02de0" }
-        ap-south-1: { "3point4": "ami-821469ed" }
+        ap-south-1:     { "3point4": "ami-821469ed" }
         ap-southeast-1: { "3point4": "ami-770c89142" }
         ap-southeast-2: { "3point4": "ami-97757ff4" }
-        ca-central-1: { "3point4": "ami-18813d7c" }
-        eu-central-1: { "3point4": "ami-4d09d722" }
-        eu-west-1: { "3point4": "ami-0ebbb468" }
-        eu-west-2: { "3point4": "ami-155d4a71" }
-        sa-east-1: { "3point4": "ami-3339565f" }
-        us-east-1: { "3point4": "ami-3fe99d29" }
-        us-east-2: { "3point4": "ami-50fcdb35" }
-        us-west-1: { "3point4": "ami-daf1d7ba" }
-        us-west-2: { "3point4": "ami-c60d68a6" }
+        ca-central-1:   { "3point4": "ami-18813d7c" }
+        eu-central-1:   { "3point4": "ami-4d09d722" }
+        eu-west-1:      { "3point4": "ami-0ebbb468" }
+        eu-west-2:      { "3point4": "ami-155d4a71" }
+        sa-east-1:      { "3point4": "ami-3339565f" }
+        us-east-1:      { "3point4": "ami-3fe99d29", "bastion": "ami-1d4e7a66" }
+        us-east-2:      { "3point4": "ami-50fcdb35" }
+        us-west-1:      { "3point4": "ami-daf1d7ba" }
+        us-west-2:      { "3point4": "ami-c60d68a6", "bastion": "ami-8803e0f0" }
 
 Conditions:
     AllowSsh: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "Keypair" }, "" ] } ] }
@@ -215,28 +215,32 @@ Resources:
             Path: "/"
             Roles: [ { Ref: "InstanceRole" } ]
 
-    PublicSshSecurityGroup:
+    InternalSshSecurityGroup:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
-            GroupDescription: "Enable external SSH access"
+            GroupDescription: "Enable SSH access"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-ssh" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
             VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
-            SecurityGroupIngress:
-              - IpProtocol: "tcp"
-                FromPort: "22"
-                ToPort: "22"
-                CidrIp: "0.0.0.0/0"
-        Condition: "AllowSsh"
 
     InstanceSecurityGroup:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
             GroupDescription: "Enable Mongodb access"
-            VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
             SecurityGroupIngress:
               - IpProtocol: "tcp"
                 FromPort: "27017"
                 ToPort: "27017"
                 CidrIp: "0.0.0.0/0"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-mongo" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
 
     ##########################################################################################################
     ## EBS AND ENI
@@ -246,11 +250,7 @@ Resources:
         Type: "AWS::EC2::NetworkInterface"
         Properties:
             Description: "ENI for instance Alpha"
-            GroupSet: { "Fn::If": [
-                "AllowSsh",
-                [ { Ref: "PublicSshSecurityGroup" }, { Ref: "InstanceSecurityGroup" }],
-                [ { Ref: "InstanceSecurityGroup" }]
-            ]}
+            GroupSet: [ { Ref: "InternalSshSecurityGroup" }, { Ref: "InstanceSecurityGroup" }]
             SubnetId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetAlphaId" ] }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-alpha" } }
@@ -389,13 +389,9 @@ Resources:
         Properties:
             AssociatePublicIpAddress: "false"
             IamInstanceProfile: { Ref: "InstanceProfile" }
-            ImageId: { "Fn::FindInMap": [ "MongoVersionRegionAmi", { Ref: "AWS::Region" }, { Ref: "MongoDbVersion" } ] }
+            ImageId: { "Fn::FindInMap": [ "RegionAmiMappings", { Ref: "AWS::Region" }, { Ref: "MongoDbVersion" } ] }
             InstanceType: { Ref: "AlphaInstanceSize" }
-            SecurityGroups: { "Fn::If": [
-                "AllowSsh",
-                [ { Ref: "PublicSshSecurityGroup" }, { Ref: "InstanceSecurityGroup" }],
-                [ { Ref: "InstanceSecurityGroup" }]
-            ]}
+            SecurityGroups: [ { Ref: "InternalSshSecurityGroup" }, { Ref: "InstanceSecurityGroup" }]
             KeyName: { "Fn::If": [
                 "AllowSsh",
                 { Ref: "Keypair" },
@@ -637,6 +633,75 @@ Resources:
                         }
                     ]
                 }
+
+    ##########################################################################################################
+    ##  BASTION
+    ##########################################################################################################
+
+    ExternalSshSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Enable external SSH access"
+            VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
+            SecurityGroupIngress:
+              - IpProtocol: "tcp"
+                FromPort: "22"
+                ToPort: "22"
+                CidrIp: "0.0.0.0/0"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-bastion-ssh" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+        Condition: "AllowSsh"
+
+    InternalSshSecurityGroupRule:
+        Type: "AWS::EC2::SecurityGroupIngress"
+        Properties:
+            FromPort: "22"
+            GroupId: { Ref: "InternalSshSecurityGroup" }
+            IpProtocol: "tcp"
+            SourceSecurityGroupId: { Ref: "ExternalSshSecurityGroup" }
+            ToPort: "22"
+        Condition: "AllowSsh"
+
+    BastionInstance:
+        Type: "AWS::EC2::Instance"
+        Properties:
+            ImageId: { "Fn::FindInMap": [ "RegionAmiMappings", { Ref: "AWS::Region" }, "bastion" ] }
+            InstanceInitiatedShutdownBehavior: "stop"
+            InstanceType: "t2.nano"
+            KeyName: { Ref: "Keypair" }
+            SecurityGroupIds: [ { Ref: "ExternalSshSecurityGroup" } ]
+            SubnetId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PublicSubnetAlphaId" ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-bastion" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "bastion" }
+            UserData: ""
+        Condition: "AllowSsh"
+
+    BastionElasticIp:
+        Type: "AWS::EC2::EIP"
+        Properties:
+            InstanceId: { Ref: "BastionInstance" }
+            Domain: "vpc"
+        Condition: "AllowSsh"
+        DependsOn: "VpcStack"
+
+    ##########################################################################################################
+    ##  OUTPUT
+    ##########################################################################################################
+
+    HostSsmParameter:
+        Type: "AWS::SSM::Parameter"
+        Properties:
+            Name: { "Fn::Sub": "mongodb.${Environment}.host" }
+            Description: "The IP addresses to use in the host field of a mongodb connection string"
+            Type: "String"
+            Value: { "Fn::GetAtt": [ "InstanceAlphaNetworkInterface", "PrimaryPrivateIpAddress" ] }
 
 Outputs:
     VpcId:

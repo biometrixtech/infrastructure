@@ -430,6 +430,17 @@ Outputs:
             ""
         ]}
 
+    PublicSubnetAlphaId:
+        Description: "The id of public subnet alpha"
+        Value: { Ref: "PublicSubnetAlpha" }
+
+    PublicSubnetBetaId:
+        Description: "The id of public subnet beta"
+        Value: { "Fn::If": [ "MultiAz",
+            { Ref: "PublicSubnetBeta" },
+            ""
+        ]}
+
     PrivateSubnetIds:
         Description: "The ids of the private subnets"
         Value: { "Fn::If": [ "MultiAz",
