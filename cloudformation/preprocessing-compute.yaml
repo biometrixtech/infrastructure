@@ -582,8 +582,11 @@ Resources:
                 SecurityGroupIds:
                   - { Ref: "Ec2SecurityGroup" }
                   - { Ref: "EfsSecurityGroup" }
-                Subnets:
-                  - { Ref: "PrivateSubnetAlpha" }
+                Subnets: { "Fn::If": [
+                    "MultiAz",
+                    [ { Ref: "PrivateSubnetAlpha" }, { Ref: "PrivateSubnetBeta" } ],
+                    [ { Ref: "PrivateSubnetAlpha" } ]
+                ]}
                 Tags:
                     Name: { "Fn::Sub": "preprocessing-${Environment}-compute" }
                     Management: "managed"
