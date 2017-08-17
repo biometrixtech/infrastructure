@@ -73,10 +73,47 @@ Parameters:
         ]
         Description: "What type the instance should be"
 
-    AlphaInstanceType:
+    BetaInstanceSize:
         Type: "String"
-        Default: "live"
-        AllowedValues: [ "live", "arbiter" ]
+        Default: "none"
+        AllowedValues: [
+            "none",
+            "t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "t2.xlarge", "t2.2xlarge",
+            "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
+            "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
+            "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge",
+            "f1.2xlarge", "f1.16xlarge",
+            "g2.2xlarge", "g2.8xlarge",
+            "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge",
+            "i3.xlarge", "i3.2xlarge", "i3.4xlarge", "i3.8xlarge", "i3.16xlarge",
+            "m4", "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge", "m4.16xlarge",
+            "p2", "p2.xlarge", "p2.8xlarge", "p2.16xlarge",
+            "r3", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
+            "r4", "r4.large", "r4.xlarge", "r4.2xlarge", "r4.4xlarge", "r4.8xlarge", "r4.16xlarge",
+            "x1", "x1.16xlarge", "x1.32xlarge"
+        ]
+        Description: "What type the instance should be"
+
+    GammaInstanceSize:
+        Type: "String"
+        Default: "none"
+        AllowedValues: [
+            "none",
+            "t2.nano", "t2.micro", "t2.small", "t2.medium", "t2.large", "t2.xlarge", "t2.2xlarge",
+            "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
+            "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
+            "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge",
+            "f1.2xlarge", "f1.16xlarge",
+            "g2.2xlarge", "g2.8xlarge",
+            "i2.xlarge", "i2.2xlarge", "i2.4xlarge", "i2.8xlarge",
+            "i3.xlarge", "i3.2xlarge", "i3.4xlarge", "i3.8xlarge", "i3.16xlarge",
+            "m4", "m4.large", "m4.xlarge", "m4.2xlarge", "m4.4xlarge", "m4.10xlarge", "m4.16xlarge",
+            "p2", "p2.xlarge", "p2.8xlarge", "p2.16xlarge",
+            "r3", "r3.large", "r3.xlarge", "r3.2xlarge", "r3.4xlarge", "r3.8xlarge",
+            "r4", "r4.large", "r4.xlarge", "r4.2xlarge", "r4.4xlarge", "r4.8xlarge", "r4.16xlarge",
+            "x1", "x1.16xlarge", "x1.32xlarge"
+        ]
+        Description: "What type the instance should be"
 
 
     VpcTemplate:
@@ -100,7 +137,8 @@ Metadata:
               - "MongoDbVersion"
               - "Keypair"
               - "AlphaInstanceSize"
-              - "AlphaInstanceType"
+              - "BetaInstanceSize"
+              - "GammaInstanceSize"
           - Label: { default: "Network" }
             Parameters:
               - "MultiAz"
@@ -116,6 +154,9 @@ Metadata:
             Keypair: { default: "EC2 Keypair" }
             MultiAz: { default: "Multi AZ?" }
             VpnCidr: { default: "VPN CIDR block" }
+            AlphaInstanceSize: { default: "Instance size (alpha)" }
+            BetaInstanceSize: { default: "Instance size (beta)" }
+            GammaInstanceSize: { default: "Instance size (gamma)" }
 
 Mappings:
     RegionAmiMappings:
@@ -135,12 +176,22 @@ Mappings:
         us-west-2:      { "3point4": "ami-c60d68a6", "bastion": "ami-8803e0f0" }
 
 Conditions:
+    MultiAzVpc: { "Fn::Or": [
+        { "Fn::Equals": [ { Ref: "MultiAz" }, "true" ] },
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "BetaInstanceSize" }, "none" ] } ] }
+    ] }
     AllowSsh: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "Keypair" }, "" ] } ] }
     SpecifyIops: { "Fn::Or": [
         { "Fn::Equals": [ { Ref: "VolumeType" }, "io1" ] },
         { "Fn::Not": [ { "Fn::Equals": [ { Ref: "VolumeProvisionedIops" }, "0" ] } ] }
     ]}
     CreateInstanceAlpha: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "AlphaInstanceSize" }, "none" ] } ] }
+    CreateInstanceBeta: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "BetaInstanceSize" }, "none" ] } ] }
+    CreateInstanceGamma: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "BetaInstanceSize" }, "none" ] } ] }
+    CreateInstanceGammaAsArbiter: { "Fn::And": [ 
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "BetaInstanceSize" }, "none" ] } ] }, 
+        { "Fn::Equals": [ { Ref: "GammaInstanceSize" }, "none" ] }
+    ] }
 
 Resources:
 
@@ -155,7 +206,7 @@ Resources:
                 Project: "mongodb"
                 Environment: { Ref: "Environment" }
                 Service: "mongodb"
-                MultiAz: { Ref: "MultiAz" }
+                MultiAz: { "Fn::If": [ "MultiAzVpc", "true", "false" ] }
                 VpnCidr: { Ref: "VpnCidr" }
                 PeeringVpc: ""
                 PeeringCidr: ""
@@ -274,6 +325,64 @@ Resources:
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: "mongodb" }
         Condition: "CreateInstanceAlpha"
+
+    InstanceBetaNetworkInterface:
+        Type: "AWS::EC2::NetworkInterface"
+        Properties:
+            Description: "ENI for instance Beta"
+            GroupSet: [ { Ref: "InternalSshSecurityGroup" }, { Ref: "InstanceSecurityGroup" }]
+            SubnetId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetBetaId" ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "mongodb" }
+        Condition: "CreateInstanceBeta"
+
+    InstanceBetaVolume:
+        Type: "AWS::EC2::Volume"
+        Properties:
+            AvailabilityZone: { "Fn::GetAtt": [ "VpcStack", "Outputs.AvailabilityZoneBeta" ] }
+            Iops: { "Fn::If": [ "SpecifyIops", { Ref: "VolumeProvisionedIops" }, { Ref: "AWS::NoValue" } ]}
+            Size: { Ref: "VolumeSize" }
+            VolumeType: { Ref: "VolumeType" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "mongodb" }
+        Condition: "CreateInstanceBeta"
+
+    InstanceGammaNetworkInterface:
+        Type: "AWS::EC2::NetworkInterface"
+        Properties:
+            Description: "ENI for instance Gamma"
+            GroupSet: [ { Ref: "InternalSshSecurityGroup" }, { Ref: "InstanceSecurityGroup" }]
+            SubnetId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetBetaId" ] }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-gamma" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "mongodb" }
+        Condition: "CreateInstanceGamma"
+
+    InstanceGammaVolume:
+        Type: "AWS::EC2::Volume"
+        Properties:
+            AvailabilityZone: { "Fn::GetAtt": [ "VpcStack", "Outputs.AvailabilityZoneBeta" ] }
+            Iops: { "Fn::If": [ "SpecifyIops", { Ref: "VolumeProvisionedIops" }, { Ref: "AWS::NoValue" } ]}
+            Size: { Ref: "VolumeSize" }
+            VolumeType: { Ref: "VolumeType" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-gamma" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "mongodb" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "mongodb" }
+        Condition: "CreateInstanceGamma"
 
     ##########################################################################################################
     ## AUTOSCALING
@@ -486,6 +595,72 @@ Resources:
                 PauseTime: PT3M
                 WaitOnResourceSignals: "true"
         Condition: "CreateInstanceAlpha"
+
+    InstanceBetaAsg:
+        Type: "AWS::AutoScaling::AutoScalingGroup"
+        DependsOn:
+          - "InstanceBetaNetworkInterface"
+          - "InstanceBetaVolume"
+        Properties:
+            VPCZoneIdentifier: [ { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetBetaId" ] } ]
+            LaunchConfigurationName: { Ref: "LaunchConfiguration" }
+            DesiredCapacity: 1
+            MinSize: 0
+            MaxSize: 1
+            HealthCheckGracePeriod: "30"
+            HealthCheckType: "EC2"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-beta" }, PropagateAtLaunch: "true" }
+              - { Key: "Management", Value: "managed", PropagateAtLaunch: "true" }
+              - { Key: "Project", Value: "mongodb", PropagateAtLaunch: "true" }
+              - { Key: "Environment", Value: { Ref: "Environment" }, PropagateAtLaunch: "true" }
+              - { Key: "Service", Value: "mongodb", PropagateAtLaunch: "true" }
+              - { Key: "InstanceEniId", Value: { Ref: "InstanceBetaNetworkInterface" }, PropagateAtLaunch: "true" }
+              - { Key: "InstanceVolumeId", Value: { Ref: "InstanceBetaVolume" }, PropagateAtLaunch: "true" }
+        CreationPolicy:
+            ResourceSignal:
+                Count: 1
+                Timeout: PT3M
+        UpdatePolicy:
+            AutoScalingRollingUpdate:
+                MaxBatchSize: 1
+                MinInstancesInService: 0
+                PauseTime: PT3M
+                WaitOnResourceSignals: "true"
+        Condition: "CreateInstanceBeta"
+
+    InstanceGammaAsg:
+        Type: "AWS::AutoScaling::AutoScalingGroup"
+        DependsOn:
+          - "InstanceGammaNetworkInterface"
+          - "InstanceGammaVolume"
+        Properties:
+            VPCZoneIdentifier: [ { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetBetaId" ] } ]
+            LaunchConfigurationName: { Ref: "LaunchConfiguration" }
+            DesiredCapacity: 1
+            MinSize: 0
+            MaxSize: 1
+            HealthCheckGracePeriod: "30"
+            HealthCheckType: "EC2"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-gamma" }, PropagateAtLaunch: "true" }
+              - { Key: "Management", Value: "managed", PropagateAtLaunch: "true" }
+              - { Key: "Project", Value: "mongodb", PropagateAtLaunch: "true" }
+              - { Key: "Environment", Value: { Ref: "Environment" }, PropagateAtLaunch: "true" }
+              - { Key: "Service", Value: "mongodb", PropagateAtLaunch: "true" }
+              - { Key: "InstanceEniId", Value: { Ref: "InstanceGammaNetworkInterface" }, PropagateAtLaunch: "true" }
+              - { Key: "InstanceVolumeId", Value: { Ref: "InstanceGammaVolume" }, PropagateAtLaunch: "true" }
+        CreationPolicy:
+            ResourceSignal:
+                Count: 1
+                Timeout: PT3M
+        UpdatePolicy:
+            AutoScalingRollingUpdate:
+                MaxBatchSize: 1
+                MinInstancesInService: 0
+                PauseTime: PT3M
+                WaitOnResourceSignals: "true"
+        Condition: "CreateInstanceGamma"
 
     ##########################################################################################################
     ##  MONITORING
