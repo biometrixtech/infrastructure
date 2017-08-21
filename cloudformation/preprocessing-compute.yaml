@@ -66,6 +66,11 @@ Parameters:
         MaxLength: "18"
         AllowedPattern: "^((\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2}))|$"
         ConstraintDescription: "Must be a valid IP CIDR range of the form x.x.x.x/x."
+
+    VpcTemplate:
+        Type: "String"
+        Default: "https://s3.amazonaws.com/biometrix-infrastructure-us-east-1/cloudformation/vpc.yaml"
+        Description: "Path to an S3 file containing the CloudFormation template for the VPC Stack"
         
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -77,9 +82,9 @@ Metadata:
             Parameters:
               - "MultiAz"
               - "VpnCidr"
-              - "Ec2InstanceSize"
-              - "Ec2Ami"
-              - "Ec2Keypair"
+              - "InstanceSize"
+              - "Ami"
+              - "Keypair"
               - "MongoDbPeeringVpc"
               - "MongoDbPeeringCidr"
             
@@ -87,7 +92,6 @@ Metadata:
             Environment: { default: "Environment" }
             MultiAz: { default: "Multi AZ?" }
             VpnCidr: { default: "VPN CIDR block" }
-            HostedZoneId: { default: "Hosted Zone" }
             InstanceSize: { default: "EC2 Instance Size" }
             Ami: { default: "EC2 AMI" }
             Keypair: { default: "EC2 Keypair" }
@@ -114,322 +118,24 @@ Resources:
     ## VPC & NETWORKING
     ##########################################################################################################
 
-    Vpc:
-        Type: "AWS::EC2::VPC"
+    VpcStack:
+        Type: "AWS::CloudFormation::Stack"
         Properties:
-            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.0.0/16" }
-            EnableDnsSupport: "true"
-            EnableDnsHostnames: "true"
-            InstanceTenancy: "default"
+            Parameters:
+                Project: "preprocessing"
+                Environment: { Ref: "Environment" }
+                MultiAz: { Ref: "MultiAz" }
+                VpnCidr: { Ref: "VpnCidr" }
+                PeeringVpc: { Ref: "MongoDbPeeringVpc" }
+                PeeringCidr: { Ref: "MongoDbPeeringCidr" }
             Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}" } }
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute" } }
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
-
-    InternetGateway:
-        Type: "AWS::EC2::InternetGateway"
-        Properties :
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-
-    InternetGatewayVpcAttachment:
-        Type: "AWS::EC2::VPCGatewayAttachment"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            InternetGatewayId: { Ref: "InternetGateway" }
-
-    MongoDbPeeringConnection:
-        Type: "AWS::EC2::VPCPeeringConnection"
-        Properties:
-            PeerVpcId: { Ref: "MongoDbPeeringVpc" }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-peering" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-            VpcId: { Ref: "Vpc" }
-        Condition: "CreateMongoDbPeeringConnection"
-
-    ##########################################################################################################
-    ##  PUBLIC AZ ALPHA
-    ##########################################################################################################
-
-    PublicSubnetAlpha:
-        Type: "AWS::EC2::Subnet"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.0.0/24" }
-            MapPublicIpOnLaunch: true
-            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-alpha" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-
-    PublicRouteTableAlpha:
-        Type: "AWS::EC2::RouteTable"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-alpha" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-
-    PublicSubnetAlphaRouteTableAssociation:
-        Type: "AWS::EC2::SubnetRouteTableAssociation"
-        Properties:
-            SubnetId: { Ref: "PublicSubnetAlpha" }
-            RouteTableId: { Ref: "PublicRouteTableAlpha" }
-
-    PublicRouteAlpha:
-        Type: "AWS::EC2::Route"
-        Properties:
-            RouteTableId: { Ref: "PublicRouteTableAlpha" }
-            GatewayId: { Ref: "InternetGateway" }
-            DestinationCidrBlock: "0.0.0.0/0"
-        DependsOn: "InternetGatewayVpcAttachment"
-
-    PublicAlphaMongoDbPeeringRoute:
-        Type: "AWS::EC2::Route"
-        Properties:
-            RouteTableId: { Ref: "PublicRouteTableAlpha" }
-            VpcPeeringConnectionId: { Ref: "MongoDbPeeringConnection" }
-            DestinationCidrBlock: { Ref: "MongoDbPeeringCidr" }
-        Condition: "CreateMongoDbPeeringConnection"
-        DependsOn: "InternetGatewayVpcAttachment"
-
-    NatGatewayEipAlpha:
-        Type: "AWS::EC2::EIP"
-        Properties:
-            Domain: "vpc"
-
-    NatGatewayAlpha:
-        DependsOn: "InternetGatewayVpcAttachment"
-        Type: "AWS::EC2::NatGateway"
-        Properties:
-            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipAlpha", "AllocationId" ] }
-            SubnetId: { Ref: "PublicSubnetAlpha" }
-
-    ##########################################################################################################
-    ##  PUBLIC AZ BETA
-    ##########################################################################################################
-
-    PublicSubnetBeta:
-        Type: "AWS::EC2::Subnet"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            CidrBlock:  { "Fn::Sub": "10.${VpnCidr}.100.0/24" }
-            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
-            MapPublicIpOnLaunch: true
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-beta" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-        Condition: "MultiAz"
-
-    PublicRouteTableBeta:
-        Type: "AWS::EC2::RouteTable"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-public-beta" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-        Condition: "MultiAz"
-
-    PublicSubnetBetaRouteTableAssociation:
-        Type: "AWS::EC2::SubnetRouteTableAssociation"
-        Properties:
-            SubnetId: { Ref: "PublicSubnetBeta" }
-            RouteTableId: { Ref: "PublicRouteTableBeta" }
-        Condition: "MultiAz"
-
-    PublicRouteBeta:
-        Type: "AWS::EC2::Route"
-        Properties:
-            RouteTableId: { Ref: "PublicRouteTableBeta" }
-            GatewayId: { Ref: "InternetGateway" }
-            DestinationCidrBlock: "0.0.0.0/0"
-        Condition: "MultiAz"
-        DependsOn: "InternetGatewayVpcAttachment"
-
-    PublicBetaMongoDbPeeringRoute:
-        Type: "AWS::EC2::Route"
-        Properties:
-            RouteTableId: { Ref: "PublicRouteTableBeta" }
-            VpcPeeringConnectionId: { Ref: "MongoDbPeeringConnection" }
-            DestinationCidrBlock: { Ref: "MongoDbPeeringCidr" }
-        Condition: "MultiAzAndCreateMongoDbPeeringConnection"
-        DependsOn: "InternetGatewayVpcAttachment"
-
-    NatGatewayEipBeta:
-        Type: "AWS::EC2::EIP"
-        Properties:
-            Domain: "vpc"
-        Condition: "MultiAz"
-
-    NatGatewayBeta:
-        DependsOn: "InternetGatewayVpcAttachment"
-        Type: "AWS::EC2::NatGateway"
-        Properties:
-            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipBeta", "AllocationId" ] }
-            SubnetId: { Ref: "PublicSubnetBeta" }
-        Condition: "MultiAz"
-
-    ##########################################################################################################
-    ##  PRIVATE AZ ALPHA
-    ##########################################################################################################
-
-    PrivateSubnetAlpha:
-        Type: "AWS::EC2::Subnet"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.1.0/24" }
-            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "a" ] ] }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-alpha" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-
-    PrivateRouteTableAlpha:
-        Type: "AWS::EC2::RouteTable"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-alpha" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-
-    PrivateSubnetAlphaRouteTableAssociation:
-        Type: "AWS::EC2::SubnetRouteTableAssociation"
-        Properties:
-            SubnetId: { Ref: "PrivateSubnetAlpha" }
-            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
-
-    PrivateRouteAlpha:
-        Type: "AWS::EC2::Route"
-        Properties:
-            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
-            NatGatewayId: { Ref: "NatGatewayAlpha" }
-            DestinationCidrBlock: "0.0.0.0/0"
-        DependsOn: "InternetGatewayVpcAttachment"
-
-    PrivateAlphaMongoDbPeeringRoute:
-        Type: "AWS::EC2::Route"
-        Properties:
-            RouteTableId: { Ref: "PrivateRouteTableAlpha" }
-            VpcPeeringConnectionId: { Ref: "MongoDbPeeringConnection" }
-            DestinationCidrBlock: { Ref: "MongoDbPeeringCidr" }
-        Condition: "CreateMongoDbPeeringConnection"
-        DependsOn: "InternetGatewayVpcAttachment"
-
-    ##########################################################################################################
-    ##  PRIVATE AZ BETA
-    ##########################################################################################################
-
-    PrivateSubnetBeta:
-        Type: "AWS::EC2::Subnet"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            CidrBlock: { "Fn::Sub": "10.${VpnCidr}.101.0/24" }
-            AvailabilityZone: { "Fn::Join": [ "", [ { Ref: "AWS::Region" }, "b" ] ] }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-beta" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-        Condition: "MultiAz"
-
-    PrivateRouteTableBeta:
-        Type: "AWS::EC2::RouteTable"
-        Properties:
-            VpcId: { Ref: "Vpc" }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-private-beta" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-        Condition: "MultiAz"
-
-    PrivateSubnetBetaRouteTableAssociation:
-        Type: "AWS::EC2::SubnetRouteTableAssociation"
-        Properties:
-            SubnetId: { Ref: "PrivateSubnetBeta" }
-            RouteTableId: { Ref: "PrivateRouteTableBeta" }
-        Condition: "MultiAz"
-
-    PrivateRouteBeta:
-        Type: "AWS::EC2::Route"
-        Properties:
-            RouteTableId: { Ref: "PrivateRouteTableBeta" }
-            NatGatewayId: { Ref: "NatGatewayBeta" }
-            DestinationCidrBlock: "0.0.0.0/0"
-        Condition: "MultiAz"
-        DependsOn: "InternetGatewayVpcAttachment"
-
-    PrivateBetaMongoDbPeeringRoute:
-        Type: "AWS::EC2::Route"
-        Properties:
-            RouteTableId: { Ref: "PrivateRouteTableBeta" }
-            VpcPeeringConnectionId: { Ref: "MongoDbPeeringConnection" }
-            DestinationCidrBlock: { Ref: "MongoDbPeeringCidr" }
-        Condition: "MultiAzAndCreateMongoDbPeeringConnection"
-        DependsOn: "InternetGatewayVpcAttachment"
-
-    ##########################################################################################################
-    ##  ENDPOINTS
-    ##########################################################################################################
-
-    # An S3 endpoint provides a direct connection from the EC2 instances to S3; providing lower latency
-    # and without incurring network bandwidth charges.  Note that currently they don't support commands like
-    # sync between S3 buckets in different regions :(
-    S3Endpoint:
-        Type: "AWS::EC2::VPCEndpoint"
-        Properties:
-            RouteTableIds: { "Fn::If": [
-                "MultiAz",
-                [
-                    { Ref: "PublicRouteTableAlpha" },
-                    { Ref: "PrivateRouteTableAlpha" },
-                    { Ref: "PublicRouteTableBeta" },
-                    { Ref: "PrivateRouteTableBeta" }
-                ],
-                [
-                    { Ref: "PublicRouteTableAlpha" },
-                    { Ref: "PrivateRouteTableAlpha" }
-                ]
-            ] }
-            ServiceName: { "Fn::Sub": "com.amazonaws.${AWS::Region}.s3" }
-            VpcId: { Ref: "Vpc" }
-
-    ##########################################################################################################
-    ##  ROUTE53
-    ##########################################################################################################
-
-    PrivateHostedZone:
-        Type: "AWS::Route53::HostedZone"
-        Properties:
-            Name: "internal"
-            HostedZoneConfig:
-                Comment: { "Fn::Sub": "Hosted zone created by the '${AWS::StackName}' CloudFormation stack" }
-            HostedZoneTags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-private" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "private" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-            VPCs:
-              - VPCId: { Ref: "Vpc" }
-                VPCRegion: { Ref: "AWS::Region" }
+              - { Key: "Service", Value: "compute" }
+            TemplateURL: { Ref: "VpcTemplate" }
+            TimeoutInMinutes: 10
 
     ##########################################################################################################
     ##  EFS
@@ -439,7 +145,7 @@ Resources:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
             GroupDescription: "Security group which allows access to the Elastic File System"
-            VpcId: { Ref: "Vpc" }
+            VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-efs" } }
               - { Key: "Management", Value: "managed" }
@@ -471,7 +177,7 @@ Resources:
             FileSystemId: { Ref: "EfsFileSystem" }
             SecurityGroups:
               - { Ref: "EfsSecurityGroup" }
-            SubnetId: { Ref: "PrivateSubnetAlpha" }
+            SubnetId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetAlphaId" ] }
 
     EfsMountTargetBeta:
         Type: "AWS::EFS::MountTarget"
@@ -479,13 +185,13 @@ Resources:
             FileSystemId: { Ref: "EfsFileSystem" }
             SecurityGroups:
               - { Ref: "EfsSecurityGroup" }
-            SubnetId: { Ref: "PrivateSubnetBeta" }
+            SubnetId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetBetaId" ] }
         Condition: "MultiAz"
 
     EfsDnsRecord:
       Type: "AWS::Route53::RecordSet"
       Properties:
-          HostedZoneId: { Ref: "PrivateHostedZone" }
+          HostedZoneId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateHostedZoneId" ] }
           Name: "efs.internal"
           Type: "CNAME"
           TTL: '600'
@@ -546,7 +252,7 @@ Resources:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
             GroupDescription: "Security group for preprocessing EC2 instances"
-            VpcId: { Ref: "Vpc" }
+            VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
             SecurityGroupIngress:
                 # All ports open from internal access
               - IpProtocol: "tcp"
@@ -563,7 +269,7 @@ Resources:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
             GroupDescription: "Security group allowing SSH access"
-            VpcId: { Ref: "Vpc" }
+            VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2-ssh" } }
               - { Key: "Management", Value: "managed" }
@@ -590,8 +296,8 @@ Resources:
                   - { Ref: "Ec2SecurityGroupInternalSsh" }
                 Subnets: { "Fn::If": [
                     "MultiAz",
-                    [ { Ref: "PrivateSubnetAlpha" }, { Ref: "PrivateSubnetBeta" } ],
-                    [ { Ref: "PrivateSubnetAlpha" } ]
+                    [ { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetAlphaId" ] }, { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetBetaId" ] } ],
+                    [ { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetAlphaId" ] } ]
                 ]}
                 Tags:
                     Name: { "Fn::Sub": "preprocessing-${Environment}-compute" }
@@ -752,7 +458,7 @@ Resources:
 Outputs:
     VpcId:
         Description: "The id of the VPC"
-        Value: { Ref: "Vpc" }
+        Value: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
 
     PrivateSubnetIds:
         Description: "The ids of the private subnets"
