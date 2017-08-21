@@ -167,3 +167,16 @@
             dest: "/root/.docker/config.json"
             group: "root"
             owner: "root"
+
+    ##########################################################################################################
+    ## PACKER
+    ##########################################################################################################
+
+      - name: 'Install Packer'
+        unarchive:
+            dest: '/usr/local/bin'
+            group: 'root'
+            mode: '755'
+            owner: 'root'
+            remote_src: 'yes'
+            src: 'https://releases.hashicorp.com/packer/1.0.4/packer_1.0.4_linux_amd64.zip'

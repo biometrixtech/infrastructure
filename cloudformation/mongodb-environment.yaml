@@ -160,20 +160,8 @@ Metadata:
 
 Mappings:
     RegionAmiMappings:
-        ap-northeast-1: { "3point4": "ami-1f4f7d78" }
-        ap-northeast-2: { "3point4": "ami-8ef02de0" }
-        ap-south-1:     { "3point4": "ami-821469ed" }
-        ap-southeast-1: { "3point4": "ami-770c89142" }
-        ap-southeast-2: { "3point4": "ami-97757ff4" }
-        ca-central-1:   { "3point4": "ami-18813d7c" }
-        eu-central-1:   { "3point4": "ami-4d09d722" }
-        eu-west-1:      { "3point4": "ami-0ebbb468" }
-        eu-west-2:      { "3point4": "ami-155d4a71" }
-        sa-east-1:      { "3point4": "ami-3339565f" }
-        us-east-1:      { "3point4": "ami-3fe99d29", "bastion": "ami-1d4e7a66" }
-        us-east-2:      { "3point4": "ami-50fcdb35" }
-        us-west-1:      { "3point4": "ami-daf1d7ba" }
-        us-west-2:      { "3point4": "ami-c60d68a6", "bastion": "ami-8803e0f0" }
+        us-east-1:      { "3point4": "ami-890e32f2", "bastion": "ami-1d4e7a66" }
+        us-west-2:      { "3point4": "ami-00000000", "bastion": "ami-8803e0f0" }
 
 Conditions:
     MultiAzVpc: { "Fn::Or": [
@@ -392,109 +380,6 @@ Resources:
         Type: "AWS::AutoScaling::LaunchConfiguration"
         DependsOn:
           - "InstanceAlphaNetworkInterface"
-        Metadata:
-            AWS::CloudFormation::Init:
-                config:
-                    packages:
-                        yum:
-                            curl: []
-                            jq: []
-                            ntp: []
-                        python:
-                            awscli: []
-                            aws-cfn-bootstrap: []
-                            boto3: []
-                            cloudwatchmon: []
-                    files:
-                        /jet/etc/mongodb/mongodb.conf:
-                            content: |
-                                storage:
-                                    journal:
-                                        enabled: true
-                            mode: "000644"
-                            owner: "root"
-                            group: "root"
-
-                        /opt/biometrix/init_stateful_server.py:
-                            content: !Sub |
-                                #!/usr/bin/env python
-                                import boto3, requests
-
-                                def attach_eni(eni_id):
-                                    while True:
-                                        try:
-                                            ec2_client.attach_network_interface(
-                                                NetworkInterfaceId=eni_id,
-                                                InstanceId=instance_id,
-                                                DeviceIndex=1
-                                            )
-                                            break
-                                        except Exception as e:
-                                            print e
-                                            time.sleep(10)
-
-                                def attach_ebs(volume_id):
-                                    while True:
-                                        try:
-                                            instance.attach_volume(
-                                                VolumeId=volume_id,
-                                                Device="/dev/xvdb"
-                                            )
-                                            break
-                                        except Exception as e:
-                                            print e
-                                            time.sleep(10)
-
-                                if __name__ == '__main__':
-                                    ec2_resource = boto3.resource('ec2', region_name='${AWS::Region}')
-                                    ec2_client = boto3.client('ec2', region_name='${AWS::Region}')
-
-                                    instance_id = requests.get('http://169.254.169.254/latest/meta-data/instance-id').text
-                                    instance = ec2_resource.Instance(instance_id)
-
-                                    tags = {tag['Key']:tag['Value'] for tag in instance.tags}
-                                    eni_id, volume_id, asg_name = tags.get('InstanceEniId', None), tags.get('InstanceVolumeId', None), tags.get('aws:cloudformation:logical-id', '')
-
-                                    attach_eni(eni_id)
-                                    attach_ebs(volume_id)
-
-                                    with open('/tmp/aws_asg_name', 'w') as f:
-                                        f.write(asg_name)
-
-                            mode: "000755"
-                            owner: "root"
-                            group: "root"
-
-                        /etc/awslogs/awscli.conf:
-                            content: !Sub |
-                                [default]
-                                region=${AWS::Region}
-                            mode: "000644"
-                            owner: "root"
-                            group: "root"
-
-                        /etc/awslogs/awslogs.conf:
-                            content: !Sub |
-                                [general]
-                                state_file = /var/awslogs/state/agent-state
-                                use_gzip_http_content_encoding = true
-
-                                [mongodb]
-                                log_group_name = application/mongodb/${Environment}
-                                log_stream_name = {hostname}
-                                datetime_format = %a %b %d %H:%M:%S.%f
-                                time_zone = UTC
-                                file = /jet/log/mongodb/mongodb.log
-                                batch_count = 100
-                            mode: "000644"
-                            owner: "root"
-                            group: "root"
-
-                    commands:
-                        cron_cloudwatchmon:
-                            command: 'echo "* /5 * * * * /usr/local/bin/mon-put-instance-stats.py --mem-util --disk-space-util --disk-path=/ --disk-path=/ext/ebs1 --disk-inode-util --auto-scaling" >> /etc/crontab'
-                        install_awslogs:
-                            command: { "Fn::Sub": 'curl https://s3.amazonaws.com//aws-cloudwatch/downloads/latest/awslogs-agent-setup.py -O && chmod +x ./awslogs-agent-setup.py && ./awslogs-agent-setup.py -n -r ${AWS::Region} -c /etc/awslogs/awslogs.conf' }
         Properties:
             AssociatePublicIpAddress: "false"
             IamInstanceProfile: { Ref: "InstanceProfile" }
@@ -527,6 +412,11 @@ Resources:
                     hostname $INSTANCE_ID
 
 
+                    # Set the region configuration for CloudWatch Logs Agent
+                    echo "region=${AWS::Region}" >> /var/awslogs/etc/aws.conf
+                    service awslogs restart
+
+
                     # Attach ENI and EBS
                     /opt/biometrix/init_stateful_server.py
                     sleep 30s
@@ -540,20 +430,18 @@ Resources:
                     if [[ $FILESYSTEM_EXISTS -ne 0 ]]; then
                         mkfs -t ext4 -L mongodatastore /dev/xvdb
                     fi
-                    mkdir -p /ext /ext/ebs1
                     mount /dev/xvdb /ext/ebs1
                     echo "LABEL=mongodatastore /ext/ebs1 ext4 nofail 0 0" >> /etc/fstab
-                    chown -R ec2-user:ec2-user /ext/ebs1
 
 
                     # If the filesystem hasn't been initialised before, do so; then mount the data directory
-                    if [ ! -d /ext/ebs1/db ]; then
-                        echo "Initialising EBS volume"
-                        mkdir /ext/ebs1/db
-                        cp /jet/prs/mongodb/db/* /ext/ebs1/db -R
-                    fi
-                    echo "Mounting MongoDb data volume"
-                    mount -o bind /ext/ebs1/db /jet/prs/mongodb/db
+                    #if [ ! -d /ext/ebs1/db ]; then
+                    #    echo "Initialising EBS volume"
+                    #    mkdir /ext/ebs1/db
+                    #    cp /jet/prs/mongodb/db/* /ext/ebs1/db -R
+                    #fi
+                    #echo "Mounting MongoDb data volume"
+                    #mount -o bind /ext/ebs1/db /jet/prs/mongodb/db
 
 
                     # Signal to the autoscaling group that the instance is configured successfully

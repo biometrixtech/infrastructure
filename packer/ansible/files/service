@@ -1,0 +1,19 @@
+[Unit]
+Description=High-performance, schema-free document-oriented database
+After=network.target
+
+[Service]
+User=mongodb
+Group=mongodb
+
+# Various limits suggested by https://docs.mongodb.com/manual/reference/ulimit/
+LimitFSIZE=infinity
+LimitCPU=infinity
+LimitAS=infinity
+LimitNOFILE=64000
+LimitNPROC=64000
+
+ExecStart=/usr/bin/mongod -f /etc/mongodb/mongodb.conf
+
+[Install]
+WantedBy=multi-user.target

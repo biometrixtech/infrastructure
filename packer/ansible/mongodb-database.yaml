@@ -1,0 +1,196 @@
+# This playbook configures an Ubuntu server to act as a mongodb database
+---
+-   name: 'Commission a mongodb database server'
+    hosts: all
+    become: true
+    become_user: root
+    connection: local
+    vars:
+        mongo_username: 'foo'
+
+    tasks:
+
+    ##########################################################################################################
+    ## MONGODB
+    ##########################################################################################################
+        
+        # ensure base users/groups, and software
+      - name: "Create mongodb group"
+        group: 
+            name: mongodb
+            state: present
+      - name: "Create mongodb user"
+        user: 
+            name: mongodb 
+            comment: "mongodb user" 
+            uid: 1040 
+            group: mongodb
+        
+      - apt: 
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'python-pip'
+          - 'numactl'
+          
+      - pip:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'pymongo'
+        
+      - name: 'Add mongo repository key signature'
+        apt_key:
+            id: '0C49F3730359A14518585931BC711F9BA15703C6'
+            keyserver: 'keyserver.ubuntu.com'
+
+      - name: 'Add mongodb repository'
+        apt_repository:
+            repo: 'deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.4 multiverse'
+            state: present
+
+      - name: 'Install mongodb package'
+        apt:
+            name: 'mongodb-org'
+            state: present
+        
+        # These are not real files, so can't be written to by the normal Ansible `copy` module
+      - name: 'Disable transparent hugepages, improves performance'
+        shell: 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
+
+      - name: 'Disable transparent hugepage defragging'
+        shell: 'echo never > /sys/kernel/mm/transparent_hugepage/defrag'
+
+      - name: 'Disable NUMA zone reclamation'
+        lineinfile:
+            line: 'vm.zone_reclaim_mode = 0'
+            dest: '/etc/sysctl.conf'
+
+      - name: 'Create the mongodb startup file'
+        copy:
+            src: 'files/service'
+            dest: '/etc/systemd/system/mongodb.service'
+            mode: '0755'
+            owner: 'mongodb'
+            group: 'mongodb'
+        
+      - name: 'Create the config directory'
+        file:
+            path: '/etc/mongodb'
+            state: 'directory'
+            owner: 'mongodb'
+            group: 'mongodb'
+        
+      - name: 'Create mongodb.conf'
+        copy:
+            src: 'files/mongodb.conf.yaml'
+            dest: '/etc/mongodb/mongodb.conf'
+            mode: '0644'
+            owner: 'mongodb'
+            group: 'mongodb'
+
+      - name: 'Create the authentication keyfile base'
+        shell: 'openssl rand -base64 756 > /etc/mongodb/keyfile.base'
+        args:
+            creates: '/etc/mongodb/keyfile.base'
+
+      - name: 'Set keyfile base permissions'
+        file:
+            dest: '/etc/mongodb/keyfile.base'
+            mode: '0600'
+            owner: 'mongodb'
+            group: 'mongodb'
+
+    ##########################################################################################################
+    ## STARTUP
+    ##########################################################################################################
+
+      - name: 'Install apt packages'
+        apt:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'curl'
+          - 'jq'
+          - 'ntp'
+
+      - name: 'Install python packages'
+        pip:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'awscli'
+          - 'https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz'
+          - 'boto3'
+          - 'cloudwatchmon'
+
+      - name: 'Create /opt/biometrix directory'
+        file:
+            path: '{{item}}'
+            state: 'directory'
+            owner: 'root'
+            group: 'root'
+        with_items:
+          - '/opt/biometrix'
+
+      - name: 'Create directories'
+        file:
+            path: '{{item}}'
+            state: 'directory'
+            owner: 'mongodb'
+            group: 'mongodb'
+        with_items:
+          - '/ext'
+          - '/ext/ebs1'
+
+      - name: 'Copy startup script'
+        copy:
+            src: 'files/init_stateful_server.py'
+            dest: '/opt/biometrix/init_stateful_server.py'
+            owner: 'root'
+            group: 'root'
+            mode: '755'
+
+    ##########################################################################################################
+    ## MONITORING AND LOGGING
+    ##########################################################################################################
+
+      - name: 'Create the /etc/awslogs directory'
+        file:
+            path: '/etc/awslogs'
+            state: 'directory'
+            owner: 'root'
+            group: 'root'
+
+      - name: 'Install CloudWatch Logs Agent configuration file'
+        copy:
+            src: 'files/awslogs.conf'
+            dest: '/etc/awslogs/awslogs.conf'
+            owner: 'root'
+            group: 'root'
+            mode: '644'
+
+      - name: 'Download CloudWatch Logs Agent installation script'
+        get_url:
+            url: 'https://s3.amazonaws.com//aws-cloudwatch/downloads/latest/awslogs-agent-setup.py'
+            dest: '/tmp/awslogs-agent-setup.py'
+            mode: '755'
+            owner: 'root'
+            group: 'root'
+
+      - name: 'Install CloudWatch Logs Agent'
+        shell: '/tmp/awslogs-agent-setup.py -n -r eu-west-1 -c /etc/awslogs/awslogs.conf'
+
+      - name: "Remove region specification from the CWLA agent, which we'll add back in later in the user data"
+        lineinfile:
+            dest: '/etc/awslogs/awslogs.conf'
+            regexp: '^region'
+            state: absent
+
+      - name: 'Crontab entries'
+        lineinfile:
+            dest: '/etc/crontab'
+            line: '{{item}}'
+        with_items:
+          - '* /5 * * * * /usr/local/bin/mon-put-instance-stats.py --mem-util --disk-space-util --disk-path=/ --disk-path=/ext/ebs1 --disk-inode-util --auto-scaling'
+          - ''
