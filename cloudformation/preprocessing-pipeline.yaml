@@ -82,6 +82,7 @@ Resources:
                           - "sns:Publish"
                           - "lambda:InvokeFunction"
                           - "states:StartExecution"
+                          - "s3:ListBucket"
                         Effect: "Allow"
                         Resource: "*"
 
@@ -107,55 +108,59 @@ Resources:
                     from operator import itemgetter
                     def handler(event, context):
                         print(event)
-                        s3_object = event['Records'][0]['s3']
-                        s3_bucket = s3_object['bucket']['name']
-                        s3_key = s3_object['object']['key'].split('/')[-1]
+                        s3_bucket = event['Records'][0]['s3']['bucket']['name']
+                        s3_key = event['Records'][0]['s3']['object']['key'].split('/')[-1]
 
                         if '_' in s3_key:
                             # A multipart upload
                             file_name, part = s3_key.split('_')
                             if part == 'complete':
                                 # Ready to combine
-                                parts = list_s3_files(s3_bucket, file_name)
-                                print(parts)
+                                s3_keys = list_s3_files(s3_bucket, file_name)
+
                             else:
-                                # Just another part
-                                pass
+                                # Not the final part
+                                return
+
                         else:
                             # A complete file
-                            execution_name = '{}-{}'.format(s3_key, int(time.time()))
-                            sfn_client = boto3.client('stepfunctions')
-                            res = sfn_client.start_execution(
-                                stateMachineArn="${StateMachine}",
-                                name=execution_name,
-                                input=json.dumps({
-                                    "Meta": {
-                                        "ExecutionArn": "arn:aws:states:${AWS::Region}:887689817172:execution:${StateMachine.Name}:{}".format(execution_name),
-                                        "ExecutionName": execution_name,
-                                    },
-                                    "SourceEvent": {
-                                        "S3Bucket": s3_bucket,
-                                        "S3Path": s3_key,
-                                    }
-                                })
-                            )
+                            s3_keys = [s3_key]
+
+                        execution_name = '{}-{}'.format(s3_key, int(time.time()))
+                        sfn_client = boto3.client('stepfunctions')
+                        res = sfn_client.start_execution(
+                            stateMachineArn="${StateMachine}",
+                            name=execution_name,
+                            input=json.dumps({
+                                "Meta": {
+                                    "ExecutionArn": "arn:aws:states:${AWS::Region}:887689817172:execution:${StateMachine.Name}:{}".format(execution_name),
+                                    "ExecutionName": execution_name,
+                                },
+                                "SourceEvent": {
+                                    "S3Bucket": s3_bucket,
+                                    "S3Paths": s3_keys,
+                                }
+                            })
+                        )
 
                     def list_s3_files(bucket, prefix):
                         objects_list = []
-                        resp = s3.list_objects(Bucket=bucket, Prefix=prefix)
-                        objects_list.extend(resp_to_filelist(resp))
+                        s3_client = boto3.client('s3')
+                        resp = s3_client.list_objects(Bucket=bucket, Prefix=prefix)
+                        objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'complete'])
                         while resp['IsTruncated']:
                             # if there are more entries than can be returned in one request, the key
                             # of the last entry returned acts as a pagination value for the next request
                             print("Found {} objects so far".format(len(objects_list)))
                             last_key = objects_list[-1][0]
                             resp = s3.list_objects(Bucket=bucket, Prefix=prefix, Marker=last_key)
-                            objects_list.extend([(x['Key'], x['Size']) for x in resp['Contents']])
-                        return sorted(object_list, key=itemgetter(0))
+                            objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'complete'])
+                        return sorted(objects_list)
 
             Handler: "index.handler"
+            MemorySize: "256"
             Runtime: "python3.6"
-            Timeout: "30"
+            Timeout: "60"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-trigger" }
             Tags:
