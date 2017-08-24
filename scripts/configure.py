@@ -10,10 +10,10 @@ def chunk_list(l, n):
         yield l[i:i + n]
 
 
-def load_parameters(keys, environment):
+def load_parameters(keys, environment, region):
     if len(keys) > 0:
         print('Retrieving configuration for [{}] from SSM'.format(", ".join(keys)))
-        ssm_client = boto3.client('ssm')
+        ssm_client = boto3.client('ssm', region_name=region)
 
         for key_batch in chunk_list(keys, 10):
             response = ssm_client.get_parameters(
@@ -57,6 +57,10 @@ if __name__ == '__main__':
                         dest='copy_from_environment',
                         type=str,
                         help='Environment to copy values from')
+    parser.add_argument('--copy-from-region',
+                        dest='copy_from_region',
+                        type=str,
+                        help='Region to copy values from')
 
     args = parser.parse_args()
 
@@ -67,11 +71,13 @@ if __name__ == '__main__':
         print("Must specify a region")
         exit(1)
 
-    config_values = {c.split('=', 1)[0]: c.split('=', 1)[-1] for c in args.configs}
+    config_values = {c.split('=', 1)[0].lower(): c.split('=', 1)[-1] for c in args.configs}
 
-    if args.copy_from_environment:
-        print("Copying values from {} environment".format(args.copy_from_environment))
-        for key, value in load_parameters(config_values.keys(), args.copy_from_environment):
+    if args.copy_from_environment or args.copy_from_region:
+        cf_environment = args.copy_from_environment or args.environment
+        cf_region = args.copy_from_region or args.region
+        print("Copying values from {}/{} environment".format(cf_region, cf_environment))
+        for key, value in load_parameters(config_values.keys(), cf_environment, cf_region):
             config_values[key] = value
 
     set_parameters(config_values)
