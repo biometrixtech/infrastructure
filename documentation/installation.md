@@ -78,7 +78,8 @@ aws cloudformation create-stack \
 The Elastic File System in the environment needs to be initialised with a directory structure.  This can be
 achieved by registering a Batch Job and then running it on the compute cluster:
 
-```shell    
+```shell
+REGION=us-west-2
 cat <<EOF > initialise-efs.json
 {
     "jobDefinitionName": "initialise-efs",
@@ -117,7 +118,7 @@ aws batch register-job-definition --cli-input-json file://initialise-efs.json
 aws batch submit-job \
     --job-name initialise-efs \
     --job-queue preprocessing-dev-compute \
-    --job-definition arn:aws:batch:us-west-2:887689817172:job-definition/initialise-efs:1
+    --job-definition arn:aws:batch:$REGION:887689817172:job-definition/initialise-efs:1
 ```
 
 Setting the `MongoDbPeeringVpc` parameters in the template will set up the peering connection and create the necessary routes in the _environment's_ VPC, but you need to create the corresponding routes in the peered VPC manually.
