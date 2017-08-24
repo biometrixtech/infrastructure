@@ -67,17 +67,21 @@ Parameters:
         Type: "String"
         Description: "A SSH keypair to grant access to instances"
 
+    VpcTemplate:
+        Type: "String"
+        Default: "https://s3.amazonaws.com/biometrix-infrastructure/cloudformation/vpc.yaml"
+        Description: "Path to an S3 file containing the CloudFormation template for the VPC Stack"
     ComputeTemplate:
         Type: "String"
-        Default: "https://s3.amazonaws.com/biometrix-preprocessing-infrastructure/cloudformation/compute.template"
+        Default: "https://s3.amazonaws.com/biometrix-infrastructure/cloudformation/preprocessing-compute.yaml"
         Description: "Path to an S3 file containing the CloudFormation template for the EC2 Cluster"
     PipelineTemplate:
         Type: "String"
-        Default: "https://s3.amazonaws.com/biometrix-preprocessing-infrastructure/cloudformation/pipeline.template"
+        Default: "https://s3.amazonaws.com/biometrix-infrastructure/cloudformation/preprocessing-pipeline.yaml"
         Description: "Path to an S3 file containing the CloudFormation template for the StepFunctions pipeline"
     PollerTemplate:
         Type: "String"
-        Default: "https://s3.amazonaws.com/biometrix-preprocessing-infrastructure/cloudformation/sfn-batch-poller.template"
+        Default: "https://s3.amazonaws.com/biometrix-infrastructure/cloudformation/sfn-batch-poller.yaml"
         Description: "Path to an S3 file containing the CloudFormation template for the sfn-batch poller cluster"
 
     BatchJobVersionDownloadandchunk:
@@ -104,6 +108,7 @@ Metadata:
               - "Environment"
           - Label: { default: "Templates" }
             Parameters:
+              - "VpcTemplate"
               - "ComputeTemplate"
               - "PipelineTemplate"
               - "PollerTemplate"
@@ -179,6 +184,30 @@ Resources:
         Condition: "CreatePipeline"
 
     ##########################################################################################################
+    ## VPC & NETWORKING
+    ##########################################################################################################
+
+    VpcStack:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+                MultiAz: { Ref: "MultiAz" }
+                PeeringCidr: { Ref: "MongoDbPeeringCidr" }
+                PeeringVpc: { Ref: "MongoDbPeeringVpc" }
+                Project: "preprocessing"
+                Service: "compute"
+                VpnCidr: { Ref: "VpnCidr" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "compute" }
+            TemplateURL: { Ref: "VpcTemplate" }
+            TimeoutInMinutes: 10
+
+    ##########################################################################################################
     ##  COMPUTE CLUSTER
     ##########################################################################################################
 
@@ -186,14 +215,17 @@ Resources:
         Type: "AWS::CloudFormation::Stack"
         Properties:
             Parameters:
-                Environment: { Ref: "Environment" }
-                MultiAz: { Ref: "MultiAz" }
-                VpnCidr: { Ref: "VpnCidr" }
-                InstanceSize: { Ref: "ComputeEc2InstanceSize" }
                 Ami: { Ref: "ComputeEc2Ami" }
+                Environment: { Ref: "Environment" }
+                InstanceSize: { Ref: "ComputeEc2InstanceSize" }
                 Keypair: { Ref: "ComputeEc2Keypair" }
-                MongoDbPeeringVpc: { Ref: "MongoDbPeeringVpc" }
-                MongoDbPeeringCidr: { Ref: "MongoDbPeeringCidr" }
+                MultiAz: { Ref: "MultiAz" }
+                PrivateHostedZoneId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateHostedZoneId" ] }
+                PrivateSubnetAlphaId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetAlphaId" ] }
+                PrivateSubnetBetaId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetBetaId" ] }
+                PublicSubnetAlphaId: { "Fn::GetAtt": [ "VpcStack", "Outputs.PublicSubnetAlphaId" ] }
+                VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
+                VpcCidr: { Ref: "VpnCidr" }
 
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute" } }
@@ -239,8 +271,8 @@ Resources:
             Parameters:
                 Project: "preprocessing"
                 Environment: { Ref: "Environment" }
-                Vpc: { "Fn::GetAtt": [ "ComputeCluster", "Outputs.VpcId" ] }
-                PrivateSubnets: { "Fn::GetAtt": [ "ComputeCluster", "Outputs.PrivateSubnetIds" ] }
+                Vpc: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
+                PrivateSubnets: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetIds" ] }
                 ActivityArn: { "Fn::GetAtt": [ "PipelineCluster", "Outputs.ActivityArn" ] }
                 InstanceSize: "t2.micro"
             Tags:
