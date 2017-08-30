@@ -119,6 +119,8 @@ Resources:
                                 # Ready to combine
                                 s3_basepath = s3_basepath
                                 suffixes = [s.replace(s3_basepath + combiner, '') for s in list_s3_files(s3_bucket, s3_basepath)]
+                                audit_packets(s3_bucket, s3_basepath, suffixes)
+                                part_count = len(suffixes) - 1
 
                             else:
                                 # Not the final part
@@ -128,7 +130,7 @@ Resources:
                             # A complete file
                             s3_basepath = s3_key
                             combiner = ''
-                            suffixes = []
+                            part_count = 0
 
                         execution_name = '{}-{}'.format(s3_key, int(time.time()))
                         sfn_client = boto3.client('stepfunctions')
@@ -143,12 +145,10 @@ Resources:
                                 "SourceEvent": {
                                     "S3Bucket": s3_bucket,
                                     "S3BasePath": s3_basepath + combiner,
-                                    "S3Suffixes": suffixes,
+                                    "PartCount": part_count,
                                 }
                             })
                         )
-
-                        audit_packets(s3_bucket, s3_basepath, suffixes)
 
 
                     s3_client = boto3.client('s3')
@@ -164,23 +164,21 @@ Resources:
                     def audit_packets(bucket, prefix, packets):
                         expected_packets = ["{:04d}".format(i + 1) for i in range(len(packets) - 1)] + ["complete"]
                         if sorted(packets) != sorted(expected_packets):
-                            try:
-                                cloudwatch_client = boto3.client('cloudwatch')
-                                cloudwatch_client.put_metric_data(
-                                    Namespace='Preprocessing',
-                                    MetricData=[
-                                        {
-                                            'MetricName': 'MissingPackets',
-                                            'Dimensions': [
-                                                {'Name': 'Environment', 'Value': os.environ['ENVIRONMENT']},
-                                            ],
-                                            'Timestamp': datetime.utcnow(),
-                                            'Value': max(len(expected_packets) - len(packets), 1),
-                                        },
-                                    ]
-                                )
-                            except Exception as exception:
-                                pass
+                            cloudwatch_client = boto3.client('cloudwatch')
+                            cloudwatch_client.put_metric_data(
+                                Namespace='Preprocessing',
+                                MetricData=[
+                                    {
+                                        'MetricName': 'MissingPackets',
+                                        'Dimensions': [
+                                            {'Name': 'Environment', 'Value': os.environ['ENVIRONMENT']},
+                                        ],
+                                        'Timestamp': datetime.utcnow(),
+                                        'Value': max(len(expected_packets) - len(packets), 1),
+                                    },
+                                ]
+                            )
+                            raise Exception("Missing packets in upload")
 
 
 
