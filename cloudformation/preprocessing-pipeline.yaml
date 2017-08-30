@@ -151,7 +151,8 @@ Resources:
                         audit_packets(s3_bucket, s3_basepath, suffixes)
 
 
-                    def list_s3_files(bucket, prefix, marker=None):
+                    s3_client = boto3.client('s3')
+                    def list_s3_files(bucket, prefix, marker=''):
                         objects_list = []
                         resp = s3_client.list_objects(Bucket=bucket, Prefix=prefix, Marker=marker)
                         objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'combined'])
@@ -161,7 +162,26 @@ Resources:
 
 
                     def audit_packets(bucket, prefix, packets):
-                        pass
+                        expected_packets = ["{:04d}".format(i + 1) for i in range(len(packets) - 1)] + ["complete"]
+                        if sorted(packets) != sorted(expected_packets):
+                            try:
+                                cloudwatch_client = boto3.client('cloudwatch')
+                                cloudwatch_client.put_metric_data(
+                                    Namespace='Preprocessing',
+                                    MetricData=[
+                                        {
+                                            'MetricName': 'MissingPackets',
+                                            'Dimensions': [
+                                                {'Name': 'Environment', 'Value': os.environ['ENVIRONMENT']},
+                                            ],
+                                            'Timestamp': datetime.utcnow(),
+                                            'Value': max(len(expected_packets) - len(packets), 1),
+                                        },
+                                    ]
+                                )
+                            except Exception as exception:
+                                pass
+
 
 
             Handler: "index.handler"
