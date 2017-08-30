@@ -105,18 +105,20 @@ Resources:
             Code:
                 ZipFile: !Sub |
                     import boto3, json, time
-                    from operator import itemgetter
+
                     def handler(event, context):
                         print(event)
                         s3_bucket = event['Records'][0]['s3']['bucket']['name']
                         s3_key = event['Records'][0]['s3']['object']['key'].split('/')[-1]
 
-                        if '_' in s3_key:
+                        combiner = '_'
+                        if combiner in s3_key:
                             # A multipart upload
-                            file_name, part = s3_key.split('_')
+                            s3_basepath, part = s3_key.split(combiner)
                             if part == 'complete':
                                 # Ready to combine
-                                s3_keys = list_s3_files(s3_bucket, file_name)
+                                s3_basepath = s3_basepath
+                                suffixes = [s.replace(s3_basepath + combiner, '') for s in list_s3_files(s3_bucket, s3_basepath)]
 
                             else:
                                 # Not the final part
@@ -124,38 +126,43 @@ Resources:
 
                         else:
                             # A complete file
-                            s3_keys = [s3_key]
+                            s3_basepath = s3_key
+                            combiner = ''
+                            suffixes = []
 
                         execution_name = '{}-{}'.format(s3_key, int(time.time()))
                         sfn_client = boto3.client('stepfunctions')
                         res = sfn_client.start_execution(
-                            stateMachineArn="${StateMachine}",
+                            stateMachineArn="arn:aws:states:us-west-2:887689817172:stateMachine:StateMachine-XEPGYPQQM6VJ",
                             name=execution_name,
                             input=json.dumps({
                                 "Meta": {
-                                    "ExecutionArn": "arn:aws:states:${AWS::Region}:887689817172:execution:${StateMachine.Name}:{}".format(execution_name),
+                                    "ExecutionArn": "arn:aws:states:us-west-2:887689817172:execution:StateMachine-XEPGYPQQM6VJ:{}".format(execution_name),
                                     "ExecutionName": execution_name,
                                 },
                                 "SourceEvent": {
                                     "S3Bucket": s3_bucket,
-                                    "S3Paths": s3_keys,
+                                    "S3BasePath": s3_basepath + combiner,
+                                    "S3Suffixes": suffixes,
                                 }
                             })
                         )
 
-                    def list_s3_files(bucket, prefix):
+                        audit_packets(s3_bucket, s3_basepath, suffixes)
+
+
+                    def list_s3_files(bucket, prefix, marker=None):
                         objects_list = []
-                        s3_client = boto3.client('s3')
-                        resp = s3_client.list_objects(Bucket=bucket, Prefix=prefix)
-                        objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'complete'])
+                        resp = s3_client.list_objects(Bucket=bucket, Prefix=prefix, Marker=marker)
+                        objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'combined'])
                         while resp['IsTruncated']:
-                            # if there are more entries than can be returned in one request, the key
-                            # of the last entry returned acts as a pagination value for the next request
-                            print("Found {} objects so far".format(len(objects_list)))
-                            last_key = objects_list[-1][0]
-                            resp = s3.list_objects(Bucket=bucket, Prefix=prefix, Marker=last_key)
-                            objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'complete'])
+                            objects_list.extend(list_s3_files(bucket, prefix, objects_list[-1][0]))
                         return sorted(objects_list)
+
+
+                    def audit_packets(bucket, prefix, packets):
+                        pass
+
 
             Handler: "index.handler"
             MemorySize: "256"
@@ -244,7 +251,7 @@ Resources:
                             LEFT JOIN users ON session_events.user_id=users.id
                             LEFT JOIN training_groups ON training_groups.id = session_events.training_group_ids[1]
                             WHERE session_events.sensor_data_filename = %s""",
-                            [event['SourceEvent']['S3Path']]
+                            [event['SourceEvent']['S3BasePath'].rstrip('_')]
                         )
                         ret = {
                             "SessionEventId": query_results.get('session_event_id', None),
@@ -493,7 +500,7 @@ Resources:
                                     "InputPath": "$"
                                 }
                             ],
-                            "Input": event['SourceEvent']
+                            "Input": {"Filename": event['SourceEvent']['S3BasePath']}
                         }
             Handler: "index.handler"
             Runtime: "python3.6"
@@ -697,7 +704,7 @@ Resources:
                                     }
                                 }
                             ],
-                            "ResultPath": "$.Upload",
+                            "ResultPath": null,
                             "Next": "Post"
                         },
                         "Post": {
