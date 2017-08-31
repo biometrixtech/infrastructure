@@ -82,6 +82,7 @@ Resources:
                           - "sns:Publish"
                           - "lambda:InvokeFunction"
                           - "states:StartExecution"
+                          - "s3:ListBucket"
                         Effect: "Allow"
                         Resource: "*"
 
@@ -104,31 +105,87 @@ Resources:
             Code:
                 ZipFile: !Sub |
                     import boto3, json, time
+
                     def handler(event, context):
                         print(event)
-                        s3_object = event['Records'][0]['s3']
-                        s3_bucket = s3_object['bucket']['name']
-                        s3_key = s3_object['object']['key'].split('/')[-1]
+                        s3_bucket = event['Records'][0]['s3']['bucket']['name']
+                        s3_key = event['Records'][0]['s3']['object']['key'].split('/')[-1]
+
+                        combiner = '_'
+                        if combiner in s3_key:
+                            # A multipart upload
+                            s3_basepath, part = s3_key.split(combiner)
+                            if part == 'complete':
+                                # Ready to combine
+                                s3_basepath = s3_basepath
+                                suffixes = [s.replace(s3_basepath + combiner, '') for s in list_s3_files(s3_bucket, s3_basepath)]
+                                audit_packets(s3_bucket, s3_basepath, suffixes)
+                                part_count = len(suffixes) - 1
+
+                            else:
+                                # Not the final part
+                                return
+
+                        else:
+                            # A complete file
+                            s3_basepath = s3_key
+                            combiner = ''
+                            part_count = 0
+
                         execution_name = '{}-{}'.format(s3_key, int(time.time()))
                         sfn_client = boto3.client('stepfunctions')
                         res = sfn_client.start_execution(
-                            stateMachineArn="${StateMachine}",
+                            stateMachineArn="arn:aws:states:us-west-2:887689817172:stateMachine:StateMachine-XEPGYPQQM6VJ",
                             name=execution_name,
                             input=json.dumps({
                                 "Meta": {
-                                    "ExecutionArn": "arn:aws:states:${AWS::Region}:887689817172:execution:${StateMachine.Name}:{}".format(execution_name),
+                                    "ExecutionArn": "arn:aws:states:us-west-2:887689817172:execution:StateMachine-XEPGYPQQM6VJ:{}".format(execution_name),
                                     "ExecutionName": execution_name,
                                 },
                                 "SourceEvent": {
                                     "S3Bucket": s3_bucket,
-                                    "S3Path": s3_key,
+                                    "S3BasePath": s3_basepath + combiner,
+                                    "PartCount": part_count,
                                 }
                             })
                         )
 
+
+                    s3_client = boto3.client('s3')
+                    def list_s3_files(bucket, prefix, marker=''):
+                        objects_list = []
+                        resp = s3_client.list_objects(Bucket=bucket, Prefix=prefix, Marker=marker)
+                        objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'combined'])
+                        while resp['IsTruncated']:
+                            objects_list.extend(list_s3_files(bucket, prefix, objects_list[-1][0]))
+                        return sorted(objects_list)
+
+
+                    def audit_packets(bucket, prefix, packets):
+                        expected_packets = ["{:04d}".format(i + 1) for i in range(len(packets) - 1)] + ["complete"]
+                        if sorted(packets) != sorted(expected_packets):
+                            cloudwatch_client = boto3.client('cloudwatch')
+                            cloudwatch_client.put_metric_data(
+                                Namespace='Preprocessing',
+                                MetricData=[
+                                    {
+                                        'MetricName': 'MissingPackets',
+                                        'Dimensions': [
+                                            {'Name': 'Environment', 'Value': os.environ['ENVIRONMENT']},
+                                        ],
+                                        'Timestamp': datetime.utcnow(),
+                                        'Value': max(len(expected_packets) - len(packets), 1),
+                                    },
+                                ]
+                            )
+                            raise Exception("Missing packets in upload")
+
+
+
             Handler: "index.handler"
+            MemorySize: "256"
             Runtime: "python3.6"
-            Timeout: "30"
+            Timeout: "60"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-trigger" }
             Tags:
@@ -212,7 +269,7 @@ Resources:
                             LEFT JOIN users ON session_events.user_id=users.id
                             LEFT JOIN training_groups ON training_groups.id = session_events.training_group_ids[1]
                             WHERE session_events.sensor_data_filename = %s""",
-                            [event['SourceEvent']['S3Path']]
+                            [event['SourceEvent']['S3BasePath'].rstrip('_')]
                         )
                         ret = {
                             "SessionEventId": query_results.get('session_event_id', None),
@@ -461,7 +518,7 @@ Resources:
                                     "InputPath": "$"
                                 }
                             ],
-                            "Input": event['SourceEvent']
+                            "Input": {"Filename": event['SourceEvent']['S3BasePath']}
                         }
             Handler: "index.handler"
             Runtime: "python3.6"
@@ -665,7 +722,7 @@ Resources:
                                     }
                                 }
                             ],
-                            "ResultPath": "$.Upload",
+                            "ResultPath": null,
                             "Next": "Post"
                         },
                         "Post": {
