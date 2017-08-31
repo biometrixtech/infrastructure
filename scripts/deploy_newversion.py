@@ -48,7 +48,7 @@ def update_cf_stack():
     else:
         jobs_to_update = ['BatchJobVersion{}'.format(args.job)]
 
-    batch_client = boto3.client('batch')
+    batch_client = boto3.client('batch', region_name=args.region)
     batch_job_data = batch_client.describe_job_definitions(
         jobDefinitionName='preprocessing-batchjob'
     )['jobDefinitions']
@@ -65,7 +65,7 @@ def update_cf_stack():
             new_parameters.append({'ParameterKey': p['ParameterKey'], 'UsePreviousValue': True})
 
     stack.update(
-        TemplateURL='https://s3.amazonaws.com/biometrix-preprocessing-infrastructure-{region}/cloudformation/environment.template'.format(
+        TemplateURL='https://s3.amazonaws.com/biometrix-infrastructure-{region}/cloudformation/preprocessing-environment.yaml'.format(
             region=args.region,
         ),
         Parameters=new_parameters,
