@@ -41,6 +41,7 @@ TODO
 
 ```shell
 REGION=us-west-2
+ENVIRONMENT=dev
 cat <<EOF > install-globalmodels.json
 {
     "jobDefinitionName": "install-globalmodels",
@@ -69,6 +70,6 @@ aws batch register-job-definition --region $REGION --cli-input-json file://insta
 aws batch submit-job \
     --region $REGION \
     --job-name install-globalmodels \
-    --job-queue preprocessing-dev-compute \
+    --job-queue preprocessing-$ENVIRONMENT-compute \
     --job-definition arn:aws:batch:$REGION:887689817172:job-definition/install-globalmodels:4
 ```
