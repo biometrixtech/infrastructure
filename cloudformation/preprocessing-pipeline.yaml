@@ -291,7 +291,7 @@ Resources:
                             "UserId": query_results.get('user_id', None),
                             "UserWeight": query_results.get('weight', None),
                             "TeamId": query_results.get('team_id', None),
-                            "SessionType": query_results.get('session_type', None),
+                            "SessionType": query_results.get('session_type', None) or 1,
                         }
                         query_result = query(
                             "SELECT * FROM fn_get_sensor_data_filename_hist((%s))",

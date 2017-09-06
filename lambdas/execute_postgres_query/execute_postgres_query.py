@@ -1,5 +1,7 @@
 import psycopg2
 import psycopg2.extras
+psycopg2.extras.register_uuid()
+import uuid
 import boto3
 import os
 import json
@@ -76,6 +78,8 @@ def handler(event, context):
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, datetime):
-        serial = obj.isoformat()
-        return serial
-    raise TypeError("Type not serializable")
+        return obj.isoformat()
+    elif isinstance(obj, uuid.UUID):
+        return str(obj)
+    else:
+        raise TypeError("Type {} not serializable".format(type(obj)))
