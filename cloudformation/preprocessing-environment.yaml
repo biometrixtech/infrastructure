@@ -18,17 +18,14 @@ Parameters:
         MinValue: 0
         MaxValue: 255
         Description: "The second digit in the IP range (10.xx.0.0/16).  VPNs with overlapping address spaces cannot be peered."
-
     MultiAz:
         Type: "String"
         AllowedValues: [ "true", "false" ]
         Description: "Whether to create instances in multiple AZs.  This has an additional cost."
-
     MongoDbPeeringVpc:
         Type: "String"
         Default: ""
         Description: "MongoDB VPC ID"
-
     MongoDbPeeringCidr:
         Type: "String"
         Description: "MongoDB VPC CIDR range"
@@ -57,12 +54,10 @@ Parameters:
         ]
         Default: "m3.medium"
         Description: "What type the EC2 instances should be"
-
     ComputeEc2Ami:
         Type: "AWS::EC2::Image::Id"
         Default: "ami-20631a36"
         Description: "The AMI to build the EC2 instances from"
-
     ComputeEc2Keypair:
         Type: "String"
         Description: "A SSH keypair to grant access to instances"
@@ -100,6 +95,11 @@ Parameters:
         Type: "String"
         Description: "The version of the `databaseupload` batch job to run"
 
+    OverrideSnsSuccessTopic:
+        Type: "String"
+        Default: ""
+        Description: "An SNS topic ARN to publish success notifications to"
+
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
@@ -121,6 +121,7 @@ Metadata:
               - "ComputeEc2InstanceSize"
               - "ComputeEc2Ami"
               - "ComputeEc2Keypair"
+              - "OverrideSnsSuccessTopic"
           - Label: { default: "Batch Jobs" }
             Parameters:
               - "BatchJobVersionDownloadandchunk"
@@ -145,6 +146,7 @@ Metadata:
             BatchJobVersionDatabaseupload: { default: "databaseupload" }
             MongoDbPeeringVpc: { default: "MongoDB VPN ID" }
             MongoDbPeeringCidr: { default: "MongoDB VPN CIDR" }
+            OverrideSnsSuccessTopic: { default: "Success SNS Topic ARN" }
 
 Conditions:
     CreateComputeCluster: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "ComputeTemplate" }, "" ] } ] }
@@ -251,6 +253,7 @@ Resources:
                 BatchJobVersionNoop: { Ref: "BatchJobVersionNoop" }
                 BatchJobVersionScoring: { Ref: "BatchJobVersionScoring" }
                 BatchJobVersionDatabaseupload: { Ref: "BatchJobVersionDatabaseupload" }
+                OverrideSnsSuccessTopic: { Ref: "OverrideSnsSuccessTopic" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline" } }
               - { Key: "Management", Value: "managed" }

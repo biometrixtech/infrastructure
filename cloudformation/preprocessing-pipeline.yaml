@@ -27,12 +27,18 @@ Parameters:
         Type: "String"
         Description: "The version of the `databaseupload` batch job to run"
 
+    OverrideSnsSuccessTopic:
+        Type: "String"
+        Default: ""
+        Description: "An SNS topic ARN to publish success notifications to"
+
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
           - Label: { default: "Environment" }
             Parameters:
               - "Environment"
+              - "OverrideSnsSuccessTopic"
           - Label: { default: "Batch Jobs" }
             Parameters:
               - "BatchJobVersionDownloadandchunk"
@@ -48,6 +54,10 @@ Metadata:
             BatchJobVersionNoop: { default: "noop" }
             BatchJobVersionScoring: { default: "scoring" }
             BatchJobVersionDatabaseupload: { default: "databaseupload" }
+            OverrideSnsSuccessTopic: { default: "Success SNS Topic ARN" }
+
+Conditions:
+    CreateSnsTopic: { "Fn::Equals": [ { Ref: "OverrideSnsSuccessTopic" }, "" ] }
 
 Resources:
 
@@ -480,7 +490,7 @@ Resources:
                         )
             Environment:
                 Variables:
-                    SNS_TOPIC: { Ref: "SnsSuccessTopic" }
+                    SNS_TOPIC: { "Fn::If": [ "CreateSnsTopic", { Ref: "SnsSuccessTopic" }, { Ref: "OverrideSnsSuccessTopic" } ] }
             Handler: "index.handler"
             Runtime: "python3.6"
             Timeout: "30"
@@ -540,6 +550,7 @@ Resources:
         Properties:
             DisplayName: "Biometrix preprocessing success notification"
             TopicName: { "Fn::Sub": "preprocessing-${Environment}-success" }
+        Condition: "CreateSnsTopic"
 
     ##########################################################################################################
     ##  STEP FUNCTIONS
