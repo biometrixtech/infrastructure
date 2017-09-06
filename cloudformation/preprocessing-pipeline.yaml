@@ -113,8 +113,8 @@ Resources:
         Type: "AWS::Lambda::Function"
         Properties:
             Code:
-                ZipFile: !Sub |
-                    import boto3, json, time
+                ZipFile: |
+                    import boto3, json, os, time
 
                     def handler(event, context):
                         print(event)
@@ -145,11 +145,11 @@ Resources:
                         execution_name = '{}-{}'.format(s3_key, int(time.time()))
                         sfn_client = boto3.client('stepfunctions')
                         res = sfn_client.start_execution(
-                            stateMachineArn="arn:aws:states:us-west-2:887689817172:stateMachine:StateMachine-XEPGYPQQM6VJ",
+                            stateMachineArn=os.environ['STATE_MACHINE_ARN'],
                             name=execution_name,
                             input=json.dumps({
                                 "Meta": {
-                                    "ExecutionArn": "arn:aws:states:us-west-2:887689817172:execution:StateMachine-XEPGYPQQM6VJ:{}".format(execution_name),
+                                    "ExecutionArn": "{}:{}".format(os.environ['STATE_MACHINE_ARN'], execution_name),
                                     "ExecutionName": execution_name,
                                 },
                                 "SourceEvent": {
@@ -190,8 +190,10 @@ Resources:
                             )
                             raise Exception("Missing packets in upload")
 
-
-
+            Environment:
+                Variables:
+                    ENVIRONMENT: { Ref: "Environment" }
+                    STATE_MACHINE_ARN: { Ref: "StateMachine" }
             Handler: "index.handler"
             MemorySize: "256"
             Runtime: "python3.6"
@@ -804,3 +806,6 @@ Outputs:
     TriggerLambdaArn:
         Description: "The ARN of the trigger lambda"
         Value: { "Fn::GetAtt": [ "LambdaTrigger", "Arn" ] }
+    StateMachineArn:
+        Description: "The ARN of the SFN state machine"
+        Value: { Ref: "StateMachine" }
