@@ -166,14 +166,14 @@ Resources:
                         objects_list = []
                         resp = s3_client.list_objects(Bucket=bucket, Prefix=prefix, Marker=marker)
                         objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'combined'])
-                        while resp['IsTruncated']:
-                            objects_list.extend(list_s3_files(bucket, prefix, objects_list[-1][0]))
+                        if resp['IsTruncated']:
+                            objects_list.extend(list_s3_files(bucket, prefix, objects_list[-1]))
                         return sorted(objects_list)
 
 
                     def audit_packets(bucket, prefix, packets):
-                        expected_packets = ["{:04d}".format(i + 1) for i in range(len(packets) - 1)] + ["complete"]
-                        if sorted(packets) != sorted(expected_packets):
+                        expected_packets = ["{:04d}".format(i) for i in range(len(packets) - 1)] + ["complete"]
+                        if packets != expected_packets:
                             cloudwatch_client = boto3.client('cloudwatch')
                             cloudwatch_client.put_metric_data(
                                 Namespace='Preprocessing',
