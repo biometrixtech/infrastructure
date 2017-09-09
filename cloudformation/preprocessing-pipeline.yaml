@@ -504,6 +504,32 @@ Resources:
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
 
+    LambdaNotifyFailure:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        import boto3, os
+                        sns_client = boto3.client('sns')
+                        response = sns_client.publish(
+                            TopicArn=os.environ['SNS_TOPIC'],
+                            Message=event['ReadDatabase']['SessionEventId'],
+                        )
+            Environment:
+                Variables:
+                    SNS_TOPIC: { Ref: "SnsFailureTopic" }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-notifyfailure" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-notifyfailure" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
     LambdaPrepareCleanup:
         Type: "AWS::Lambda::Function"
         Properties:
@@ -553,6 +579,12 @@ Resources:
             DisplayName: "Biometrix preprocessing success notification"
             TopicName: { "Fn::Sub": "preprocessing-${Environment}-success" }
         Condition: "CreateSnsTopic"
+
+    SnsFailureTopic:
+        Type: "AWS::SNS::Topic"
+        Properties:
+            DisplayName: "Biometrix preprocessing failure notification"
+            TopicName: { "Fn::Sub": "preprocessing-${Environment}-failure" }
 
     ##########################################################################################################
     ##  STEP FUNCTIONS
@@ -673,7 +705,22 @@ Resources:
                                             "Type": "Task",
                                             "InputPath": "$.Scoring",
                                             "Resource": "${StepFunctionsActivity}",
+                                            "Catch": [
+                                                {
+                                                    "ErrorEquals": [ "NoHistoricalDataException" ],
+                                                    "Next": "ExceptionNoHistoricalData",
+                                                    "ResultPath": "$._ExceptionOutput"
+                                                }
+                                            ],
                                             "End": true
+                                        },
+                                        "ExceptionNoHistoricalData": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaNotifyFailure.Arn}",
+                                            "Next": "ExceptionStop"
+                                        },
+                                        "ExceptionStop": {
+                                            "Type": "Fail"
                                         }
                                     }
                                 }
