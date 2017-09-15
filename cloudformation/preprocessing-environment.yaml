@@ -277,6 +277,7 @@ Resources:
                 Vpc: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
                 PrivateSubnets: { "Fn::GetAtt": [ "VpcStack", "Outputs.PrivateSubnetIds" ] }
                 ActivityArn: { "Fn::GetAtt": [ "PipelineCluster", "Outputs.ActivityArn" ] }
+                SqsQueueName: { "Fn::GetAtt": [ "PipelineCluster", "Outputs.LinearitySqsQueueName" ] }
                 InstanceSize: "t2.micro"
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-sfn-batch-poller" } }

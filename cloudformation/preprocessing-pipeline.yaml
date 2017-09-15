@@ -570,7 +570,21 @@ Resources:
               - { Key: "Environment", Value: { Ref: "Environment" } }
 
     ##########################################################################################################
-    ##  LAMBDA
+    ##  SQS
+    ##########################################################################################################
+
+    LinearityEnforcingQueue:
+        Type: "AWS::SQS::Queue"
+        Properties:
+            ContentBasedDeduplication: false
+            FifoQueue: true
+            MessageRetentionPeriod: 86400
+            QueueName: { "Fn::Sub": "preprocessing-${Environment}-linearity.fifo" }
+            ReceiveMessageWaitTimeSeconds: 20
+            VisibilityTimeout: 3600
+
+    ##########################################################################################################
+    ##  SNS
     ##########################################################################################################
 
     SnsSuccessTopic:
@@ -850,6 +864,9 @@ Outputs:
     ActivityArn:
         Description: "The ARN of the Batch Activity"
         Value: { Ref: "StepFunctionsActivity" }
+    LinearitySqsQueueName:
+        Description: "The name of the linearity-enforcing SQS Queue"
+        Value: { Ref: "LinearityEnforcingQueue" }
     TriggerLambdaArn:
         Description: "The ARN of the trigger lambda"
         Value: { "Fn::GetAtt": [ "LambdaTrigger", "Arn" ] }
