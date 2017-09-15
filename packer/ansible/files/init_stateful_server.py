@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
+import argparse
 import boto3
 import requests
 import time
@@ -33,15 +34,23 @@ def attach_ebs(volume_id):
 
 
 if __name__ == '__main__':
-    ec2_resource = boto3.resource('ec2', region_name='${AWS::Region}')
-    ec2_client = boto3.client('ec2', region_name='${AWS::Region}')
+    parser = argparse.ArgumentParser(description='Invoke one or more test files')
+    parser.add_argument('--region', '-r',
+                        type=str,
+                        help='AWS Region',
+                        default='us-west-2')
+    args = parser.parse_args()
+
+    ec2_resource = boto3.resource('ec2', region_name=args.region)
+    ec2_client = boto3.client('ec2', region_name=args.region)
 
     instance_id = requests.get('http://169.254.169.254/latest/meta-data/instance-id').text
     instance = ec2_resource.Instance(instance_id)
 
     tags = {tag['Key']: tag['Value'] for tag in instance.tags}
-    eni_id, volume_id, asg_name = tags.get('InstanceEniId', None), tags.get('InstanceVolumeId', None), tags.get(
-        'aws:cloudformation:logical-id', '')
+    eni_id = tags.get('InstanceEniId', None)
+    volume_id = tags.get('InstanceVolumeId', None)
+    asg_name = tags.get('aws:cloudformation:logical-id', '')
 
     attach_eni(eni_id)
     attach_ebs(volume_id)

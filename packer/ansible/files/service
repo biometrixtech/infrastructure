@@ -1,6 +1,6 @@
 [Unit]
 Description=High-performance, schema-free document-oriented database
-After=network.target
+After=cloud-init.target
 
 [Service]
 User=mongodb
@@ -13,7 +13,10 @@ LimitAS=infinity
 LimitNOFILE=64000
 LimitNPROC=64000
 
-ExecStart=/usr/bin/mongod -f /etc/mongodb/mongodb.conf
+Type=forking
+PIDFile=/var/run/mongodb/mongod.pid
+ExecStart=/usr/bin/mongod --config /etc/mongodb/mongodb.conf
+ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target

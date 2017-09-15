@@ -160,7 +160,7 @@ Metadata:
 
 Mappings:
     RegionAmiMappings:
-        us-east-1:      { "3point4": "ami-890e32f2", "bastion": "ami-1d4e7a66" }
+        us-east-1:      { "3point4": "ami-293e2752", "bastion": "ami-1d4e7a66" }
         us-west-2:      { "3point4": "ami-00000000", "bastion": "ami-8803e0f0" }
 
 Conditions:
@@ -399,14 +399,7 @@ Resources:
                     set -euo pipefail
 
 
-                    # Install the files referenced in the metadata above
-                    /opt/aws/bin/cfn-init \
-                        --resource LaunchConfiguration \
-                        --stack ${AWS::StackName} \
-                        --region ${AWS::Region}
-
-
-                    # Set the hostname
+                    # Set the hostname and region
                     INSTANCE_ID=$( curl -s http://169.254.169.254/latest/meta-data/instance-id )
                     echo $INSTANCE_ID > /etc/hostname
                     hostname $INSTANCE_ID
@@ -417,21 +410,26 @@ Resources:
                     service awslogs restart
 
 
+                    # Performance improvements for Mongodb
+                    echo never > /sys/kernel/mm/transparent_hugepage/enabled
+                    echo never > /sys/kernel/mm/transparent_hugepage/defrag
+
+
                     # Attach ENI and EBS
-                    /opt/biometrix/init_stateful_server.py
+                    /opt/biometrix/init_stateful_server.py --region ${AWS::Region}
                     sleep 30s
 
 
                     # Mount the EBS volume as a new filesystem
                     set +e
-                    blkid -L mongodatastore
+                    blkid -L mongodata
                     FILESYSTEM_EXISTS=$?
                     set -e
                     if [[ $FILESYSTEM_EXISTS -ne 0 ]]; then
-                        mkfs -t ext4 -L mongodatastore /dev/xvdb
+                        mkfs.xfs -L mongodbdata /dev/xvdb
                     fi
                     mount /dev/xvdb /ext/ebs1
-                    echo "LABEL=mongodatastore /ext/ebs1 ext4 nofail 0 0" >> /etc/fstab
+                    echo "LABEL=mongodata /ext/ebs1 xfs nofail 0 0" >> /etc/fstab
 
 
                     # If the filesystem hasn't been initialised before, do so; then mount the data directory
@@ -445,7 +443,7 @@ Resources:
 
 
                     # Signal to the autoscaling group that the instance is configured successfully
-                    /opt/aws/bin/cfn-signal \
+                    cfn-signal \
                         --success true \
                         --stack ${AWS::StackName} \
                         --resource `cat /tmp/aws_asg_name` \

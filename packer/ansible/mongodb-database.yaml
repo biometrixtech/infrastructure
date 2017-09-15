@@ -19,11 +19,12 @@
         group: 
             name: mongodb
             state: present
+
       - name: "Create mongodb user"
         user: 
             name: mongodb 
             comment: "mongodb user" 
-            uid: 1040 
+            uid: 1001
             group: mongodb
         
       - apt: 
@@ -53,13 +54,6 @@
         apt:
             name: 'mongodb-org'
             state: present
-        
-        # These are not real files, so can't be written to by the normal Ansible `copy` module
-      - name: 'Disable transparent hugepages, improves performance'
-        shell: 'echo never > /sys/kernel/mm/transparent_hugepage/enabled'
-
-      - name: 'Disable transparent hugepage defragging'
-        shell: 'echo never > /sys/kernel/mm/transparent_hugepage/defrag'
 
       - name: 'Disable NUMA zone reclamation'
         lineinfile:
@@ -70,9 +64,23 @@
         copy:
             src: 'files/service'
             dest: '/etc/systemd/system/mongodb.service'
-            mode: '0755'
+            mode: '0644'
             owner: 'mongodb'
             group: 'mongodb'
+
+      - name: 'Enable mongodb service on startup'
+        file:
+            src: '/etc/systemd/system/mongodb.service'
+            dest: '/etc/systemd/system/multi-user.target.wants/mongodb.service'
+            state: 'link'
+
+      - name: 'Create the /var/run/mongodb directory on startup'
+        copy:
+            content: 'D /var/run/mongodb 755 mongodb mongodb'
+            dest: '/etc/tmpfiles.d/mongodb.conf'
+            owner: 'root'
+            group: 'root'
+            mode: '0644'
         
       - name: 'Create the config directory'
         file:
@@ -123,6 +131,7 @@
           - 'https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz'
           - 'boto3'
           - 'cloudwatchmon'
+          - 'requests'
 
       - name: 'Create /opt/biometrix directory'
         file:
@@ -192,5 +201,5 @@
             dest: '/etc/crontab'
             line: '{{item}}'
         with_items:
-          - '* /5 * * * * /usr/local/bin/mon-put-instance-stats.py --mem-util --disk-space-util --disk-path=/ --disk-path=/ext/ebs1 --disk-inode-util --auto-scaling'
+          - '* * * * * root /usr/local/bin/mon-put-instance-stats.py --mem-util --disk-space-util --disk-path=/ --disk-path=/ext/ebs1 --disk-inode-util --auto-scaling'
           - ''
