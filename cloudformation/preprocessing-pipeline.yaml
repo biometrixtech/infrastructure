@@ -339,11 +339,11 @@ Resources:
                                     },
                                     "InputPath": "$[{}]".format(i)
                                 }
-                                for i in range(len(event['DownloadAndChunk'][1]['Output']['Filenames']))
+                                for i in range(len(event['DownloadAndChunk']['Output']['Filenames']))
                             ],
                             "Input": [
                                 {**event["ReadDatabase"], **{"Filename": f}}
-                                for f in event['DownloadAndChunk'][1]['Output']['Filenames']
+                                for f in event['DownloadAndChunk']['Output']['Filenames']
                             ]
                         }
             Handler: "index.handler"
@@ -385,7 +385,7 @@ Resources:
                             ],
                             "Input": {
                                 **event["ReadDatabase"],
-                                **{"Filenames": event['DownloadAndChunk'][1]['Output']['Filenames']}
+                                **{"Filenames": event['DownloadAndChunk']['Output']['Filenames']}
                             }
                         }
             Handler: "index.handler"
@@ -460,11 +460,11 @@ Resources:
                                     },
                                     "InputPath": "$[{}]".format(i)
                                 }
-                                for i in range(len(event['Scoring'][1]['Output']['Filenames']))
+                                for i in range(len(event['Scoring']['Output']['Filenames']))
                             ],
                             "Input": [
                                 {**event["ReadDatabase"], **{"Filename": f}}
-                                for f in event['Scoring'][1]['Output']['Filenames']
+                                for f in event['Scoring']['Output']['Filenames']
                             ]
                         }
             Handler: "index.handler"
@@ -623,31 +623,9 @@ Resources:
                             "Next": "DownloadAndChunk"
                         },
                         "DownloadAndChunk": {
-                            "Type": "Parallel",
-                            "Branches": [
-                                {
-                                    "StartAt": "ScheduleDownloadAndChunk",
-                                    "States": {
-                                        "ScheduleDownloadAndChunk": {
-                                            "Type": "Task",
-                                            "InputPath": "$.DownloadAndChunk",
-                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
-                                            "End": true
-                                        }
-                                    }
-                                },
-                                {
-                                    "StartAt": "RespondDownloadAndChunk",
-                                    "States": {
-                                        "RespondDownloadAndChunk": {
-                                            "Type": "Task",
-                                            "InputPath": "$.DownloadAndChunk",
-                                            "Resource": "${StepFunctionsActivity}",
-                                            "End": true
-                                        }
-                                    }
-                                }
-                            ],
+                            "Type": "Task",
+                            "InputPath": "$.DownloadAndChunk",
+                            "Resource": "${StepFunctionsActivity}",
                             "ResultPath": "$.DownloadAndChunk",
                             "Next": "ReadDatabase"
                         },
@@ -664,31 +642,9 @@ Resources:
                             "Next": "SessionProcess2"
                         },
                         "SessionProcess2": {
-                            "Type": "Parallel",
-                            "Branches": [
-                                {
-                                    "StartAt": "ScheduleSessionProcess2",
-                                    "States": {
-                                        "ScheduleSessionProcess2": {
-                                            "Type": "Task",
-                                            "InputPath": "$.SessionProcess2",
-                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
-                                            "End": true
-                                        }
-                                    }
-                                },
-                                {
-                                    "StartAt": "RespondSessionProcess2",
-                                    "States": {
-                                        "RespondSessionProcess2": {
-                                            "Type": "Task",
-                                            "InputPath": "$.SessionProcess2",
-                                            "Resource": "${StepFunctionsActivity}",
-                                            "End": true
-                                        }
-                                    }
-                                }
-                            ],
+                            "Type": "Task",
+                            "InputPath": "$.SessionProcess2",
+                            "Resource": "${StepFunctionsActivity}",
                             "ResultPath": "$.SessionProcess2",
                             "Next": "BuildScoringContext"
                         },
@@ -699,44 +655,14 @@ Resources:
                             "Next": "Scoring"
                         },
                         "Scoring": {
-                            "Type": "Parallel",
-                            "Branches": [
+                            "Type": "Task",
+                            "InputPath": "$.Scoring",
+                            "Resource": "${StepFunctionsActivity}",
+                            "Catch": [
                                 {
-                                    "StartAt": "ScheduleScoring",
-                                    "States": {
-                                        "ScheduleScoring": {
-                                            "Type": "Task",
-                                            "InputPath": "$.Scoring",
-                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
-                                            "End": true
-                                        }
-                                    }
-                                },
-                                {
-                                    "StartAt": "RespondScoring",
-                                    "States": {
-                                        "RespondScoring": {
-                                            "Type": "Task",
-                                            "InputPath": "$.Scoring",
-                                            "Resource": "${StepFunctionsActivity}",
-                                            "Catch": [
-                                                {
-                                                    "ErrorEquals": [ "NoHistoricalDataException" ],
-                                                    "Next": "ExceptionNoHistoricalData",
-                                                    "ResultPath": "$._ExceptionOutput"
-                                                }
-                                            ],
-                                            "End": true
-                                        },
-                                        "ExceptionNoHistoricalData": {
-                                            "Type": "Task",
-                                            "Resource": "${LambdaNotifyFailure.Arn}",
-                                            "Next": "ExceptionStop"
-                                        },
-                                        "ExceptionStop": {
-                                            "Type": "Fail"
-                                        }
-                                    }
+                                    "ErrorEquals": [ "NoHistoricalDataException" ],
+                                    "Next": "ExceptionNoHistoricalData",
+                                    "ResultPath": "$._ExceptionOutput"
                                 }
                             ],
                             "ResultPath": "$.Scoring",
@@ -765,31 +691,9 @@ Resources:
                                             "Next": "WriteMongo"
                                         },
                                         "WriteMongo": {
-                                            "Type": "Parallel",
-                                            "Branches": [
-                                                {
-                                                    "StartAt": "ScheduleWriteMongo",
-                                                    "States": {
-                                                        "ScheduleWriteMongo": {
-                                                            "Type": "Task",
-                                                            "InputPath": "$.WriteMongo",
-                                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
-                                                            "End": true
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "StartAt": "RespondWriteMongo",
-                                                    "States": {
-                                                        "RespondWriteMongo": {
-                                                            "Type": "Task",
-                                                            "InputPath": "$.WriteMongo",
-                                                            "Resource": "${StepFunctionsActivity}",
-                                                            "End": true
-                                                        }
-                                                    }
-                                                }
-                                            ],
+                                            "Type": "Task",
+                                            "InputPath": "$.WriteMongo",
+                                            "Resource": "${StepFunctionsActivity}",
                                             "ResultPath": "$.WriteMongo",
                                             "End": true
                                         }
@@ -822,31 +726,9 @@ Resources:
                                             "Next": "Cleanup"
                                         },
                                         "Cleanup": {
-                                            "Type": "Parallel",
-                                            "Branches": [
-                                                {
-                                                    "StartAt": "ScheduleCleanup",
-                                                    "States": {
-                                                        "ScheduleCleanup": {
-                                                            "Type": "Task",
-                                                            "InputPath": "$.Cleanup",
-                                                            "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-sfn-batch-schedule",
-                                                            "End": true
-                                                        }
-                                                    }
-                                                },
-                                                {
-                                                    "StartAt": "RespondCleanup",
-                                                    "States": {
-                                                        "RespondCleanup": {
-                                                            "Type": "Task",
-                                                            "InputPath": "$.Cleanup",
-                                                            "Resource": "${StepFunctionsActivity}",
-                                                            "End": true
-                                                        }
-                                                    }
-                                                }
-                                            ],
+                                            "Type": "Task",
+                                            "InputPath": "$.Cleanup",
+                                            "Resource": "${StepFunctionsActivity}",
                                             "ResultPath": "$.Cleanup",
                                             "End": true
                                         }
@@ -855,6 +737,14 @@ Resources:
                             ],
                             "ResultPath": "$.Cleanup",
                             "End": true
+                        },
+                        "ExceptionNoHistoricalData": {
+                            "Type": "Task",
+                            "Resource": "${LambdaNotifyFailure.Arn}",
+                            "Next": "ExceptionStop"
+                        },
+                        "ExceptionStop": {
+                            "Type": "Fail"
                         }
                     }
                 }
