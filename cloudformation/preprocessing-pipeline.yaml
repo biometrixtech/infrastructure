@@ -478,6 +478,92 @@ Resources:
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
 
+    LambdaPrepareAggregateSession:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "ExecutionName": event['Meta']['ExecutionName'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDatabaseupload}",
+                                        "BatchJob": "aggregatesession",
+                                        "Memory": 2048,
+                                        "Vcpus": 2,
+                                    },
+                                    "InputPath": "$[{}]".format(i)
+                                }
+                                for i in range(len(event['Scoring']['Output']['Filenames']))
+                            ],
+                            "Input": [
+                                {**event["ReadDatabase"], **{"Filename": f}}
+                                for f in event['Scoring']['Output']['Filenames']
+                            ]
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatesession" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatesession" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    LambdaPrepareAggregateTwomin:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "ExecutionName": event['Meta']['ExecutionName'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDatabaseupload}",
+                                        "BatchJob": "aggregatetwomin",
+                                        "Memory": 2048,
+                                        "Vcpus": 2,
+                                    },
+                                    "InputPath": "$[{}]".format(i)
+                                }
+                                for i in range(len(event['Scoring']['Output']['Filenames']))
+                            ],
+                            "Input": [
+                                {**event["ReadDatabase"], **{"Filename": f}}
+                                for f in event['Scoring']['Output']['Filenames']
+                            ]
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatetwomin" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatetwomin" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
     LambdaNotifySuccess:
         Type: "AWS::Lambda::Function"
         Properties:
@@ -695,6 +781,37 @@ Resources:
                                             "InputPath": "$.WriteMongo",
                                             "Resource": "${StepFunctionsActivity}",
                                             "ResultPath": "$.WriteMongo",
+                                            "End": true
+                                        }
+                                    }
+                                },
+                                {
+                                    "StartAt": "BuildAggregateSessionContext",
+                                    "States": {
+                                        "BuildAggregateSessionContext": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaPrepareAggregateSession.Arn}",
+                                            "ResultPath": "$.AggregateSession",
+                                            "Next": "AggregateSession"
+                                        },
+                                        "AggregateSession": {
+                                            "Type": "Task",
+                                            "InputPath": "$.AggregateSession",
+                                            "Resource": "${StepFunctionsActivity}",
+                                            "ResultPath": "$.AggregateSession",
+                                            "Next": "BuildAggregateTwominContext"
+                                        },
+                                        "BuildAggregateTwominContext": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaPrepareAggregateTwomin.Arn}",
+                                            "ResultPath": "$.AggregateTwomin",
+                                            "Next": "AggregateTwomin"
+                                        },
+                                        "AggregateTwomin": {
+                                            "Type": "Task",
+                                            "InputPath": "$.AggregateTwomin",
+                                            "Resource": "${StepFunctionsActivity}",
+                                            "ResultPath": "$.AggregateTwomin",
                                             "End": true
                                         }
                                     }
