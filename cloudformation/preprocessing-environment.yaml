@@ -163,17 +163,17 @@ Resources:
         Type: "AWS::S3::Bucket"
         Properties:
             BucketName: { "Fn::Sub": "biometrix-preprocessing-${Environment}-${AWS::Region}" }
-            NotificationConfiguration:
-                LambdaConfigurations:
-                  - Event: "s3:ObjectCreated:*"
-                    Function: { "Fn::GetAtt": [ "PipelineCluster", "Outputs.TriggerLambdaArn" ] }
+            NotificationConfiguration: { "Fn::If": [
+                "CreatePipeline",
+                { "LambdaConfigurations": [ { "Event": "s3:ObjectCreated:*", "Function": { "Fn::GetAtt": [ "PipelineCluster", "Outputs.TriggerLambdaArn" ] } } ] },
+                { Ref: "AWS::NoValue" }
+            ]}
             Tags:
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
         # Don't delete this if we accidentally delete the stack (which would fail anyway unless the bucket is empty)
         DeletionPolicy : "Retain"
-        Condition: "CreatePipeline"
 
     LambdaTriggerPermission:
         Type: "AWS::Lambda::Permission"
