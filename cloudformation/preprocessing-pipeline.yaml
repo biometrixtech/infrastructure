@@ -156,6 +156,7 @@ Resources:
                                     "S3Bucket": s3_bucket,
                                     "S3BasePath": s3_basepath + combiner,
                                     "PartCount": part_count,
+                                    "SensorDataFilename": s3_basepath
                                 }
                             })
                         )
@@ -267,6 +268,7 @@ Resources:
                             return result[0] if len(result) else {}
 
                     def handler(event, context):
+                        sensor_data_filename = event['SourceEvent']['S3BasePath'].rstrip('_')
                         query_results = query(
                             """SELECT
                               session_events.id AS session_event_id,
@@ -281,9 +283,10 @@ Resources:
                             LEFT JOIN users ON session_events.user_id=users.id
                             LEFT JOIN training_groups ON training_groups.id = session_events.training_group_ids[1]
                             WHERE session_events.sensor_data_filename = %s""",
-                            [event['SourceEvent']['S3BasePath'].rstrip('_')]
+                            [sensor_data_filename]
                         )
                         ret = {
+                            "SensorDataFilename": sensor_data_filename,
                             "SessionEventId": query_results.get('session_event_id', None),
                             "TrainingSessionLogId": query_results.get('training_session_log_id', None),
                             "HipNTransform": query_results.get('hip_n_transform', None),
@@ -496,19 +499,15 @@ Resources:
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDatabaseupload}",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
                                         "BatchJob": "aggregatesession",
-                                        "Memory": 2048,
-                                        "Vcpus": 2,
+                                        "Memory": 4096,
+                                        "Vcpus": 4,
                                     },
-                                    "InputPath": "$[{}]".format(i)
+                                    "InputPath": "$"
                                 }
-                                for i in range(len(event['Scoring']['Output']['Filenames']))
                             ],
-                            "Input": [
-                                {**event["ReadDatabase"], **{"Filename": f}}
-                                for f in event['Scoring']['Output']['Filenames']
-                            ]
+                            "Input": event["ReadDatabase"]
                         }
             Handler: "index.handler"
             Runtime: "python3.6"
@@ -560,6 +559,45 @@ Resources:
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatetwomin" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatetwomin" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    LambdaPrepareAggregateDateUser:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "ExecutionName": event['Meta']['ExecutionName'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJob": "aggregatedateuser",
+                                        "Memory": 4096,
+                                        "Vcpus": 4,
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": event["ReadDatabase"]
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatedateuser" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatedateuser" } }
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
@@ -812,6 +850,24 @@ Resources:
                                             "InputPath": "$.AggregateTwomin",
                                             "Resource": "${StepFunctionsActivity}",
                                             "ResultPath": "$.AggregateTwomin",
+                                            "End": true
+                                        }
+                                    }
+                                },
+                                {
+                                    "StartAt": "BuildAggregateDateContext",
+                                    "States": {
+                                        "BuildAggregateDateContext": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaPrepareAggregateDateUser.Arn}",
+                                            "ResultPath": "$.AggregateDate",
+                                            "Next": "AggregateDate"
+                                        },
+                                        "AggregateDate": {
+                                            "Type": "Task",
+                                            "InputPath": "$.AggregateDate",
+                                            "Resource": "${StepFunctionsActivity}",
+                                            "ResultPath": "$.AggregateDate",
                                             "End": true
                                         }
                                     }
