@@ -85,6 +85,7 @@ Resources:
                           - "logs:CreateLogGroup"
                           - "logs:CreateLogStream"
                           - "logs:PutLogEvents"
+                          - "cloudwatch:PutMetricData"
                         Effect: "Allow"
                         Resource: "*"
 
@@ -115,6 +116,7 @@ Resources:
             Code:
                 ZipFile: |
                     import boto3, json, os, time
+                    from datetime import datetime
 
                     def handler(event, context):
                         print(event)
@@ -294,7 +296,7 @@ Resources:
                             "HipNTransform": query_results.get('hip_n_transform', None),
                             "TrainingGroupId": query_results.get('training_group_ids', None),
                             "UserId": query_results.get('user_id', None),
-                            "UserWeight": query_results.get('weight', None),
+                            "UserMass": query_results.get('weight', None),
                             "TeamId": query_results.get('team_id', None),
                             "SessionType": query_results.get('session_type', None) or 1,
                         }
@@ -722,7 +724,7 @@ Resources:
                                     "InputPath": "$"
                                 }
                             ],
-                            "Input": {"Filename": event['SourceEvent']['S3BasePath']}
+                            "Input": event["ReadDatabase"]
                         }
             Handler: "index.handler"
             Runtime: "python3.6"
