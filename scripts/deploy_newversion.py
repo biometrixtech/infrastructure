@@ -6,7 +6,9 @@ import boto3
 import argparse
 import os
 import subprocess
+import sys
 import time
+from subprocess import Popen, PIPE
 
 
 def trigger_codebuild():
@@ -72,6 +74,17 @@ def update_cf_stack():
         Capabilities=['CAPABILITY_NAMED_IAM'],
     )
 
+
+def update_git_branch():
+    run_process(cmd=["git", "branch", "-f", "{}-{}".format(args.environment, args.region), args.version])
+    run_process(cmd=["git", "push", "origin", "{}-{}".format(args.environment, args.region)])
+
+
+def run_process(cmd):
+    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    retcode = proc.wait()
+    if retcode:
+        sys.exit(retcode)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Fire off a CodeBuild job, update the CloudFormation stack, and wait for CodeBuild completion')
