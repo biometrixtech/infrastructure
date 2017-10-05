@@ -20,20 +20,11 @@ def register_job_definition():
                 " \
                     mkdir /net /net/efs ; \
                     mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=10,retrans=2 efs.internal:/ /net/efs 2>&1 ; \
-                    mkdir \
-                        /net/efs/downloadandchunk \
-                        /net/efs/downloadandchunk/output \
-                        /net/efs/sessionprocess2 \
-                        /net/efs/sessionprocess2/output \
-                        /net/efs/scoring \
-                        /net/efs/scoring/output \
-                        /net/efs/writemongo \
-                        /net/efs/writemongo/input \
+                    mkdir -p \
+                        /net/efs/preprocessing \
                         /net/efs/globalmodels \
                         /net/efs/globalscalers \
                     ; \
-                    ln -s ../downloadandchunk/output /net/efs/sessionprocess2/input ; \
-                    ln -s ../sessionprocess2/output /net/efs/scoring/input ; \
                 "
             ],
             "readonlyRootFilesystem": False,
