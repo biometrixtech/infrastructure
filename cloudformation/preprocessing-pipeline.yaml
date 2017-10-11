@@ -65,6 +65,39 @@ Resources:
     ##  IAM
     ##########################################################################################################
 
+    LambdaTriggerRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "lambda.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+            Policies:
+              - PolicyName: "default"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Action:
+                          - "logs:CreateLogGroup"
+                          - "logs:CreateLogStream"
+                          - "logs:PutLogEvents"
+                        Effect: "Allow"
+                        Resource: "*"
+
+                      - Action:
+                          - "s3:DeleteObject"
+                          - "s3:GetObject"
+                          - "s3:ListBucket"
+                          - "s3:PutObject"
+                          - "states:StartExecution"
+                        Effect: "Allow"
+                        Resource: "*"
+            RoleName: { "Fn::Sub": "preprocessing-${Environment}-lambda-trigger-${AWS::Region}" }
+
     LambdaExecutionRole:
         Type: "AWS::IAM::Role"
         Properties:
@@ -92,7 +125,6 @@ Resources:
                       - Action:
                           - "sns:Publish"
                           - "lambda:InvokeFunction"
-                          - "states:StartExecution"
                           - "s3:ListBucket"
                         Effect: "Allow"
                         Resource: "*"
@@ -174,24 +206,57 @@ Resources:
                         return sorted(objects_list)
 
 
+                    def rename_s3_file(bucket, old_file, new_file):
+                        s3_client.copy_object(Bucket=bucket, CopySource="{}/{}".format(bucket, old_file), Key=new_file)
+                        s3_client.delete_object(Bucket=bucket, Key=old_file)
+
+
                     def audit_packets(bucket, prefix, packets):
                         expected_packets = ["{:04d}".format(i) for i in range(len(packets) - 1)] + ["complete"]
-                        if packets != expected_packets:
-                            cloudwatch_client = boto3.client('cloudwatch')
-                            cloudwatch_client.put_metric_data(
-                                Namespace='Preprocessing',
-                                MetricData=[
-                                    {
-                                        'MetricName': 'MissingPackets',
-                                        'Dimensions': [
-                                            {'Name': 'Environment', 'Value': os.environ['ENVIRONMENT']},
-                                        ],
-                                        'Timestamp': datetime.utcnow(),
-                                        'Value': max(len(expected_packets) - len(packets), 1),
-                                    },
-                                ]
+
+                        if len(packets) != len(expected_packets):
+                            # Definitely wrong
+                            raise_packet_errors(
+                                max(len(expected_packets) - len(packets), 1),
+                                "Missing packets in upload, expected {} packets, got {}".format(len(expected_packets), len(packets))
                             )
-                            raise Exception("Missing packets in upload")
+
+                        if packets != expected_packets:
+                            extra_packets = set(packets).difference(expected_packets)
+                            missing_packets = set(expected_packets).difference(packets)
+                            print("extra_packets: {}, missing_packets: {}".format(extra_packets, missing_packets))
+
+                            if len(extra_packets) == 1 and len(missing_packets) == 1 and prefix in extra_packets:
+                                # https://app.asana.com/0/419313112177425/449967103403639
+                                # Occasionally a packet is uploaded with no suffix, so if the un-suffixed filename
+                                # appears in the packet list, and there is one suffix missing, rename it to fill in
+                                # the gap
+                                rename_s3_file(bucket, prefix, prefix + '_' + min(extra_packets))
+
+                            else:
+                                # There's a more subtle mismatch
+                                raise_packet_errors(
+                                    0,
+                                    "Corrupted packets uploaded"
+                                )
+
+                    def raise_packet_errors(num_packets, message):
+                        cloudwatch_client = boto3.client('cloudwatch')
+                        cloudwatch_client.put_metric_data(
+                            Namespace='Preprocessing',
+                            MetricData=[
+                                {
+                                    'MetricName': 'MissingPackets',
+                                    'Dimensions': [
+                                        {'Name': 'Environment', 'Value': os.environ['ENVIRONMENT']},
+                                    ],
+                                    'Timestamp': datetime.utcnow(),
+                                    'Value': num_packets,
+                                },
+                            ]
+                        )
+                        raise Exception(message)
+
 
             Environment:
                 Variables:
@@ -201,7 +266,7 @@ Resources:
             MemorySize: "256"
             Runtime: "python3.6"
             Timeout: "60"
-            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            Role: { "Fn::GetAtt" : [ "LambdaTriggerRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-trigger" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-trigger" } }
