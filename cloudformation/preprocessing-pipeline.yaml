@@ -171,10 +171,8 @@ Resources:
                                 return
 
                         else:
-                            # A complete file
-                            s3_basepath = s3_key
-                            combiner = ''
-                            part_count = 0
+                            # A complete file.  We don't do these any more (must be a bug)
+                            return
 
                         execution_name = '{}-{}'.format(s3_key, int(time.time()))
                         sfn_client = boto3.client('stepfunctions')
