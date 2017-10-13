@@ -27,11 +27,6 @@ Parameters:
         Type: "String"
         Description: "The version of the `databaseupload` batch job to run"
 
-    OverrideSnsSuccessTopic:
-        Type: "String"
-        Default: ""
-        Description: "An SNS topic ARN to publish success notifications to"
-
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
@@ -55,9 +50,6 @@ Metadata:
             BatchJobVersionScoring: { default: "scoring" }
             BatchJobVersionDatabaseupload: { default: "databaseupload" }
             OverrideSnsSuccessTopic: { default: "Success SNS Topic ARN" }
-
-Conditions:
-    CreateSnsTopic: { "Fn::Equals": [ { Ref: "OverrideSnsSuccessTopic" }, "" ] }
 
 Resources:
 
@@ -866,13 +858,6 @@ Resources:
     ##########################################################################################################
     ##  SNS
     ##########################################################################################################
-
-    SnsSuccessTopic:
-        Type: "AWS::SNS::Topic"
-        Properties:
-            DisplayName: "Biometrix preprocessing success notification"
-            TopicName: { "Fn::Sub": "preprocessing-${Environment}-success" }
-        Condition: "CreateSnsTopic"
 
     SnsFailureTopic:
         Type: "AWS::SNS::Topic"

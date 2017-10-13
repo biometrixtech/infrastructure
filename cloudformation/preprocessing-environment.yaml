@@ -95,11 +95,6 @@ Parameters:
         Type: "String"
         Description: "The version of the `databaseupload` batch job to run"
 
-    OverrideSnsSuccessTopic:
-        Type: "String"
-        Default: ""
-        Description: "An SNS topic ARN to publish success notifications to"
-
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
@@ -121,7 +116,6 @@ Metadata:
               - "ComputeEc2InstanceSize"
               - "ComputeEc2Ami"
               - "ComputeEc2Keypair"
-              - "OverrideSnsSuccessTopic"
           - Label: { default: "Batch Jobs" }
             Parameters:
               - "BatchJobVersionDownloadandchunk"
@@ -146,7 +140,6 @@ Metadata:
             BatchJobVersionDatabaseupload: { default: "databaseupload" }
             MongoDbPeeringVpc: { default: "MongoDB VPN ID" }
             MongoDbPeeringCidr: { default: "MongoDB VPN CIDR" }
-            OverrideSnsSuccessTopic: { default: "Success SNS Topic ARN" }
 
 Conditions:
     CreateComputeCluster: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "ComputeTemplate" }, "" ] } ] }
@@ -253,7 +246,6 @@ Resources:
                 BatchJobVersionNoop: { Ref: "BatchJobVersionNoop" }
                 BatchJobVersionScoring: { Ref: "BatchJobVersionScoring" }
                 BatchJobVersionDatabaseupload: { Ref: "BatchJobVersionDatabaseupload" }
-                OverrideSnsSuccessTopic: { Ref: "OverrideSnsSuccessTopic" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline" } }
               - { Key: "Management", Value: "managed" }
