@@ -22,3 +22,106 @@ Resources:
         # Don't delete this if we accidentally delete the stack (which would fail anyway unless the bucket is empty)
         DeletionPolicy : "Retain"
 
+    ##########################################################################################################
+    ##  LAMBDAS
+    ##########################################################################################################
+
+    LambdaExecutionRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "lambda.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+            Policies:
+              - PolicyName: "default"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Action:
+                          - "logs:CreateLogGroup"
+                          - "logs:CreateLogStream"
+                          - "logs:PutLogEvents"
+                          - "cloudwatch:PutMetricData"
+                        Effect: "Allow"
+                        Resource: "*"
+
+                      - Action:
+                          - "ec2:CreateTags"
+                          - "ec2:DescribeInstances"
+                          - "ec2:DescribeNetworkInterfaces"
+                          - "ec2:DescribeSnapshots"
+                          - "ec2:DescribeVolumes"
+                        Effect: "Allow"
+                        Resource: "*"
+
+            RoleName: { "Fn::Sub": "infrastructure-lambda-${AWS::Region}" }
+
+    LambdaSynchroniseEc2Tags:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: |
+                    # A lambda function that will copy EC2 tags to all related Volumes and Network Interfaces.
+                    # Based on http://mlapida.com/thoughts/tagging-and-snapshotting-with-lambda
+                    # Copyright Mike Lapidakis, Stephen Poole
+                    import boto3, os
+
+                    def handler(event, context):
+                        ec2_resource = boto3.resource('ec2', region_name=os.environ['AWS_REGION'])
+                        for instance in ec2_resource.instances.all():
+                            for volume in instance.volumes.all():
+                                print(volume.create_tags(Tags=tag_cleanup(instance, volume.attachments[0]['Device'])))
+                            for eni in instance.network_interfaces:
+                                print(eni.create_tags(Tags=tag_cleanup(instance, "eth" + str(eni.attachment['DeviceIndex']))))
+
+                        for volume in ec2_resource.volumes.all():
+                            for snapshot in volume.snapshots.all():
+                                print(snapshot.create_tags(Tags=tag_cleanup(instance, volume.id)))
+
+                    def tag_cleanup(instance, detail):
+                        temp_tags = []
+                        for t in instance.tags:
+                            if t['Key'] == 'Name':
+                                temp_tags.append({'Key': 'Name', 'Value': '{} ({})'.format(t['Value'], detail)})
+                            elif t['Key'] in os.environ['TAGS_TO_COPY'].split(','):
+                                print('Tag {}={}'.format(t['Key'], t['Value']))
+                                temp_tags.append(t)
+                            else:
+                                print('Skipping Tag {}'.format(t['Key']))
+                        return temp_tags
+
+            Environment:
+                Variables:
+                    TAGS_TO_COPY: "Project,Environment,Service,Management"
+            Handler: "index.handler"
+            MemorySize: "256"
+            Runtime: "python3.6"
+            Timeout: "60"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "infrastructure-synchroniseec2tags" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "infrastructure-synchroniseec2tags" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "infrastructure" }
+              - { Key: "Environment", Value: "infrastructure" }
+
+    LambdaSynchroniseEc2TagsSchedule:
+        Type: "AWS::Events::Rule"
+        Properties:
+            ScheduleExpression: "rate(1 day)"
+            Targets:
+              - Id: 'scheduler'
+                Arn: { "Fn::GetAtt": [ "LambdaSynchroniseEc2Tags", "Arn" ] }
+
+    LambdaSynchroniseEc2TagsInvokePermission:
+        Type: "AWS::Lambda::Permission"
+        Properties:
+            FunctionName: { "Fn::GetAtt": [ "LambdaSynchroniseEc2Tags", "Arn" ] }
+            Action: "lambda:InvokeFunction"
+            Principal: "events.amazonaws.com"
+            SourceArn: { "Fn::GetAtt": [ "LambdaSynchroniseEc2TagsSchedule", "Arn" ] }
