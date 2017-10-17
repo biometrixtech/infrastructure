@@ -365,7 +365,13 @@ Resources:
                                 ],
                                 [ ".", ".", ".", ".", ".", "sessionprocess2" ],
                                 [ ".", ".", ".", ".", ".", "scoring" ],
-                                [ ".", ".", ".", ".", ".", "writemongo" ]
+                                [ ".", ".", ".", ".", ".", "aggregatesession" ],
+                                [ ".", ".", ".", ".", ".", "aggregatetwomin" ],
+                                [ ".", ".", ".", ".", ".", "aggregatedateuser" ],
+                                [ ".", ".", ".", ".", ".", "aggregateprogcomp" ],
+                                [ ".", ".", ".", ".", ".", "aggregateprogcompdate" ],
+                                [ ".", ".", ".", ".", ".", "aggregateteam" ],
+                                [ ".", ".", ".", ".", ".", "aggregatetraininggroup" ]
                             ],
                             "period": 60,
                             "stat": "Average",
@@ -389,7 +395,13 @@ Resources:
                                 ],
                                 [ ".", ".", ".", ".", ".", "sessionprocess2" ],
                                 [ ".", ".", ".", ".", ".", "scoring" ],
-                                [ ".", ".", ".", ".", ".", "writemongo" ]
+                                [ ".", ".", ".", ".", ".", "aggregatesession" ],
+                                [ ".", ".", ".", ".", ".", "aggregatetwomin" ],
+                                [ ".", ".", ".", ".", ".", "aggregatedateuser" ],
+                                [ ".", ".", ".", ".", ".", "aggregateprogcomp" ],
+                                [ ".", ".", ".", ".", ".", "aggregateprogcompdate" ],
+                                [ ".", ".", ".", ".", ".", "aggregateteam" ],
+                                [ ".", ".", ".", ".", ".", "aggregatetraininggroup" ]
                             ],
                             "period": 60,
                             "stat": "Average",
@@ -405,7 +417,7 @@ Resources:
                         "height": 6,
                         "properties": {
                             "metrics": [
-                                [ "AWS/States", "ExecutionsStarted", "StateMachineArn", "arn:aws:states:us-west-2:887689817172:stateMachine:StateMachine-4ENQYJODFNYT" ],
+                                [ "AWS/States", "ExecutionsStarted", "StateMachineArn", "${PipelineCluster.Outputs.StateMachineArn}" ],
                                 [ ".", "ExecutionsFailed", ".", "." ],
                                 [ ".", "ExecutionsSucceeded", ".", "." ]
                             ],
