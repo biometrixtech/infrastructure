@@ -5,10 +5,9 @@ import json
 import boto3
 import argparse
 import os
-import subprocess
 import sys
 import time
-from subprocess import Popen, PIPE
+from subprocess import check_output, CalledProcessError
 
 
 def trigger_codebuild():
@@ -76,15 +75,13 @@ def update_cf_stack():
 
 
 def update_git_branch():
-    run_process(cmd=["git", "branch", "-f", "{}-{}".format(args.environment, args.region), args.version])
-    run_process(cmd=["git", "push", "origin", "{}-{}".format(args.environment, args.region)])
+    try:
+        os.system("git -C /vagrant/PreProcessing branch -f {}-{} {}".format(args.environment, args.region, args.version))
+        os.system("git -C /vagrant/PreProcessing push origin {}-{}".format(args.environment, args.region))
+    except CalledProcessError as e:
+        print(e.output)
+        raise
 
-
-def run_process(cmd):
-    proc = Popen(cmd, stdout=PIPE, stderr=PIPE)
-    retcode = proc.wait()
-    if retcode:
-        sys.exit(retcode)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Fire off a CodeBuild job, update the CloudFormation stack, and wait for CodeBuild completion')
@@ -110,6 +107,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    update_git_branch()
     build_id = trigger_codebuild()
     if not args.noupdate:
         update_cf_stack()

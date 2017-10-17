@@ -43,7 +43,8 @@ Vagrant.configure(2) do |config|
 	# the path on the host to the actual folder. The second argument is
 	# the path on the guest to mount the folder. And the optional third
 	# argument is a set of non-required options.
-	config.vm.synced_folder "../../Preprocessing", "/vagrant/Preprocessing", id: "preprocessing"
+	config.vm.synced_folder "../../PreProcessing", "/vagrant/PreProcessing", id: "preprocessing"
+	config.vm.synced_folder "../../StatsAPI", "/vagrant/StatsAPI", id: "statsapi"
 	config.vm.synced_folder "..", "/vagrant/Infrastructure", id: "infrastructure"
 	config.vm.synced_folder "../../../stephen-164/aws-cloudformation-polyfill", "/vagrant/aws-cloudformation-polyfill", id: "polyfill"
 	config.vm.synced_folder "../../../stephen-164/aws-sfn-batch", "/vagrant/aws-sfn-batch", id: "sfn-batch"
