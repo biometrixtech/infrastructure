@@ -94,6 +94,9 @@ Parameters:
     BatchJobVersionDatabaseupload:
         Type: "String"
         Description: "The version of the `databaseupload` batch job to run"
+    PollerVersion:
+        Type: "String"
+        Description: "The version of the `sfnbatch` poller to deploy"
 
     OverrideSnsSuccessTopic:
         Type: "String"
@@ -279,6 +282,7 @@ Resources:
                 ActivityArn: { "Fn::GetAtt": [ "PipelineCluster", "Outputs.ActivityArn" ] }
                 SqsQueueName: { "Fn::GetAtt": [ "PipelineCluster", "Outputs.LinearitySqsQueueName" ] }
                 InstanceSize: "t2.micro"
+                PollerVersion: { Ref: "PollerVersion" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-sfn-batch-poller" } }
               - { Key: "Management", Value: "managed" }
