@@ -79,6 +79,7 @@ Resources:
                           - "states:SendTaskFailure"
                           - "states:SendTaskHeartbeat"
                           - "states:SendTaskSuccess"
+                          - "sqs:DeleteMessage"
                         Effect: "Allow"
                         Resource: "*"
                       - Action:
