@@ -5,7 +5,7 @@ import uuid
 import boto3
 import os
 import json
-from datetime import datetime
+from datetime import datetime, date
 
 
 def load_parameters(keys, environment):
@@ -64,6 +64,7 @@ def handler(event, context):
                 cursor.execute(query.get("Query"), query.get("Parameters", {}))
                 results.append(cursor.fetchall())
                 errors.append(None)
+                connection.commit()
             except psycopg2.Error as e:
                 results.append(None)
                 errors.append(e.pgerror)
@@ -78,6 +79,8 @@ def handler(event, context):
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, date):
         return obj.isoformat()
     elif isinstance(obj, uuid.UUID):
         return str(obj)
