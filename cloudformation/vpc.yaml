@@ -183,6 +183,12 @@ Resources:
         Properties:
             AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipAlpha", "AllocationId" ] }
             SubnetId: { Ref: "PublicSubnetAlpha" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-alpha" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
 
     ##########################################################################################################
     ##  PUBLIC AZ BETA
@@ -252,6 +258,12 @@ Resources:
         Properties:
             AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipBeta", "AllocationId" ] }
             SubnetId: { Ref: "PublicSubnetBeta" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-beta" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
         Condition: "MultiAz"
 
     ##########################################################################################################
