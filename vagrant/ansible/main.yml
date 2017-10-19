@@ -189,6 +189,11 @@
     ## PACKER
     ##########################################################################################################
 
+      - name: "Ensure unzip is installed"
+        apt:
+            name: "unzip"
+            state: "installed"
+
       - name: 'Install Packer'
         unarchive:
             dest: '/usr/local/bin'
