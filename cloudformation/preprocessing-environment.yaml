@@ -98,11 +98,6 @@ Parameters:
         Type: "String"
         Description: "The version of the `sfnbatch` poller to deploy"
 
-    OverrideSnsSuccessTopic:
-        Type: "String"
-        Default: ""
-        Description: "An SNS topic ARN to publish success notifications to"
-
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
@@ -124,7 +119,6 @@ Metadata:
               - "ComputeEc2InstanceSize"
               - "ComputeEc2Ami"
               - "ComputeEc2Keypair"
-              - "OverrideSnsSuccessTopic"
           - Label: { default: "Batch Jobs" }
             Parameters:
               - "BatchJobVersionDownloadandchunk"
@@ -149,7 +143,6 @@ Metadata:
             BatchJobVersionDatabaseupload: { default: "databaseupload" }
             MongoDbPeeringVpc: { default: "MongoDB VPN ID" }
             MongoDbPeeringCidr: { default: "MongoDB VPN CIDR" }
-            OverrideSnsSuccessTopic: { default: "Success SNS Topic ARN" }
 
 Conditions:
     CreateComputeCluster: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "ComputeTemplate" }, "" ] } ] }
@@ -256,7 +249,6 @@ Resources:
                 BatchJobVersionNoop: { Ref: "BatchJobVersionNoop" }
                 BatchJobVersionScoring: { Ref: "BatchJobVersionScoring" }
                 BatchJobVersionDatabaseupload: { Ref: "BatchJobVersionDatabaseupload" }
-                OverrideSnsSuccessTopic: { Ref: "OverrideSnsSuccessTopic" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline" } }
               - { Key: "Management", Value: "managed" }
@@ -377,7 +369,13 @@ Resources:
                                 ],
                                 [ ".", ".", ".", ".", ".", "sessionprocess2" ],
                                 [ ".", ".", ".", ".", ".", "scoring" ],
-                                [ ".", ".", ".", ".", ".", "writemongo" ]
+                                [ ".", ".", ".", ".", ".", "aggregatesession" ],
+                                [ ".", ".", ".", ".", ".", "aggregatetwomin" ],
+                                [ ".", ".", ".", ".", ".", "aggregatedateuser" ],
+                                [ ".", ".", ".", ".", ".", "aggregateprogcomp" ],
+                                [ ".", ".", ".", ".", ".", "aggregateprogcompdate" ],
+                                [ ".", ".", ".", ".", ".", "aggregateteam" ],
+                                [ ".", ".", ".", ".", ".", "aggregatetraininggroup" ]
                             ],
                             "period": 60,
                             "stat": "Average",
@@ -401,7 +399,13 @@ Resources:
                                 ],
                                 [ ".", ".", ".", ".", ".", "sessionprocess2" ],
                                 [ ".", ".", ".", ".", ".", "scoring" ],
-                                [ ".", ".", ".", ".", ".", "writemongo" ]
+                                [ ".", ".", ".", ".", ".", "aggregatesession" ],
+                                [ ".", ".", ".", ".", ".", "aggregatetwomin" ],
+                                [ ".", ".", ".", ".", ".", "aggregatedateuser" ],
+                                [ ".", ".", ".", ".", ".", "aggregateprogcomp" ],
+                                [ ".", ".", ".", ".", ".", "aggregateprogcompdate" ],
+                                [ ".", ".", ".", ".", ".", "aggregateteam" ],
+                                [ ".", ".", ".", ".", ".", "aggregatetraininggroup" ]
                             ],
                             "period": 60,
                             "stat": "Average",
@@ -417,7 +421,7 @@ Resources:
                         "height": 6,
                         "properties": {
                             "metrics": [
-                                [ "AWS/States", "ExecutionsStarted", "StateMachineArn", "arn:aws:states:us-west-2:887689817172:stateMachine:StateMachine-4ENQYJODFNYT" ],
+                                [ "AWS/States", "ExecutionsStarted", "StateMachineArn", "${PipelineCluster.Outputs.StateMachineArn}" ],
                                 [ ".", "ExecutionsFailed", ".", "." ],
                                 [ ".", "ExecutionsSucceeded", ".", "." ]
                             ],

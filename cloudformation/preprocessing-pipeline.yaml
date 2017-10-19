@@ -27,11 +27,6 @@ Parameters:
         Type: "String"
         Description: "The version of the `databaseupload` batch job to run"
 
-    OverrideSnsSuccessTopic:
-        Type: "String"
-        Default: ""
-        Description: "An SNS topic ARN to publish success notifications to"
-
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
@@ -55,9 +50,6 @@ Metadata:
             BatchJobVersionScoring: { default: "scoring" }
             BatchJobVersionDatabaseupload: { default: "databaseupload" }
             OverrideSnsSuccessTopic: { default: "Success SNS Topic ARN" }
-
-Conditions:
-    CreateSnsTopic: { "Fn::Equals": [ { Ref: "OverrideSnsSuccessTopic" }, "" ] }
 
 Resources:
 
@@ -505,49 +497,6 @@ Resources:
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
 
-    LambdaPrepareWriteMongo:
-        Type: "AWS::Lambda::Function"
-        Properties:
-            Code:
-                ZipFile: !Sub |
-                    def handler(event, context):
-                        return {
-                            "Meta": {
-                                "ActivityArn": "${StepFunctionsActivity}",
-                                "ExecutionArn": event['Meta']['ExecutionArn'],
-                                "ExecutionName": event['Meta']['ExecutionName'],
-                                "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
-                            },
-                            "Branches": [
-                                {
-                                    "Resource": {
-                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDatabaseupload}",
-                                        "BatchJob": "writemongo",
-                                        "Memory": 2048,
-                                        "Vcpus": 2,
-                                    },
-                                    "InputPath": "$[{}]".format(i)
-                                }
-                                for i in range(len(event['Scoring']['Output']['Filenames']))
-                            ],
-                            "Input": [
-                                {**event["ReadDatabase"], **{"Filename": f}}
-                                for f in event['Scoring']['Output']['Filenames']
-                            ]
-                        }
-            Handler: "index.handler"
-            Runtime: "python3.6"
-            Timeout: "30"
-            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
-            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-writemongo" }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-writemongo" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "preprocessing" }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-
     LambdaPrepareAggregateSession:
         Type: "AWS::Lambda::Function"
         Properties:
@@ -709,28 +658,120 @@ Resources:
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
 
-    LambdaNotifyCSharp:
+    LambdaPrepareAggregateTrainingGroup:
         Type: "AWS::Lambda::Function"
         Properties:
             Code:
                 ZipFile: !Sub |
                     def handler(event, context):
-                        import boto3, os
-                        sns_client = boto3.client('sns')
-                        response = sns_client.publish(
-                            TopicArn=os.environ['SNS_TOPIC'],
-                            Message=event['ReadDatabase']['SessionEventId'],
-                        )
-            Environment:
-                Variables:
-                    SNS_TOPIC: { "Fn::If": [ "CreateSnsTopic", { Ref: "SnsSuccessTopic" }, { Ref: "OverrideSnsSuccessTopic" } ] }
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "ExecutionName": event['Meta']['ExecutionName'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJob": "aggregatetraininggroup",
+                                        "Memory": 512,
+                                        "Vcpus": 1,
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": event["ReadDatabase"],
+                            "LinearityGroup": event["ReadDatabase"]["TrainingGroupId"][0]
+                        }
             Handler: "index.handler"
             Runtime: "python3.6"
             Timeout: "30"
             Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
-            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-notifycsharp" }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatetraininggroup" }
             Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-notifycsharp" } }
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregatetraininggroup" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    LambdaPrepareAggregateProgComp:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "ExecutionName": event['Meta']['ExecutionName'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJob": "aggregateprogcomp",
+                                        "Memory": 4096,
+                                        "Vcpus": 4,
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": event["ReadDatabase"]
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregateprogcomp" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregateprogcomp" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    LambdaPrepareAggregateProgCompDate:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "ExecutionName": event['Meta']['ExecutionName'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJob": "aggregateprogcompdate",
+                                        "Memory": 4096,
+                                        "Vcpus": 4,
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": event["ReadDatabase"]
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregateprogcompdate" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-aggregateprogcompdate" } }
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
@@ -818,13 +859,6 @@ Resources:
     ##  SNS
     ##########################################################################################################
 
-    SnsSuccessTopic:
-        Type: "AWS::SNS::Topic"
-        Properties:
-            DisplayName: "Biometrix preprocessing success notification"
-            TopicName: { "Fn::Sub": "preprocessing-${Environment}-success" }
-        Condition: "CreateSnsTopic"
-
     SnsFailureTopic:
         Type: "AWS::SNS::Topic"
         Properties:
@@ -857,6 +891,8 @@ Resources:
                             "Type": "Task",
                             "InputPath": "$.DownloadAndChunk",
                             "Resource": "${StepFunctionsActivity}",
+                            "TimeoutSeconds": 600,
+                            "HeartbeatSeconds": 600,
                             "ResultPath": "$.DownloadAndChunk",
                             "Next": "ReadDatabase"
                         },
@@ -876,6 +912,8 @@ Resources:
                             "Type": "Task",
                             "InputPath": "$.SessionProcess2",
                             "Resource": "${StepFunctionsActivity}",
+                            "TimeoutSeconds": 600,
+                            "HeartbeatSeconds": 600,
                             "ResultPath": "$.SessionProcess2",
                             "Next": "BuildScoringContext"
                         },
@@ -889,6 +927,8 @@ Resources:
                             "Type": "Task",
                             "InputPath": "$.Scoring",
                             "Resource": "${StepFunctionsActivity}",
+                            "TimeoutSeconds": 600,
+                            "HeartbeatSeconds": 600,
                             "Catch": [
                                 {
                                     "ErrorEquals": [ "NoHistoricalDataException" ],
@@ -913,24 +953,36 @@ Resources:
                                     }
                                 },
                                 {
-                                    "StartAt": "BuildWriteMongoContext",
+                                    "StartAt": "BuildAggregateProgComp",
                                     "States": {
-                                        "BuildWriteMongoContext": {
+                                        "BuildAggregateProgComp": {
                                             "Type": "Task",
-                                            "Resource": "${LambdaPrepareWriteMongo.Arn}",
-                                            "ResultPath": "$.WriteMongo",
-                                            "Next": "WriteMongo"
+                                            "Resource": "${LambdaPrepareAggregateProgComp.Arn}",
+                                            "ResultPath": "$.AggregateProgComp",
+                                            "Next": "AggregateProgComp"
                                         },
-                                        "WriteMongo": {
+                                        "AggregateProgComp": {
                                             "Type": "Task",
-                                            "InputPath": "$.WriteMongo",
+                                            "InputPath": "$.AggregateProgComp",
                                             "Resource": "${StepFunctionsActivity}",
-                                            "ResultPath": "$.WriteMongo",
-                                            "Next": "NotifyCSharp"
+                                            "TimeoutSeconds": 600,
+                                            "HeartbeatSeconds": 600,
+                                            "ResultPath": "$.AggregateProgComp",
+                                            "Next": "BuildAggregateProgCompDate"
                                         },
-                                        "NotifyCSharp": {
+                                        "BuildAggregateProgCompDate": {
                                             "Type": "Task",
-                                            "Resource": "${LambdaNotifyCSharp.Arn}",
+                                            "Resource": "${LambdaPrepareAggregateProgCompDate.Arn}",
+                                            "ResultPath": "$.AggregateProgCompDate",
+                                            "Next": "AggregateProgCompDate"
+                                        },
+                                        "AggregateProgCompDate": {
+                                            "Type": "Task",
+                                            "InputPath": "$.AggregateProgCompDate",
+                                            "Resource": "${StepFunctionsActivity}",
+                                            "TimeoutSeconds": 600,
+                                            "HeartbeatSeconds": 600,
+                                            "ResultPath": "$.AggregateProgCompDate",
                                             "End": true
                                         }
                                     }
@@ -948,20 +1000,24 @@ Resources:
                                             "Type": "Task",
                                             "InputPath": "$.AggregateSession",
                                             "Resource": "${StepFunctionsActivity}",
+                                            "TimeoutSeconds": 600,
+                                            "HeartbeatSeconds": 600,
                                             "ResultPath": "$.AggregateSession",
-                                            "Next": "BuildAggregateDateContext"
+                                            "Next": "BuildAggregateDateUserContext"
                                         },
-                                        "BuildAggregateDateContext": {
+                                        "BuildAggregateDateUserContext": {
                                             "Type": "Task",
                                             "Resource": "${LambdaPrepareAggregateDateUser.Arn}",
-                                            "ResultPath": "$.AggregateDate",
-                                            "Next": "AggregateDate"
+                                            "ResultPath": "$.AggregateDateUser",
+                                            "Next": "AggregateDateUser"
                                         },
-                                        "AggregateDate": {
+                                        "AggregateDateUser": {
                                             "Type": "Task",
-                                            "InputPath": "$.AggregateDate",
+                                            "InputPath": "$.AggregateDateUser",
                                             "Resource": "${StepFunctionsActivity}",
-                                            "ResultPath": "$.AggregateDate",
+                                            "TimeoutSeconds": 600,
+                                            "HeartbeatSeconds": 600,
+                                            "ResultPath": "$.AggregateDateUser",
                                             "End": true
                                         }
                                     }
@@ -979,6 +1035,8 @@ Resources:
                                             "Type": "Task",
                                             "InputPath": "$.AggregateTwomin",
                                             "Resource": "${StepFunctionsActivity}",
+                                            "TimeoutSeconds": 600,
+                                            "HeartbeatSeconds": 600,
                                             "ResultPath": "$.AggregateTwomin",
                                             "End": true
                                         }
@@ -1004,7 +1062,29 @@ Resources:
                                             "Type": "Task",
                                             "InputPath": "$.AggregateTeam",
                                             "Resource": "${StepFunctionsActivity}",
+                                            "TimeoutSeconds": 600,
+                                            "HeartbeatSeconds": 600,
                                             "ResultPath": "$.AggregateTeam",
+                                            "End": true
+                                        }
+                                    }
+                                },
+                                {
+                                    "StartAt": "BuildAggregateTrainingGroupContext",
+                                    "States": {
+                                        "BuildAggregateTrainingGroupContext": {
+                                            "Type": "Task",
+                                            "Resource": "${LambdaPrepareAggregateTrainingGroup.Arn}",
+                                            "ResultPath": "$.AggregateTrainingGroup",
+                                            "Next": "AggregateTrainingGroup"
+                                        },
+                                        "AggregateTrainingGroup": {
+                                            "Type": "Task",
+                                            "InputPath": "$.AggregateTrainingGroup",
+                                            "Resource": "${StepFunctionsActivity}",
+                                            "TimeoutSeconds": 600,
+                                            "HeartbeatSeconds": 600,
+                                            "ResultPath": "$.AggregateTrainingGroup",
                                             "End": true
                                         }
                                     }
@@ -1029,6 +1109,8 @@ Resources:
                                             "Type": "Task",
                                             "InputPath": "$.Cleanup",
                                             "Resource": "${StepFunctionsActivity}",
+                                            "TimeoutSeconds": 600,
+                                            "HeartbeatSeconds": 600,
                                             "ResultPath": "$.Cleanup",
                                             "End": true
                                         }
