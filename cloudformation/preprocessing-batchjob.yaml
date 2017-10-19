@@ -111,7 +111,9 @@ Resources:
                     Version: "2012-10-17"
                     Statement:
                       - Action:
+                          - "codebuild:BatchGetBuilds"
                           - "codebuild:StartBuild"
+                          - "ecr:ListImages"
                         Effect: "Allow"
                         Resource: "*"
             RoleName: { "Fn::Sub": "preprocessing-infrastructure-batchjob-trigger-${AWS::Region}" }
@@ -159,7 +161,7 @@ Resources:
 
                         pre_build:
                             commands:
-                              - GIT_COMMIT=$(git rev-parse --short HEAD)
+                              - GIT_COMMIT=$(git rev-parse $CODEBUILD_SOURCE_VERSION)
                               - IMAGE_NAME=$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT
 
                                 # Log in to the registry
@@ -256,7 +258,7 @@ Resources:
                     ECR_REPOSITORY: { Ref: "EcrRepository" }
             Handler: "index.handler"
             Runtime: "python3.6"
-            Timeout: "30"
+            Timeout: "300"
             Role: { "Fn::GetAtt" : [ "TriggerRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "preprocessing-infrastructure-batchjob-trigger" }
             Tags:

@@ -91,6 +91,7 @@ class CloudFormationHandler:
             self._send_cloudformation_response(False, reason=str(e))
 
         except Exception as e:
+            raise
             self._send_cloudformation_response(False, reason=str(e) + "\n\n" + traceback.format_exc())
 
 
@@ -114,8 +115,8 @@ class CodeBuildEcrImage:
         Check whether the image exists in the ECR repository, if not trigger a CodeBuild job and wait
         for it to complete.
         """
-        ecr_registry_name = '887689817172.dkr.ecr.us-west-2.amazonaws.com'
-        ecr_repository_name = properties.get('EcrRepositoryName')
+        ecr_registry_name = os.environ['ECR_REGISTRY']
+        ecr_repository_name = os.environ['ECR_REPOSITORY']
         ecr_image_tag = properties.get('EcrImageTag', 'latest')
 
         try:
@@ -171,7 +172,7 @@ class CodeBuildEcrImage:
         Wait for a CodeBuild job to complete
         """
         return retry_call(
-            self._assert_codebuild_completed(build_id),
+            self._assert_codebuild_completed,
             [build_id],
             exceptions=self.CodebuildStillRunningException,
             tries=tries,
@@ -182,12 +183,11 @@ class CodeBuildEcrImage:
         """
         Check whether an image with a given tag exists in an ECR repository, returning its digest
         """
-        response = self.ecr_client.list_images(repositoryName=repository_name)
-        images_matching_tag = [image['imageDigest'] for image in response['imageIds'] if image['imageTag'] == image_tag]
-        if len(images_matching_tag) == 0:
+        image_digest = self._get_all_images(registry_name, repository_name).get(image_tag, None)
+        if image_digest is None:
             raise self.NoSuchImageException()
         else:
-            return images_matching_tag[0]
+            return image_digest
 
     def _assert_codebuild_completed(self, build_id) -> bool:
         """
@@ -201,6 +201,16 @@ class CodeBuildEcrImage:
         else:
             print('CodeBuild job complete')
             return True
+
+    def _get_all_images(self, registry_name, repository_name, next_token=None):
+        if next_token is None:
+            res = self.ecr_client.list_images(repositoryName=repository_name)
+        else:
+            res = self.ecr_client.list_images(repositoryName=repository_name, nextToken=next_token)
+        images = {image['imageTag'] if 'imageTag' in image else 'none': image['imageDigest'] for image in res['imageIds']}
+        if 'nextToken' in res:
+            images.update(self._get_all_images(registry_name, repository_name, res['nextToken']))
+        return images
 
 
 def handler(event, context):
