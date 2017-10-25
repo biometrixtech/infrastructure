@@ -11,45 +11,15 @@ Parameters:
         Type: "String"
         Description: "The name of the Environment"
 
-    BatchJobVersionDownloadandchunk:
+    BatchJobVersion:
         Type: "String"
         Description: "The version of the downloadandchunk batch job to run"
-    BatchJobVersionSessionprocess2:
-        Type: "String"
-        Description: "The version of the sessionprocess2 batch job to run"
-    BatchJobVersionNoop:
-        Type: "String"
-        Description: "The version of the `noop` batch job to run"
-    BatchJobVersionScoring:
-        Type: "String"
-        Description: "The version of the `scoring` batch job to run"
-    BatchJobVersionDatabaseupload:
-        Type: "String"
-        Description: "The version of the `databaseupload` batch job to run"
 
 Metadata:
     "AWS::CloudFormation::Interface":
-        ParameterGroups:
-          - Label: { default: "Environment" }
-            Parameters:
-              - "Environment"
-              - "OverrideSnsSuccessTopic"
-          - Label: { default: "Batch Jobs" }
-            Parameters:
-              - "BatchJobVersionDownloadandchunk"
-              - "BatchJobVersionSessionprocess2"
-              - "BatchJobVersionNoop"
-              - "BatchJobVersionScoring"
-              - "BatchJobVersionDatabaseupload"
-
         ParameterLabels:
             Environment: { default: "Environment" }
-            BatchJobVersionDownloadandchunk: { default: "downloadandchunk" }
-            BatchJobVersionSessionprocess2: { default: "sessionprocess2" }
-            BatchJobVersionNoop: { default: "noop" }
-            BatchJobVersionScoring: { default: "scoring" }
-            BatchJobVersionDatabaseupload: { default: "databaseupload" }
-            OverrideSnsSuccessTopic: { default: "Success SNS Topic ARN" }
+            BatchJobVersion: { default: "Application Code version" }
 
 Resources:
 
@@ -173,8 +143,7 @@ Resources:
         Type: "Custom::CodeBuildEcrImage"
         Properties:
             ServiceToken: { "Fn::Sub": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:preprocessing-infrastructure-batchjob-trigger" }
-            EcrImageTag: 'latest'
-
+            EcrImageTag: { Ref: "BatchJobVersion" }
 
     BatchJobDefinition:
         Type: "AWS::Batch::JobDefinition"
@@ -188,7 +157,7 @@ Resources:
                 JobRoleArn: { "Fn::GetAtt": [ "BatchExecutionRole", "Arn" ] }
                 ReadonlyRootFilesystem: false
                 Vcpus: 2
-                Image: ""
+                Image: { Ref: "BatchJobImage" }
             JobDefinitionName: { "Fn::Sub": "preprocessing-${Environment}-batchjob" }
             RetryStrategy:
                 Attempts: 1
@@ -345,7 +314,7 @@ Resources:
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDownloadandchunk}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "downloadandchunk",
                                         "Memory": 2048,
                                         "Vcpus": 2,
@@ -451,13 +420,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionSessionprocess2}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "sessionprocess2",
                                         "Memory": 1024,
                                         "Vcpus": 2,
@@ -494,13 +463,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "scoring",
                                         "Memory": 4096,
                                         "Vcpus": 4,
@@ -572,13 +541,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "aggregatesession",
                                         "Memory": 4096,
                                         "Vcpus": 4,
@@ -611,13 +580,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionDatabaseupload}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "aggregatetwomin",
                                         "Memory": 2048,
                                         "Vcpus": 2,
@@ -654,13 +623,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "aggregatedateuser",
                                         "Memory": 4096,
                                         "Vcpus": 4,
@@ -693,13 +662,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "aggregateteam",
                                         "Memory": 512,
                                         "Vcpus": 1,
@@ -733,13 +702,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "aggregatetraininggroup",
                                         "Memory": 512,
                                         "Vcpus": 1,
@@ -773,13 +742,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "aggregateprogcomp",
                                         "Memory": 4096,
                                         "Vcpus": 4,
@@ -812,13 +781,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "aggregateprogcompdate",
                                         "Memory": 4096,
                                         "Vcpus": 4,
@@ -877,13 +846,13 @@ Resources:
                                 "ExecutionArn": event['Meta']['ExecutionArn'],
                                 "ExecutionName": event['Meta']['ExecutionName'],
                                 "Environment": "${Environment}",
-                                "NoopJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionNoop}"
+                                "NoopJobDefinition": "${BatchJobDefinition}"
                             },
                             "Branches": [
                                 {
                                     "Resource": {
                                         "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
-                                        "BatchJobDefinition": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-definition/preprocessing-batchjob${BatchJobVersionScoring}",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
                                         "BatchJob": "cleanup",
                                         "Memory": 256,
                                         "Vcpus": 2,

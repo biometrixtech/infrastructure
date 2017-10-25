@@ -58,42 +58,6 @@ Resources:
     ##  IAM
     ##########################################################################################################
 
-    JobRole:
-        Type: "AWS::IAM::Role"
-        Properties:
-            AssumeRolePolicyDocument:
-                Version: "2012-10-17"
-                Statement:
-                  - Effect: "Allow"
-                    Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
-                    Action: "sts:AssumeRole"
-            Policies:
-              - PolicyName: "default"
-                PolicyDocument:
-                    Version: "2012-10-17"
-                    Statement:
-                      - Action:
-                          - "s3:GetObject"
-                          - "s3:PutObject"
-                          - "s3:ListBucket"
-                          - "states:SendTaskFailure"
-                          - "states:SendTaskHeartbeat"
-                          - "states:SendTaskSuccess"
-                          - "sqs:DeleteMessage"
-                        Effect: "Allow"
-                        Resource: "*"
-                      - Action:
-                          - "ssm:DescribeParameters"
-                          - "ssm:GetParameters"
-                          - "kms:Decrypt"
-                        Effect: "Allow"
-                        Resource: "*" # TODO this should be segregated by environment somehow
-                      - Action:
-                          - "cloudwatch:PutMetricData"
-                        Effect: "Allow"
-                        Resource: "*"
-            RoleName: { "Fn::Sub": "preprocessing-infrastructure-${AWS::Region}" }
-
     TriggerRole:
         Type: "AWS::IAM::Role"
         Properties:
@@ -138,9 +102,6 @@ Resources:
                   - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
                   - { Name: "ECR_REGISTRY", Value: { "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com" } }
                   - { Name: "ECR_REPOSITORY", Value: { Ref: "EcrRepository" } }
-                  - { Name: "JOB_ROLE_ARN", Value: { "Fn::GetAtt": [ "JobRole", "Arn" ] } }
-                  - { Name: "DEFAULT_CPU", Value: { Ref : "DefaultVcpus" } }
-                  - { Name: "DEFAULT_MEMORY", Value: { Ref : "DefaultMemory" } }
             TimeoutInMinutes: 30
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-batchjob" } }
@@ -178,85 +139,18 @@ Resources:
                                 # Push the image to the docker registry
                               - docker push $IMAGE_NAME
 
-                                # Create the job definition skeleton
-                              - JOB_DEFINITION_NAME=preprocessing-batchjob
-                              - 'echo "{
-                                    \"jobDefinitionName\": \"$JOB_DEFINITION_NAME\",
-                                    \"type\": \"container\",
-                                    \"parameters\": { \"Meta\": \"{}\", \"Input\": \"{}\" },
-                                    \"containerProperties\": {
-                                        \"command\": [ \"Ref::Job\", \"Ref::Input\", \"Ref::Meta\" ],
-                                        \"image\": \"$IMAGE_NAME\",
-                                        \"jobRoleArn\": \"$JOB_ROLE_ARN\",
-                                        \"memory\": $DEFAULT_MEMORY,
-                                        \"privileged\": true,
-                                        \"readonlyRootFilesystem\": false,
-                                        \"vcpus\": $DEFAULT_CPU
-                                    },
-                                    \"retryStrategy\": {
-                                        \"attempts\": 2
-                                    }
-                                }" > taskdefinition.json'
-                              - cat taskdefinition.json
-
-                              - aws batch register-job-definition --job-definition-name $JOB_DEFINITION_NAME --cli-input-json file://taskdefinition.json
-
     LambdaTrigger:
         Type: "AWS::Lambda::Function"
         Properties:
             Code:
-                ZipFile: !Sub |
-                    from botocore.vendored import requests
-                    import json
-
-                    SUCCESS = "SUCCESS"
-                    FAILED = "FAILED"
-
-
-                    def send(event, context, response_status, response_data=None, physical_resource_id=None):
-                        response_url = event['ResponseURL']
-
-                        print(response_url)
-
-                        response_body = {}
-                        response_body['Status'] = response_status
-                        response_body['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name
-                        response_body['PhysicalResourceId'] = physical_resource_id or context.log_stream_name
-                        response_body['StackId'] = event['StackId']
-                        response_body['RequestId'] = event['RequestId']
-                        response_body['LogicalResourceId'] = event['LogicalResourceId']
-                        response_body['Data'] = response_data
-
-                        json_response_body = json.dumps(response_body)
-
-                        headers = {
-                            'content-type': '',
-                            'content-length': str(len(json_response_body))
-                        }
-
-                        try:
-                            response = requests.put(response_url,
-                                                    data=json_response_body,
-                                                    headers=headers)
-                            print("Status code: " + response.reason)
-                        except Exception as e:
-                            print("send(..) failed executing requests.put(..): " + str(e))
-
-                    import logging
-                    import boto3
-
-                    logger = logging.getLogger()
-                    logger.setLevel(logging.INFO)
-
-                    def handler(event, context):
-                        logger.info(event)
-                        send(event, context, SUCCESS)
+                S3Bucket: { "Fn::Sub": "biometrix-infrastructure-${AWS::Region}" }
+                S3Key: "lambdas/trigger_batchjob_codebuild.zip"
 
             Environment:
                 Variables:
                     ECR_REGISTRY: { "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com" }
                     ECR_REPOSITORY: { Ref: "EcrRepository" }
-            Handler: "index.handler"
+            Handler: "trigger_batchjob_codebuild.handler"
             Runtime: "python3.6"
             Timeout: "300"
             Role: { "Fn::GetAtt" : [ "TriggerRole", "Arn" ] }
