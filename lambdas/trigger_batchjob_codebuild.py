@@ -76,7 +76,7 @@ class CloudFormationHandler:
             if self.action == 'Create':
                 self.physical_resource_id = resource.create(self.event['ResourceProperties'])
             elif self.action == 'Update':
-                resource.update(
+                self.physical_resource_id = resource.update(
                     self.event['PhysicalResourceId'],
                     self.event['OldResourceProperties'],
                     self.event['ResourceProperties']
@@ -85,18 +85,18 @@ class CloudFormationHandler:
                 resource.delete(self.event['PhysicalResourceId'], self.event['ResourceProperties'])
             else:
                 raise HandlerException("Unknown RequestType")
+
+            print("physical_resource_id={}".format(self.physical_resource_id))
             self._send_cloudformation_response(True)
 
         except (HandlerException, ResourceException) as e:
             self._send_cloudformation_response(False, reason=str(e))
 
         except Exception as e:
-            raise
             self._send_cloudformation_response(False, reason=str(e) + "\n\n" + traceback.format_exc())
 
 
 class CodeBuildEcrImage:
-
     def __init__(self, event):
         self.codebuild_client = boto3.client('codebuild', region_name=aws_region)
         self.ecr_client = boto3.client('ecr', region_name=aws_region)
@@ -121,6 +121,7 @@ class CodeBuildEcrImage:
 
         try:
             ecr_image_digest = self._assert_image_exists(ecr_registry_name, ecr_repository_name, ecr_image_tag)
+            print('Found existing image in ECR with digest {}'.format(ecr_image_digest))
         except self.NoSuchImageException as e:
             # Need to create it
             print('Triggering CodeBuild for version "{}"'.format(ecr_image_tag))
@@ -134,8 +135,8 @@ class CodeBuildEcrImage:
             # Wait for the image to be created
             self._wait_for_codebuild_completion(
                 build_id,
-                delay=15,
-                tries=20
+                delay=5,
+                tries=100
             )
 
             ecr_image_digest = self._assert_image_exists(ecr_registry_name, ecr_repository_name, ecr_image_tag)
@@ -183,11 +184,11 @@ class CodeBuildEcrImage:
         """
         Check whether an image with a given tag exists in an ECR repository, returning its digest
         """
-        image_digest = self._get_all_images(registry_name, repository_name).get(image_tag, None)
-        if image_digest is None:
-            raise self.NoSuchImageException()
+        images = self._get_all_images(registry_name, repository_name)
+        if image_tag in images:
+            return images[image_tag]
         else:
-            return image_digest
+            raise self.NoSuchImageException()
 
     def _assert_codebuild_completed(self, build_id) -> bool:
         """
@@ -255,7 +256,7 @@ def retry_call(f, fargs=None, fkwargs=None, exceptions=Exception, tries=-1, dela
             if tries == 0:
                 raise
 
-            logger.warning('%s, retrying in %s seconds...', e, delay)
+            logger.warning('%s, retry #%s in %s seconds...', e, delay, tries)
 
             time.sleep(delay)
             delay = min(delay * backoff + (random.uniform(*jitter) if isinstance(jitter, tuple) else jitter), max_delay)
