@@ -115,24 +115,36 @@ Resources:
                     Version: "2012-10-17"
                     Statement:
                       - Action:
+                          - "sqs:DeleteMessage"
+                        Effect: "Allow"
+                        Resource: { "Fn::GetAtt": [ "LinearityEnforcingQueue", "Arn" ] }
+
+                      - Action:
                           - "s3:GetObject"
                           - "s3:PutObject"
                           - "s3:ListBucket"
+                        Effect: "Allow"
+                        Resource: "*"
+
+                      - Action:
                           - "states:SendTaskFailure"
                           - "states:SendTaskHeartbeat"
                           - "states:SendTaskSuccess"
                         Effect: "Allow"
-                        Resource: "*"
+                        Resource: { Ref: "StepFunctionsActivity" }
+
                       - Action:
                           - "ssm:DescribeParameters"
                           - "ssm:GetParameters"
                           - "kms:Decrypt"
                         Effect: "Allow"
                         Resource: "*" # TODO this should be segregated by environment somehow
+
                       - Action:
                           - "cloudwatch:PutMetricData"
                         Effect: "Allow"
                         Resource: "*"
+
             RoleName: { "Fn::Sub": "preprocessing-${Environment}-execute-${AWS::Region}" }
 
     ##########################################################################################################
@@ -154,7 +166,7 @@ Resources:
                 Command: [ "Ref::Job", "Ref::Input", "Ref::Meta" ]
                 Memory: 512
                 Privileged: true
-                JobRoleArn: { "Fn::GetAtt": [ "BatchExecutionRole", "Arn" ] }
+                JobRoleArn: { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:role/preprocessing-${Environment}-execute-${AWS::Region}" }
                 ReadonlyRootFilesystem: false
                 Vcpus: 2
                 Image: { Ref: "BatchJobImage" }
