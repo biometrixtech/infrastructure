@@ -58,41 +58,29 @@ Resources:
     ##  IAM
     ##########################################################################################################
 
-    JobRole:
+    TriggerRole:
         Type: "AWS::IAM::Role"
         Properties:
             AssumeRolePolicyDocument:
                 Version: "2012-10-17"
                 Statement:
                   - Effect: "Allow"
-                    Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
+                    Principal: { Service: [ "lambda.amazonaws.com" ] }
                     Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
             Policies:
               - PolicyName: "default"
                 PolicyDocument:
                     Version: "2012-10-17"
                     Statement:
                       - Action:
-                          - "s3:GetObject"
-                          - "s3:PutObject"
-                          - "s3:ListBucket"
-                          - "states:SendTaskFailure"
-                          - "states:SendTaskHeartbeat"
-                          - "states:SendTaskSuccess"
-                          - "sqs:DeleteMessage"
+                          - "codebuild:BatchGetBuilds"
+                          - "codebuild:StartBuild"
+                          - "ecr:ListImages"
                         Effect: "Allow"
                         Resource: "*"
-                      - Action:
-                          - "ssm:DescribeParameters"
-                          - "ssm:GetParameters"
-                          - "kms:Decrypt"
-                        Effect: "Allow"
-                        Resource: "*" # TODO this should be segregated by environment somehow
-                      - Action:
-                          - "cloudwatch:PutMetricData"
-                        Effect: "Allow"
-                        Resource: "*"
-            RoleName: { "Fn::Sub": "preprocessing-batchjob-${AWS::Region}" }
+            RoleName: { "Fn::Sub": "preprocessing-infrastructure-batchjob-trigger-${AWS::Region}" }
 
     ##########################################################################################################
     ##  CODEBUILD
@@ -114,9 +102,6 @@ Resources:
                   - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
                   - { Name: "ECR_REGISTRY", Value: { "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com" } }
                   - { Name: "ECR_REPOSITORY", Value: { Ref: "EcrRepository" } }
-                  - { Name: "JOB_ROLE_ARN", Value: { "Fn::GetAtt": [ "JobRole", "Arn" ] } }
-                  - { Name: "DEFAULT_CPU", Value: { Ref : "DefaultVcpus" } }
-                  - { Name: "DEFAULT_MEMORY", Value: { Ref : "DefaultMemory" } }
             TimeoutInMinutes: 30
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-batchjob" } }
@@ -137,7 +122,7 @@ Resources:
 
                         pre_build:
                             commands:
-                              - GIT_COMMIT=$(git rev-parse --short HEAD)
+                              - GIT_COMMIT=$(git rev-parse $CODEBUILD_SOURCE_VERSION)
                               - IMAGE_NAME=$ECR_REGISTRY/$ECR_REPOSITORY:$GIT_COMMIT
 
                                 # Log in to the registry
@@ -154,25 +139,24 @@ Resources:
                                 # Push the image to the docker registry
                               - docker push $IMAGE_NAME
 
-                                # Create the job definition skeleton
-                              - JOB_DEFINITION_NAME=preprocessing-batchjob
-                              - 'echo "{
-                                    \"jobDefinitionName\": \"$JOB_DEFINITION_NAME\",
-                                    \"type\": \"container\",
-                                    \"parameters\": { \"Meta\": \"{}\", \"Input\": \"{}\" },
-                                    \"containerProperties\": {
-                                        \"command\": [ \"Ref::Job\", \"Ref::Input\", \"Ref::Meta\" ],
-                                        \"image\": \"$IMAGE_NAME\",
-                                        \"jobRoleArn\": \"$JOB_ROLE_ARN\",
-                                        \"memory\": $DEFAULT_MEMORY,
-                                        \"privileged\": true,
-                                        \"readonlyRootFilesystem\": false,
-                                        \"vcpus\": $DEFAULT_CPU
-                                    },
-                                    \"retryStrategy\": {
-                                        \"attempts\": 2
-                                    }
-                                }" > taskdefinition.json'
-                              - cat taskdefinition.json
+    LambdaTrigger:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                S3Bucket: { "Fn::Sub": "biometrix-infrastructure-${AWS::Region}" }
+                S3Key: "lambdas/trigger_batchjob_codebuild.zip"
 
-                              - aws batch register-job-definition --job-definition-name $JOB_DEFINITION_NAME --cli-input-json file://taskdefinition.json
+            Environment:
+                Variables:
+                    ECR_REGISTRY: { "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com" }
+                    ECR_REPOSITORY: { Ref: "EcrRepository" }
+            Handler: "trigger_batchjob_codebuild.handler"
+            Runtime: "python3.6"
+            Timeout: "300"
+            Role: { "Fn::GetAtt" : [ "TriggerRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-infrastructure-batchjob-trigger" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-infrastructure-batchjob-trigger" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: "infra" }

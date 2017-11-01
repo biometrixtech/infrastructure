@@ -79,24 +79,16 @@ Parameters:
         Default: "https://s3.amazonaws.com/biometrix-infrastructure/cloudformation/sfn-batch-poller.yaml"
         Description: "Path to an S3 file containing the CloudFormation template for the sfn-batch poller cluster"
 
-    BatchJobVersionDownloadandchunk:
+    BatchJobVersion:
         Type: "String"
-        Description: "The version of the `downloadandchunk` batch job to run"
-    BatchJobVersionSessionprocess2:
-        Type: "String"
-        Description: "The version of the `sessionprocess2` batch job to run"
-    BatchJobVersionNoop:
-        Type: "String"
-        Description: "The version of the `noop` batch job to run"
-    BatchJobVersionScoring:
-        Type: "String"
-        Description: "The version of the `scoring` batch job to run"
-    BatchJobVersionDatabaseupload:
-        Type: "String"
-        Description: "The version of the `databaseupload` batch job to run"
+        Description: "The git commit hash of the `batchjob` code to deploy"
+        AllowedPattern: "[a-f0-9]{40}"
+        ConstraintDescription: "Must be a 40-hex-digit Git full commit hash"
     PollerVersion:
         Type: "String"
-        Description: "The version of the `sfnbatch` poller to deploy"
+        Description: "The git commit hash of the `sfnbatch` poller to deploy"
+        AllowedPattern: "[a-f0-9]{7}"
+        ConstraintDescription: "Must be an 8-hex-digit Git short commit hash"
 
 Metadata:
     "AWS::CloudFormation::Interface":
@@ -119,13 +111,10 @@ Metadata:
               - "ComputeEc2InstanceSize"
               - "ComputeEc2Ami"
               - "ComputeEc2Keypair"
-          - Label: { default: "Batch Jobs" }
+          - Label: { default: "Code versions" }
             Parameters:
-              - "BatchJobVersionDownloadandchunk"
-              - "BatchJobVersionSessionprocess2"
-              - "BatchJobVersionNoop"
-              - "BatchJobVersionScoring"
-              - "BatchJobVersionDatabaseupload"
+              - "BatchJobVersion"
+              - "PollerVersion"
 
         ParameterLabels:
             Environment: { default: "Environment" }
@@ -136,11 +125,8 @@ Metadata:
             ComputeTemplate: { default: "CF template: Compute Cluster" }
             PipelineTemplate: { default: "CF template: Pipeline" }
             PollerTemplate: { default: "CF template: sfn-batch poller" }
-            BatchJobVersionDownloadandchunk: { default: "downloadandchunk" }
-            BatchJobVersionSessionprocess2: { default: "sessionprocess2" }
-            BatchJobVersionNoop: { default: "noop" }
-            BatchJobVersionScoring: { default: "scoring" }
-            BatchJobVersionDatabaseupload: { default: "databaseupload" }
+            BatchJobVersion: { default: "batchjob" }
+            PollerVersion: { default: "sfnbatch poller" }
             MongoDbPeeringVpc: { default: "MongoDB VPN ID" }
             MongoDbPeeringCidr: { default: "MongoDB VPN CIDR" }
 
@@ -228,9 +214,9 @@ Resources:
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute" } }
               - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "compute" }
+              - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
-              - { Key: "Service", Value: "public" }
+              - { Key: "Service", Value: "compute" }
             TemplateURL: { Ref: "ComputeTemplate" }
             TimeoutInMinutes: 10
         Condition: "CreateComputeCluster"
@@ -244,17 +230,13 @@ Resources:
         Properties:
             Parameters:
                 Environment: { Ref: "Environment" }
-                BatchJobVersionDownloadandchunk: { Ref: "BatchJobVersionDownloadandchunk" }
-                BatchJobVersionSessionprocess2: { Ref: "BatchJobVersionSessionprocess2" }
-                BatchJobVersionNoop: { Ref: "BatchJobVersionNoop" }
-                BatchJobVersionScoring: { Ref: "BatchJobVersionScoring" }
-                BatchJobVersionDatabaseupload: { Ref: "BatchJobVersionDatabaseupload" }
+                BatchJobVersion: { Ref: "BatchJobVersion" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline" } }
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "compute" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
-              - { Key: "Service", Value: "public" }
+              - { Key: "Service", Value: "pipeline" }
             TemplateURL: { Ref: "PipelineTemplate" }
             TimeoutInMinutes: 10
         Condition: "CreatePipeline"
@@ -276,11 +258,11 @@ Resources:
                 InstanceSize: "t2.micro"
                 PollerVersion: { Ref: "PollerVersion" }
             Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-sfn-batch-poller" } }
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-sfnbatch-poller" } }
               - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "compute" }
+              - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
-              - { Key: "Service", Value: "public" }
+              - { Key: "Service", Value: "sfnbatch" }
             TemplateURL: { Ref: "PollerTemplate" }
             TimeoutInMinutes: 10
         Condition: "CreatePoller"
