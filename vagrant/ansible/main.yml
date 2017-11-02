@@ -202,3 +202,17 @@
             owner: 'root'
             remote_src: 'yes'
             src: 'https://releases.hashicorp.com/packer/1.0.4/packer_1.0.4_linux_amd64.zip'
+
+    ##########################################################################################################
+    ## RUBY
+    ##########################################################################################################
+
+      - name: Latest version of Ruby is installed
+        apt:
+            name: '{{ item }}'
+            state: latest
+        with_items:
+          - 'ruby'
+          - 'ruby-dev'
+          - 'zlib1g-dev'
+          - 'libpq-dev'
