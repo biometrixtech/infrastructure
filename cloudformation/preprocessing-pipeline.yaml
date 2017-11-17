@@ -202,9 +202,15 @@ Resources:
                                 suffixes = [s.replace(s3_basepath + combiner, '') for s in list_s3_files(s3_bucket, s3_basepath)]
                                 audit_packets(s3_bucket, s3_basepath, suffixes)
                                 part_count = len(suffixes) - 1
+                                version = '2.3'
 
-                            else:
-                                # Not the final part
+                            elif part == 'v1.0':  # A version 1 file
+                                combiner = ''
+                                suffixes = []
+                                part_count = 1
+                                version = '1.0'
+
+                            else:  # Not the final part
                                 return
 
                         else:
@@ -225,7 +231,8 @@ Resources:
                                     "S3Bucket": s3_bucket,
                                     "S3BasePath": s3_basepath + combiner,
                                     "PartCount": part_count,
-                                    "SensorDataFilename": s3_basepath
+                                    "SensorDataFilename": s3_basepath,
+                                    "SensorDataFileVersion": version,
                                 }
                             })
                         )
@@ -370,7 +377,7 @@ Resources:
                             return result[0] if len(result) else {}
 
                     def handler(event, context):
-                        sensor_data_filename = event['SourceEvent']['S3BasePath'].rstrip('_')
+                        sensor_data_filename = event['SourceEvent']['SensorDataFilename']
                         query_results = query(
                             """SELECT
                               session_events.id AS session_event_id,
@@ -390,6 +397,7 @@ Resources:
                         )
                         ret = {
                             "SensorDataFilename": sensor_data_filename,
+                            "SensorDataFileVersion": event['SourceEvent']['SensorDataFilename'],  # TODO get this from db
                             "SessionEventId": query_results.get('session_event_id', None),
                             "EventDate": query_results.get('event_date', None),
                             "TrainingSessionLogId": query_results.get('training_session_log_id', None),
