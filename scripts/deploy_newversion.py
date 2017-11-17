@@ -1,19 +1,17 @@
 #!/usr/bin/env python
 # Upload a cloudformation template to S3, then run a stack update
-import json
-
+from __future__ import print_function
 import boto3
 import argparse
 import os
 import sys
+import threading
 import time
 from subprocess import check_output, CalledProcessError
 
 
-def update_cf_stack():
+def update_cf_stack(stack):
     print('Updating CloudFormation stack')
-    cf_resource = boto3.resource('cloudformation', region_name=args.region)
-    stack = cf_resource.Stack('preprocessing-{}'.format(args.environment))
 
     new_parameters = []
     for p in stack.parameters or {}:
@@ -31,6 +29,35 @@ def update_cf_stack():
     )
 
 
+def await_stack_update(stack):
+    fail_statuses = [
+        'UPDATE_ROLLBACK_IN_PROGRESS',
+        'UPDATE_ROLLBACK_FAILED',
+        'UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS',
+        'UPDATE_ROLLBACK_COMPLETE'
+    ]
+    success_statuses = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS']
+
+    while True:
+        stack.reload()
+        status = stack.stack_status
+
+        sys.stdout.write("\033[K")  # Clear the line
+        print("\rStack status: {} ".format(status), end="")
+
+        if status in fail_statuses:
+            print()  # Newline
+            print(stack.stack_status_reason)
+            raise Exception("Update failed!")
+        elif status in success_statuses:
+            print()  # Newline
+            return
+        else:
+            time.sleep(15)
+            continue
+    pass
+
+
 def update_git_branch():
     try:
         os.system("git -C /vagrant/PreProcessing branch -f {}-{} {}".format(args.environment, args.region, args.batchjob_version))
@@ -38,6 +65,16 @@ def update_git_branch():
     except CalledProcessError as e:
         print(e.output)
         raise
+
+
+def main():
+    cf_resource = boto3.resource('cloudformation', region_name=args.region)
+    stack = cf_resource.Stack('preprocessing-{}'.format(args.environment))
+
+    update_git_branch()
+    if not args.noupdate:
+        update_cf_stack(stack)
+        await_stack_update(stack)
 
 
 if __name__ == '__main__':
@@ -60,7 +97,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    update_git_branch()
-    if not args.noupdate:
-        update_cf_stack()
+    main()
 
