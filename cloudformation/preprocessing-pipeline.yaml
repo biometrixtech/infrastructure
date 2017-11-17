@@ -184,8 +184,7 @@ Resources:
         Properties:
             Code:
                 ZipFile: |
-                    import boto3, json, os, time
-                    from datetime import datetime
+                    import boto3, json, os, time, datetime
 
                     def handler(event, context):
                         print(event)
@@ -193,12 +192,9 @@ Resources:
                         s3_key = event['Records'][0]['s3']['object']['key'].split('/')[-1]
 
                         combiner = '_'
-                        if combiner in s3_key:
-                            # A multipart upload
+                        if combiner in s3_key:  # A multipart upload
                             s3_basepath, part = s3_key.split(combiner)
-                            if part == 'complete':
-                                # Ready to combine
-                                s3_basepath = s3_basepath
+                            if part == 'complete':  # The final part of a version 2 file
                                 suffixes = [s.replace(s3_basepath + combiner, '') for s in list_s3_files(s3_bucket, s3_basepath)]
                                 audit_packets(s3_bucket, s3_basepath, suffixes)
                                 part_count = len(suffixes) - 1
@@ -213,8 +209,7 @@ Resources:
                             else:  # Not the final part
                                 return
 
-                        else:
-                            # A complete file.  We don't do these any more (must be a bug)
+                        else:  # An un-suffixed file.  We don't do these any more (must be a bug)
                             return
 
                         execution_name = '{}-{}'.format(s3_key, int(time.time()))
@@ -240,24 +235,18 @@ Resources:
 
                     s3_client = boto3.client('s3')
                     def list_s3_files(bucket, prefix, marker=''):
-                        objects_list = []
+                        ret = []
                         resp = s3_client.list_objects(Bucket=bucket, Prefix=prefix, Marker=marker)
-                        objects_list.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'combined'])
+                        ret.extend([x['Key'] for x in resp['Contents'] if x['Key'][-8:] != 'combined'])
                         if resp['IsTruncated']:
-                            objects_list.extend(list_s3_files(bucket, prefix, objects_list[-1]))
-                        return sorted(objects_list)
-
-
-                    def rename_s3_file(bucket, old_file, new_file):
-                        s3_client.copy_object(Bucket=bucket, CopySource="{}/{}".format(bucket, old_file), Key=new_file)
-                        s3_client.delete_object(Bucket=bucket, Key=old_file)
+                            ret.extend(list_s3_files(bucket, prefix, ret[-1]))
+                        return sorted(ret)
 
 
                     def audit_packets(bucket, prefix, packets):
                         expected_packets = ["{:04d}".format(i) for i in range(len(packets) - 1)] + ["complete"]
 
                         if len(packets) != len(expected_packets):
-                            # Definitely wrong
                             raise_packet_errors(
                                 max(len(expected_packets) - len(packets), 1),
                                 "Missing packets in upload, expected {} packets, got {}".format(len(expected_packets), len(packets))
@@ -266,36 +255,26 @@ Resources:
                         if packets != expected_packets:
                             extra_packets = set(packets).difference(expected_packets)
                             missing_packets = set(expected_packets).difference(packets)
-                            print("extra_packets: {}, missing_packets: {}".format(extra_packets, missing_packets))
 
                             if len(extra_packets) == 1 and len(missing_packets) == 1 and prefix in extra_packets:
                                 # https://app.asana.com/0/419313112177425/449967103403639
-                                # Occasionally a packet is uploaded with no suffix, so if the un-suffixed filename
-                                # appears in the packet list, and there is one suffix missing, rename it to fill in
-                                # the gap
-                                rename_s3_file(bucket, prefix, prefix + '_' + min(extra_packets))
+                                # Occasionally a packet is uploaded with no suffix, so if the un-suffixed filename appears
+                                # in the packet list, and there is one suffix missing, rename it to fill in the gap
+                                s3_client.copy_object(Bucket=bucket, CopySource="{}/{}".format(bucket, old_file), Key=new_file)
+                                s3_client.delete_object(Bucket=bucket, Key=old_file)
 
                             else:
-                                # There's a more subtle mismatch
-                                raise_packet_errors(
-                                    0,
-                                    "Corrupted packets uploaded"
-                                )
+                                raise_packet_errors(0, "Corrupted packets uploaded")
 
                     def raise_packet_errors(num_packets, message):
-                        cloudwatch_client = boto3.client('cloudwatch')
-                        cloudwatch_client.put_metric_data(
+                        boto3.client('cloudwatch').put_metric_data(
                             Namespace='Preprocessing',
-                            MetricData=[
-                                {
-                                    'MetricName': 'MissingPackets',
-                                    'Dimensions': [
-                                        {'Name': 'Environment', 'Value': os.environ['ENVIRONMENT']},
-                                    ],
-                                    'Timestamp': datetime.utcnow(),
-                                    'Value': num_packets,
-                                },
-                            ]
+                            MetricData=[{
+                                'MetricName': 'MissingPackets',
+                                'Dimensions': [{'Name': 'Environment', 'Value': os.environ['ENVIRONMENT']}],
+                                'Timestamp': datetime.datetime.utcnow(),
+                                'Value': num_packets
+                            }]
                         )
                         raise Exception(message)
 
