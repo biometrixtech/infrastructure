@@ -376,7 +376,6 @@ Resources:
                               session_events.id AS session_event_id,
                               session_events.happened_at::date AS event_date,
                               session_events.training_session_log_id,
-                              session_events.hip_n_transform,
                               session_events.training_group_ids,
                               session_events.user_id,
                               users.weight,
@@ -393,7 +392,6 @@ Resources:
                             "SessionEventId": query_results.get('session_event_id', None),
                             "EventDate": query_results.get('event_date', None),
                             "TrainingSessionLogId": query_results.get('training_session_log_id', None),
-                            "HipNTransform": query_results.get('hip_n_transform', None),
                             "TrainingGroupId": query_results.get('training_group_ids', None),
                             "UserId": query_results.get('user_id', None),
                             "UserMass": query_results.get('weight', None),
@@ -417,6 +415,48 @@ Resources:
             FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-readpostgres" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-readpostgres" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    LambdaPrepareTransformAndPlacement:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: !Sub |
+                    def handler(event, context):
+                        return {
+                            "Meta": {
+                                "ActivityArn": "${StepFunctionsActivity}",
+                                "ExecutionArn": event['Meta']['ExecutionArn'],
+                                "ExecutionName": event['Meta']['ExecutionName'],
+                                "Environment": "${Environment}",
+                                "NoopJobDefinition": "${BatchJobDefinition}"
+                            },
+                            "Branches": [
+                                {
+                                    "Resource": {
+                                        "BatchJobQueue": "arn:aws:batch:${AWS::Region}:${AWS::AccountId}:job-queue/preprocessing-${Environment}-compute",
+                                        "BatchJobDefinition": "${BatchJobDefinition}",
+                                        "BatchJob": "transformandplacement",
+                                        "Memory": 1024,
+                                        "Vcpus": 2,
+                                    },
+                                    "InputPath": "$"
+                                }
+                            ],
+                            "Input": {
+                                **event["ReadDatabase"],
+                                **{"Filename": event['DownloadAndChunk']['Output']['Filenames'][0]}
+                            }
+                        }
+            Handler: "index.handler"
+            Runtime: "python3.6"
+            Timeout: "30"
+            Role: { "Fn::GetAtt" : [ "LambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "preprocessing-${Environment}-pipeline-prepare-transformandplacement" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-pipeline-transformandplacement" } }
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "preprocessing" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
@@ -449,7 +489,15 @@ Resources:
                                 for i in range(len(event['DownloadAndChunk']['Output']['Filenames']))
                             ],
                             "Input": [
-                                {**event["ReadDatabase"], **{"Filename": f}}
+                                {
+                                    **event["ReadDatabase"],
+                                    **{
+                                        "Filename": f,
+                                        "BodyFrameTransforms": event['TransformAndPlacement']['Output']['Normalisation'],
+                                        "HipNeutralYaw": event['TransformAndPlacement']['Output']['Normalisation'],
+                                        "Placement": event['TransformAndPlacement']['Output']['Placement'],
+                                    }
+                                }
                                 for f in event['DownloadAndChunk']['Output']['Filenames']
                             ]
                         }
@@ -945,6 +993,21 @@ Resources:
                             "Type": "Task",
                             "Resource": "${LambdaReadPostgres.Arn}",
                             "ResultPath": "$.ReadDatabase",
+                            "Next": "BuildTransformAndPlacementContext"
+                        },
+                        "BuildTransformAndPlacementContext": {
+                            "Type": "Task",
+                            "Resource": "${LambdaPrepareTransformAndPlacement.Arn}",
+                            "ResultPath": "$.TransformAndPlacement",
+                            "Next": "TransformAndPlacement"
+                        },
+                        "TransformAndPlacement": {
+                            "Type": "Task",
+                            "InputPath": "$.TransformAndPlacement",
+                            "Resource": "${StepFunctionsActivity}",
+                            "TimeoutSeconds": 600,
+                            "HeartbeatSeconds": 600,
+                            "ResultPath": "$.TransformAndPlacement",
                             "Next": "BuildSessionProcess2Context"
                         },
                         "BuildSessionProcess2Context": {
