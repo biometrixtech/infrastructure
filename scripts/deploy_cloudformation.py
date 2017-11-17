@@ -1,14 +1,48 @@
 #!/usr/bin/env python
 # Upload a cloudformation template to S3, then run a stack update
-
+from __future__ import print_function
 import argparse
 import boto3
 import os
+import threading
 import time
+import sys
 
 template_local_dir = os.path.abspath('../cloudformation')
 template_s3_bucket = 'biometrix-infrastructure'
 template_s3_path = 'cloudformation/'
+
+
+class Spinner:
+    spinning = False
+    delay = 0.25
+
+    @staticmethod
+    def spinning_cursor():
+        while 1:
+            for cursor in '|/-\\':
+                yield cursor
+
+    def __init__(self, delay=None):
+        self.spinner_generator = self.spinning_cursor()
+        if delay and float(delay):
+            self.delay = delay
+
+    def spinner_task(self):
+        while self.spinning:
+            sys.stdout.write(next(self.spinner_generator))
+            sys.stdout.flush()
+            time.sleep(self.delay)
+            sys.stdout.write('\b')
+            sys.stdout.flush()
+
+    def start(self):
+        self.spinning = True
+        threading.Thread(target=self.spinner_task).start()
+
+    def stop(self):
+        self.spinning = False
+        time.sleep(self.delay)
 
 
 def get_boto3_resource(resource):
@@ -50,21 +84,28 @@ def await_stack_update(stack):
     ]
     success_statuses = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS']
 
+    spinner = Spinner()
+    spinner.start()
+
     while True:
         stack.reload()
         status = stack.stack_status
-        print("Stack status: {}".format(status))
+
+        spinner.stop()
+        sys.stdout.write("\033[K")  # Clear the line
+        print("\rStack status: {} ".format(status), end="")
+
         if status in fail_statuses:
+            print()  # Newline
             print(stack.stack_status_reason)
             raise Exception("Update failed!")
         elif status in success_statuses:
-            print('Update complete')
+            print('                           ')  # Newline
             return
         else:
-            print('Update still running')
-            time.sleep(5)
+            spinner.start()
+            time.sleep(15)
             continue
-    pass
 
 
 def main():

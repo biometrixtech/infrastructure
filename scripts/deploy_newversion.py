@@ -10,6 +10,38 @@ import time
 from subprocess import check_output, CalledProcessError
 
 
+class Spinner:
+    spinning = False
+    delay = 0.25
+
+    @staticmethod
+    def spinning_cursor():
+        while 1:
+            for cursor in '|/-\\':
+                yield cursor
+
+    def __init__(self, delay=None):
+        self.spinner_generator = self.spinning_cursor()
+        if delay and float(delay):
+            self.delay = delay
+
+    def spinner_task(self):
+        while self.spinning:
+            sys.stdout.write(next(self.spinner_generator))
+            sys.stdout.flush()
+            time.sleep(self.delay)
+            sys.stdout.write('\b')
+            sys.stdout.flush()
+
+    def start(self):
+        self.spinning = True
+        threading.Thread(target=self.spinner_task).start()
+
+    def stop(self):
+        self.spinning = False
+        time.sleep(self.delay)
+
+
 def update_cf_stack(stack):
     print('Updating CloudFormation stack')
 
@@ -38,10 +70,14 @@ def await_stack_update(stack):
     ]
     success_statuses = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS']
 
+    spinner = Spinner()
+    spinner.start()
+
     while True:
         stack.reload()
         status = stack.stack_status
 
+        spinner.stop()
         sys.stdout.write("\033[K")  # Clear the line
         print("\rStack status: {} ".format(status), end="")
 
@@ -50,12 +86,12 @@ def await_stack_update(stack):
             print(stack.stack_status_reason)
             raise Exception("Update failed!")
         elif status in success_statuses:
-            print()  # Newline
+            print('                           ')  # Newline
             return
         else:
+            spinner.start()
             time.sleep(15)
             continue
-    pass
 
 
 def update_git_branch():
