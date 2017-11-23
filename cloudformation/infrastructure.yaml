@@ -166,29 +166,9 @@ Resources:
                 TTL: "600"
                 ResourceRecords:
                   - "10	ASPMX.L.GOOGLE.COM"
-
-              - Name: "biometrixtech.com."
-                Type: "MX"
-                TTL: "600"
-                ResourceRecords:
                   - "20	ALT1.ASPMX.L.GOOGLE.COM"
-
-              - Name: "biometrixtech.com."
-                Type: "MX"
-                TTL: "600"
-                ResourceRecords:
                   - "30	ALT2.ASPMX.L.GOOGLE.COM"
-
-              - Name: "biometrixtech.com."
-                Type: "MX"
-                TTL: "600"
-                ResourceRecords:
                   - "40	ASPMX2.GOOGLEMAIL.COM"
-
-              - Name: "biometrixtech.com."
-                Type: "MX"
-                TTL: "600"
-                ResourceRecords:
                   - "50	ASPMX3.GOOGLEMAIL.COM"
 
     PublicHostedZoneBiometrixtechLegacyRecords:
@@ -326,29 +306,9 @@ Resources:
                 TTL: "600"
                 ResourceRecords:
                   - "10	ASPMX.L.GOOGLE.COM"
-
-              - Name: "fathomai.com."
-                Type: "MX"
-                TTL: "600"
-                ResourceRecords:
                   - "20	ALT1.ASPMX.L.GOOGLE.COM"
-
-              - Name: "fathomai.com."
-                Type: "MX"
-                TTL: "600"
-                ResourceRecords:
                   - "30	ALT2.ASPMX.L.GOOGLE.COM"
-
-              - Name: "fathomai.com."
-                Type: "MX"
-                TTL: "600"
-                ResourceRecords:
                   - "40	ASPMX2.GOOGLEMAIL.COM"
-
-              - Name: "fathomai.com."
-                Type: "MX"
-                TTL: "600"
-                ResourceRecords:
                   - "50	ASPMX3.GOOGLEMAIL.COM"
 
     PublicHostedZoneFathomaiLegacyRecords:
