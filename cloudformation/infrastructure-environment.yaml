@@ -1,0 +1,40 @@
+# A template that creates top-level infrastructure for a Fathom AI environment
+#
+# Copyright 2017 Melon Software Ltd (UK), all rights reserved.  Used under license.
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates top-level infrastructure for a Fathom AI environment"
+
+Parameters:
+
+    Environment:
+        Type: "String"
+        Description: "The name of the environment"
+
+Resources:
+
+    ##########################################################################################################
+    ##  ROUTE53
+    ##########################################################################################################
+
+    PublicHostedZone:
+        Type: "AWS::Route53::HostedZone"
+        Properties:
+            Name: { "Fn::Sub": "${Environment}.fathomai.com" }
+            HostedZoneConfig:
+                Comment: { "Fn::Sub": "Hosted zone created by the '${AWS::StackName}' CloudFormation stack" }
+            HostedZoneTags:
+              - { Key: "Name", Value: { "Fn::Sub": "infrastructure-${Environment}-public" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "infrastructure" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    PublicHostedZoneNameserverDelegation:
+        Type: "AWS::Route53::RecordSet"
+        Properties:
+            HostedZoneId: { "Fn::ImportValue": "FathomaiHostedZoneId" }
+            Comment: "Nameserver delegation"
+            Name: { "Fn::Sub": "${Environment}.fathomai.com" }
+            Type: "NS"
+            TTL: "600"
+            ResourceRecords: { "Fn::GetAtt": [ "PublicHostedZone", "NameServers" ] }
