@@ -8,10 +8,6 @@ import threading
 import time
 import sys
 
-template_local_dir = os.path.abspath('../cloudformation')
-template_s3_bucket = 'biometrix-infrastructure'
-template_s3_path = 'cloudformation/'
-
 
 class Spinner:
     spinning = False
@@ -56,9 +52,9 @@ def upload_cf_stack(template):
     print('Uploading stack')
     s3_resource = get_boto3_resource('s3')
     data = open(template, 'rb')
-    s3_path = template_s3_path + os.path.basename(template)
-    s3_resource.Bucket(template_s3_bucket + '-' + args.region).put_object(Key=s3_path, Body=data)
-    return s3_path
+    s3_full_path = '{}/{}'.format(s3_base_path, os.path.basename(template))
+    s3_resource.Bucket(s3_bucket).put_object(Key=s3_full_path, Body=data)
+    return s3_full_path
 
 
 def update_cf_stack(stack, s3_path):
@@ -67,7 +63,7 @@ def update_cf_stack(stack, s3_path):
     stack.update(
         TemplateURL='https://s3.amazonaws.com/{bucket}/{template}'.format(
             region=args.region,
-            bucket=template_s3_bucket + '-' + args.region,
+            bucket=s3_bucket,
             template=s3_path,
         ),
         Parameters=[{'ParameterKey': p['ParameterKey'], 'UsePreviousValue': True} for p in stack.parameters or {}],
@@ -109,12 +105,13 @@ def await_stack_update(stack):
 
 
 def main():
-    s3_path = upload_cf_stack(args.template)
+    s3_full_path = upload_cf_stack(args.template)
+    print('Uploaded template to s3://{}/{}'.format(s3_bucket, s3_full_path))
 
-    if args.stack != '':
+    if not args.noupdate:
         cf_resource = get_boto3_resource('cloudformation')
         stack = cf_resource.Stack(args.stack)
-        update_cf_stack(stack, s3_path)
+        update_cf_stack(stack, s3_full_path)
         await_stack_update(stack)
 
 
@@ -131,6 +128,19 @@ if __name__ == '__main__':
     parser.add_argument('--region', '-r',
                         type=str,
                         help='AWS Region')
+    parser.add_argument('--project', '-p',
+                        type=str,
+                        help='The project being deployed')
+    parser.add_argument('--environment', '-e',
+                        type=str,
+                        help='Environment')
+    parser.add_argument('--no-update',
+                        action='store_true',
+                        dest='noupdate',
+                        help='Skip updating CF stack')
 
     args = parser.parse_args()
+
+    s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
+    s3_base_path = 'cloudformation/{}-{}'.format(args.project, args.environment)
     main()
