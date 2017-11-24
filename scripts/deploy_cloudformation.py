@@ -108,7 +108,7 @@ def main():
     s3_full_path = upload_cf_stack(args.template)
     print('Uploaded template to s3://{}/{}'.format(s3_bucket, s3_full_path))
 
-    if not args.noupdate:
+    if not args.noupdate and args.stack:
         cf_resource = get_boto3_resource('cloudformation')
         stack = cf_resource.Stack(args.stack)
         update_cf_stack(stack, s3_full_path)
