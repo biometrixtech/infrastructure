@@ -1,0 +1,112 @@
+# A template that creates top-level infrastructure for a Fathom AI environment
+#
+# Copyright 2017 Melon Software Ltd (UK), all rights reserved.  Used under license.
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates top-level infrastructure for a Fathom AI environment"
+
+Parameters:
+
+    Environment:
+        Type: "String"
+        Description: "The name of the environment"
+
+    # To use an ACM certificate in API Gateway, it must have been created in North Virginia (boo hiss).
+    # We can't create cross-region resources in a stack, but we want to export the certificate id in
+    # *this* region.  So create the certificate manually in us-east-1, then pass its id as a parameter
+    # here, and it'll be passed through and exported.
+    # TODO what happens if this stack is created *in* us-east-1?!
+    FathomaiSslCertificateArnVirginia:
+        Description: "The ACM Certificate ARN for *.<env>.fathomai.com wildcard cert in us-east-1"
+        Type: "String"
+        Default: ""
+
+    # CloudFormation (and indeed the AWS CLI) currently doesn't support retrieving the required DNS validation
+    # CNAME record, which is required to support renewing the certificate
+    # TODO make a custom resource to extract this information as and when it's supported by boto3
+    FathomaiSslCertificateVirginiaValidation:
+        Description: "The CNAME record required to validate the *.<env>.fathomai.com wildcard cert in us-east-1.  Supply just the first part of each domain, separated by a pipe"
+        Type: "String"
+        Default: ""
+
+Metadata:
+    "AWS::CloudFormation::Interface":
+        ParameterGroups:
+          - Label: { default: "Environment" }
+            Parameters:
+              - "Environment"
+          - Label: { default: "ACM" }
+            Parameters:
+              - "FathomaiSslCertificateArnVirginia"
+              - "FathomaiSslCertificateVirginiaValidation"
+
+        ParameterLabels:
+            Environment: { default: "Environment" }
+            FathomaiSslCertificateArnVirginia: { default: "ACM Certificate ID (us-east-1)" }
+            FathomaiSslCertificateVirginiaValidation: { default: "ACM CNAME validation (us-east-1)" }
+
+Conditions:
+    CreateFathomaiSslCertificateVirginiaValidation: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "FathomaiSslCertificateVirginiaValidation" }, "" ] } ] }
+
+Resources:
+
+    ##########################################################################################################
+    ##  ROUTE53
+    ##########################################################################################################
+
+    PublicHostedZone:
+        Type: "AWS::Route53::HostedZone"
+        Properties:
+            Name: { "Fn::Sub": "${Environment}.fathomai.com" }
+            HostedZoneConfig:
+                Comment: { "Fn::Sub": "Hosted zone created by the '${AWS::StackName}' CloudFormation stack" }
+            HostedZoneTags:
+              - { Key: "Name", Value: { "Fn::Sub": "infrastructure-${Environment}-public" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "infrastructure" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+
+    PublicHostedZoneNameserverDelegation:
+        Type: "AWS::Route53::RecordSet"
+        Properties:
+            HostedZoneId: { "Fn::ImportValue": "FathomaiHostedZoneId" }
+            Comment: "Nameserver delegation"
+            Name: { "Fn::Sub": "${Environment}.fathomai.com" }
+            Type: "NS"
+            TTL: "600"
+            ResourceRecords: { "Fn::GetAtt": [ "PublicHostedZone", "NameServers" ] }
+
+    FathomaiSslCertificateVirginiaValidationRecords:
+        Type: "AWS::Route53::RecordSet"
+        Properties:
+            HostedZoneId: { Ref: "PublicHostedZone" }
+            Comment: "Nameserver delegation"
+            Name: { "Fn::Sub": [
+                "${FirstPart}.${Environment}.fathomai.com.",
+                { FirstPart: { "Fn::Select": [ 0, { "Fn::Split": [ "|", { Ref: "FathomaiSslCertificateVirginiaValidation" } ] } ] } }
+             ] }
+            Type: "CNAME"
+            TTL: "600"
+            ResourceRecords: [ { "Fn::Sub": [
+                "${FirstPart}.acm-validations.aws.",
+                { FirstPart: { "Fn::Select": [ 1, { "Fn::Split": [ "|", { Ref: "FathomaiSslCertificateVirginiaValidation" } ] } ] } }
+             ] } ]
+        Condition: "CreateFathomaiSslCertificateVirginiaValidation"
+
+    ##########################################################################################################
+    ##  OUTPUTS
+    ##########################################################################################################
+
+Outputs:
+
+    FathomaiHostedZoneId:
+        Description: "The ID of the <env>.fathomai.com public Hosted Zone"
+        Value: { Ref: "PublicHostedZone" }
+        Export:
+            Name: { "Fn::Sub": "FathomaiHostedZoneId-${Environment}" }
+
+    FathomaiSslCertificateAdnVirginia:
+        Description: "The ARN of the *.<env>.fathomai.com ACM Certificate (in us-east-1)"
+        Value: { "Fn::Sub": "arn:aws:acm:us-east-1:${AWS::AccountId}:certificate/${FathomaiSslCertificateArnVirginia}" }
+        Export:
+            Name: { "Fn::Sub": "FathomaiSslCertificateArnVirginia-${Environment}" }

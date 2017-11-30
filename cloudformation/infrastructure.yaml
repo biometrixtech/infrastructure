@@ -125,3 +125,274 @@ Resources:
             Action: "lambda:InvokeFunction"
             Principal: "events.amazonaws.com"
             SourceArn: { "Fn::GetAtt": [ "LambdaSynchroniseEc2TagsSchedule", "Arn" ] }
+
+    ##########################################################################################################
+    ##  ROUTE53
+    ##########################################################################################################
+
+    PublicHostedZoneBiometrixtech:
+        Type: "AWS::Route53::HostedZone"
+        Properties:
+            Name: "biometrixtech.com"
+            HostedZoneConfig:
+                Comment: { "Fn::Sub": "Hosted zone created by the '${AWS::StackName}' CloudFormation stack" }
+            HostedZoneTags:
+              - { Key: "Name", Value: { "Fn::Sub": "infrastructure-infra-biometrixtech" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "infrastructure" }
+              - { Key: "Environment", Value: "infra" }
+              - { Key: "Service", Value: "dns" }
+
+    PublicHostedZoneBiometrixtechMailRecords:
+        Type: "AWS::Route53::RecordSetGroup"
+        Properties:
+            HostedZoneId: { Ref: "PublicHostedZoneBiometrixtech" }
+            RecordSets:
+              - Name: "biometrixtech.com."
+                Type: "TXT"
+                TTL: "900"
+                ResourceRecords:
+                  - '"v=spf1 include:_spf.google.com ~all"'
+                  - '"v=spf1 include:mailgun.org ~all"'
+                  - '"google-site-verification=3fVpiNbOVmAcItidj9UEWTGkhkSuzX2pXCD63S2lR8E"'
+
+              - Name: "krs._domainkey.biometrixtech.com."
+                Type: "TXT"
+                TTL: "900"
+                ResourceRecords: [ '"k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDINNPEF3fd8LGVNVWbk/Pdqo1egX6RaABspCR4R8jPNYBi4CzO9F+kGMHuEc2bry6QDfhp9ybIIaYuWW5BMg/s92bngvJoXhSvEQBVtabiJl3E0+EigKAWNnJk5w4vWA7AXpdtZ62dGSNmrUJgGtf4Ko2XFcTAuZlxS8YnfLsVuQIDAQAB"' ]
+
+              - Name: "biometrixtech.com."
+                Type: "MX"
+                TTL: "600"
+                ResourceRecords:
+                  - "10	ASPMX.L.GOOGLE.COM"
+                  - "20	ALT1.ASPMX.L.GOOGLE.COM"
+                  - "30	ALT2.ASPMX.L.GOOGLE.COM"
+                  - "40	ASPMX2.GOOGLEMAIL.COM"
+                  - "50	ASPMX3.GOOGLEMAIL.COM"
+
+    PublicHostedZoneBiometrixtechLegacyRecords:
+        Type: "AWS::Route53::RecordSetGroup"
+        Properties:
+            HostedZoneId: { Ref: "PublicHostedZoneBiometrixtech" }
+            RecordSets:
+              - Name: "biometrixtech.com."
+                Type: "A"
+                TTL: "900"
+                ResourceRecords: [ '184.168.221.25' ]
+
+              - Name: "_domainconnect.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ '_domainconnect.gd.domaincontrol.com' ]
+
+              - Name: "calendar.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ghs.googlehosted.com' ]
+
+              - Name: "dashboard.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'rails-app-1105185689.us-west-2.elb.amazonaws.com' ]
+
+              - Name: "dashboard-dev.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ec2-52-33-19-201.us-west-2.compute.amazonaws.com' ]
+
+              - Name: "dashboard-test.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ec2-52-43-117-116.us-west-2.compute.amazonaws.com' ]
+
+              - Name: "dashboard-v2.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'rails-app-v2-alb-472858714.us-west-2.elb.amazonaws.com' ]
+
+              - Name: "drive.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ghs.googlehosted.com' ]
+
+              - Name: "email.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'mailgun.org' ]
+
+              - Name: "firmware.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ddmx9hpf183zt.cloudfront.net' ]
+
+              - Name: "mail.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ghs.googlehosted.com' ]
+
+              - Name: "rails-api.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'rails-app-1105185689.us-west-2.elb.amazonaws.com' ]
+
+              - Name: "rails-api-v2.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'rails-app-v2-alb-472858714.us-west-2.elb.amazonaws.com' ]
+
+              - Name: "rails-db.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ec2-35-162-107-177.us-west-2.compute.amazonaws.com' ]
+
+              - Name: "sites.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ghs.googlehosted.com' ]
+
+              - Name: "stats-api-dev.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'biometrixstatsapi-dev.us-west-2.elasticbeanstalk.com' ]
+
+              - Name: "stats-api.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'biometrixstatsapi-prod.us-west-2.elasticbeanstalk.com' ]
+
+              - Name: "sysops.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ghs.googlehosted.com' ]
+
+              - Name: "wiki.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ghs.googlehosted.com' ]
+
+              - Name: "www.biometrixtech.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'biometrixtech.relaxedandalive.com' ]
+
+    PublicHostedZoneFathomai:
+        Type: "AWS::Route53::HostedZone"
+        Properties:
+            Name: "fathomai.com"
+            HostedZoneConfig:
+                Comment: { "Fn::Sub": "Hosted zone created by the '${AWS::StackName}' CloudFormation stack" }
+            HostedZoneTags:
+              - { Key: "Name", Value: { "Fn::Sub": "infrastructure-infra-biometrixtech" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "infrastructure" }
+              - { Key: "Environment", Value: "infra" }
+              - { Key: "Service", Value: "dns" }
+
+    PublicHostedZoneFathomaiMailRecords:
+        Type: "AWS::Route53::RecordSetGroup"
+        Properties:
+            HostedZoneId: { Ref: "PublicHostedZoneFathomai" }
+            RecordSets:
+              - Name: "fathomai.com."
+                Type: "TXT"
+                TTL: "900"
+                ResourceRecords:
+                  - '"google-site-verification=KD6HN5OxzigkdAU7SzsCWqb4yCIhQV2B8u_kkMrNbuM"'
+                  - '"google-site-verification=-zj_c1csBSS3C1TM5-VUR2u4ubUuxIY_SbU2uAQ02Ks"'
+
+              - Name: "fathomai.com."
+                Type: "MX"
+                TTL: "600"
+                ResourceRecords:
+                  - "10	ASPMX.L.GOOGLE.COM"
+                  - "20	ALT1.ASPMX.L.GOOGLE.COM"
+                  - "30	ALT2.ASPMX.L.GOOGLE.COM"
+                  - "40	ASPMX2.GOOGLEMAIL.COM"
+                  - "50	ASPMX3.GOOGLEMAIL.COM"
+
+    PublicHostedZoneFathomaiLegacyRecords:
+        Type: "AWS::Route53::RecordSetGroup"
+        Properties:
+            HostedZoneId: { Ref: "PublicHostedZoneFathomai" }
+            RecordSets:
+              - Name: "fathomai.com."
+                Type: "A"
+                TTL: "900"
+                ResourceRecords: [ '54.148.17.2' ]
+
+              - Name: "_domainconnect.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ '_domainconnect.gd.domaincontrol.com' ]
+
+              - Name: "beta.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'rails-app-beta-demo-1408190084.us-west-2.elb.amazonaws.com' ]
+
+              - Name: "dashboard.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'rails-app-v2-prod-1981511554.us-west-2.elb.amazonaws.com' ]
+
+              - Name: "email.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'email.secureserver.net' ]
+
+              - Name: "ftp.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'fathomai.com' ]
+
+              - Name: "go.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'rebrandlydomain.com' ]
+
+              - Name: "rails-api.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'rails-app-v2-prod-1981511554.us-west-2.elb.amazonaws.com' ]
+
+              - Name: "sub.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'fathomai.com' ]
+
+              - Name: "time.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'ec2-52-11-26-32.us-west-2.compute.amazonaws.com' ]
+
+              - Name: "www.fathomai.com."
+                Type: "CNAME"
+                TTL: "900"
+                ResourceRecords: [ 'wordpress-prod-1136385471.us-west-2.elb.amazonaws.com' ]
+
+    ##########################################################################################################
+    ##  OUTPUTS
+    ##########################################################################################################
+
+Outputs:
+
+    BiometrixHostedZoneId:
+        Description: "The ID of the biometrixtech.com public Hosted Zone"
+        Value: { Ref: "PublicHostedZoneBiometrixtech" }
+        Export:
+            Name: "BiometrixHostedZoneId"
+
+    BiometrixHostedZoneNameservers:
+        Description: "The nameservers that the biometrixtech.com domain should be delegated to"
+        Value: { "Fn::Join": [ ", ", { "Fn::GetAtt": [ "PublicHostedZoneBiometrixtech", "NameServers" ] } ] }
+
+    FathomaiHostedZoneId:
+        Description: "The ID of the fathomai.com public Hosted Zone"
+        Value: { Ref: "PublicHostedZoneFathomai" }
+        Export:
+            Name: "FathomaiHostedZoneId"
+
+    FathomaiHostedZoneNameservers:
+        Description: "The nameservers that the fathomai.com domain should be delegated to"
+        Value: { "Fn::Join": [ ", ", { "Fn::GetAtt": [ "PublicHostedZoneFathomai", "NameServers" ] } ] }
