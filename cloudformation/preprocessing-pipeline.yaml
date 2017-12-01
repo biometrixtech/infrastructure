@@ -1164,6 +1164,7 @@ Resources:
                 }
 
             RoleArn: { "Fn::ImportValue" : "StepFunctionsServiceRole" }
+            StateMachineName: { "Fn::Sub": "preprocessing-${Environment}" }
 Outputs:
     ActivityArn:
         Description: "The ARN of the Batch Activity"

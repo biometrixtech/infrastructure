@@ -126,6 +126,7 @@ Resources:
     EfsSecurityGroup:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
+            GroupName: { "Fn::Sub": "preprocessing-${Environment}-compute-efs" }
             GroupDescription: "Security group which allows access to the Elastic File System"
             VpcId: { Ref: "VpcId" }
             Tags:
@@ -200,6 +201,12 @@ Resources:
                         AWS: { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root" }
                     Action: "kms:*"
                     Resource: "*"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "compute" }
 
     ParameterStoreKeyAlias:
         Type: "AWS::KMS::Alias"
@@ -234,6 +241,7 @@ Resources:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
             GroupDescription: "Security group for preprocessing EC2 instances"
+            GroupName: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2" }
             VpcId: { Ref: "VpcId" }
             SecurityGroupIngress:
                 # All ports open from internal access
@@ -251,6 +259,7 @@ Resources:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
             GroupDescription: "Security group allowing SSH access"
+            GroupName: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2-ssh" }
             VpcId: { Ref: "VpcId" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}-compute-ec2-ssh" } }
@@ -309,6 +318,7 @@ Resources:
     Ec2SecurityGroupExternalSsh:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
+            GroupName: { "Fn::Sub": "preprocessing-${Environment}-bastion-ssh" }
             GroupDescription: "Enable external SSH access"
             VpcId: { Ref: "VpcId" }
             SecurityGroupIngress:

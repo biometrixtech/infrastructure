@@ -257,6 +257,7 @@ Resources:
     InternalSshSecurityGroup:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
+            GroupName: { "Fn::Sub": "mongodb-${Environment}-mongodb-ssh" }
             GroupDescription: "Enable SSH access"
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "mongodb-${Environment}-mongodb-ssh" } }
@@ -268,6 +269,7 @@ Resources:
     InstanceSecurityGroup:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
+            GroupName: { "Fn::Sub": "mongodb-${Environment}-mongodb-mongo" }
             GroupDescription: "Enable Mongodb access"
             SecurityGroupIngress:
               - IpProtocol: "tcp"
@@ -702,6 +704,7 @@ Resources:
     ExternalSshSecurityGroup:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
+            GroupName: { "Fn::Sub": "mongodb-${Environment}-bastion-ssh" }
             GroupDescription: "Enable external SSH access"
             VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
             SecurityGroupIngress:
