@@ -377,6 +377,12 @@ Resources:
 
 Outputs:
 
+    InfrastructureBucketName:
+        Description: "The name of the infrastructure S3 bucket"
+        Value: { Ref: "S3Bucket" }
+        Export:
+            Name: "InfrastructureBucketName"
+
     BiometrixHostedZoneId:
         Description: "The ID of the biometrixtech.com public Hosted Zone"
         Value: { Ref: "PublicHostedZoneBiometrixtech" }
