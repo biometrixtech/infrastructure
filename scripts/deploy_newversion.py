@@ -121,10 +121,12 @@ if __name__ == '__main__':
                         default='HEAD')
     parser.add_argument('--region', '-r',
                         type=str,
+                        choices=['us-east-1', 'us-west-2'],
                         help='AWS Region')
     parser.add_argument('--environment', '-e',
                         type=str,
                         help='Environment',
+                        choices=['infra', 'dev', 'qa', 'production'],
                         default='dev')
     parser.add_argument('--no-update',
                         action='store_true',

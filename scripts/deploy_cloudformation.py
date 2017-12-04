@@ -127,12 +127,15 @@ if __name__ == '__main__':
                         help='the name of a CF stack')
     parser.add_argument('--region', '-r',
                         type=str,
+                        choices=['us-east-1', 'us-west-2'],
                         help='AWS Region')
     parser.add_argument('--project', '-p',
                         type=str,
+                        choices=['preprocessing', 'infrastructure', 'statsapi', 'alerts'],
                         help='The project being deployed')
     parser.add_argument('--environment', '-e',
                         type=str,
+                        choices=['infra', 'dev', 'qa', 'production'],
                         help='Environment')
     parser.add_argument('--no-update',
                         action='store_true',
