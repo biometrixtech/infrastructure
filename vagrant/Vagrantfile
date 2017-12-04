@@ -49,6 +49,7 @@ Vagrant.configure(2) do |config|
 	config.vm.synced_folder "../../StatsAPI", "/vagrant/StatsAPI", id: "statsapi"
 	config.vm.synced_folder "../../Website", "/vagrant/Website", id: "website"
 	config.vm.synced_folder "..", "/vagrant/Infrastructure", id: "infrastructure"
+	config.vm.synced_folder "../../Alerts", "/vagrant/Alerts", id: "alerts"
 	config.vm.synced_folder "../../../stephen-164/aws-cloudformation-polyfill", "/vagrant/aws-cloudformation-polyfill", id: "polyfill"
 	config.vm.synced_folder "../../../stephen-164/aws-sfn-batch", "/vagrant/aws-sfn-batch", id: "sfn-batch"
 
