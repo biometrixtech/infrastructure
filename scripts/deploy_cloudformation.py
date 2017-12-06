@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 # Upload a cloudformation template to S3, then run a stack update
 from __future__ import print_function
+from botocore.exceptions import ClientError
+from colorama import Fore, Back, Style
+from datetime import datetime
 import argparse
 import boto3
+import __builtin__
 import os
 import threading
 import time
@@ -79,6 +83,7 @@ def await_stack_update(stack):
         'UPDATE_ROLLBACK_COMPLETE'
     ]
     success_statuses = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS']
+    cutoff = datetime.now()
 
     spinner = Spinner()
     spinner.start()
@@ -89,30 +94,65 @@ def await_stack_update(stack):
 
         spinner.stop()
         sys.stdout.write("\033[K")  # Clear the line
-        print("\rStack status: {} ".format(status), end="")
 
         if status in fail_statuses:
-            print()  # Newline
-            print(stack.stack_status_reason)
-            raise Exception("Update failed!")
+            print("\rStack status: {}                        ".format(status), colour=Fore.RED)
+            failure_resource_statuses = [
+                'UPDATE_ROLLBACK_IN_PROGRESS',
+                'CREATE_FAILED',
+                'UPDATE_FAILED',
+                'DELETE_FAILED'
+            ]
+            failure_events = [e for e in stack.events.all()
+                              if e.timestamp.replace(tzinfo=None) > cutoff
+                              and e.resource_status in failure_resource_statuses
+                              and e.resource_status_reason is not None]
+            print('\n'.join([e.resource_status_reason for e in failure_events]), colour=Fore.RED)
+            return False
         elif status in success_statuses:
-            print('                           ')  # Newline
-            return
+            print("\rStack status: {}                        ".format(status), colour=Fore.GREEN)
+            return True
         else:
+            print("\rStack status: {} ".format(status), colour=Fore.CYAN, end="")
             spinner.start()
             time.sleep(15)
             continue
 
 
+def print(*args, **kwargs):
+    if 'colour' in kwargs:
+        __builtin__.print(kwargs['colour'], end="")
+        del kwargs['colour']
+
+        end = kwargs.get('end', '\n')
+        kwargs['end'] = ''
+        __builtin__.print(*args, **kwargs)
+
+        __builtin__.print(Style.RESET_ALL, end=end)
+
+    else:
+        __builtin__.print(*args, **kwargs)
+
+
 def main():
     s3_full_path = upload_cf_stack(args.template)
-    print('Uploaded template to s3://{}/{}'.format(s3_bucket, s3_full_path))
+    print('Uploaded template to s3://{}/{}'.format(s3_bucket, s3_full_path), colour=Fore.GREEN)
 
     if not args.noupdate and args.stack:
         cf_resource = get_boto3_resource('cloudformation')
         stack = cf_resource.Stack(args.stack)
-        update_cf_stack(stack, s3_full_path)
-        await_stack_update(stack)
+
+        try:
+            update_cf_stack(stack, s3_full_path)
+        except ClientError as e:
+            if 'No updates are to be performed' in str(e):
+                print('No updates are to be performed', colour=Fore.YELLOW)
+                exit(0)
+            else:
+                print(e, colour=Fore.RED)
+                exit(1)
+
+        exit(await_stack_update(stack))
 
 
 if __name__ == '__main__':
