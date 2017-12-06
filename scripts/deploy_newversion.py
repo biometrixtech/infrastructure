@@ -1,13 +1,17 @@
 #!/usr/bin/env python
 # Upload a cloudformation template to S3, then run a stack update
 from __future__ import print_function
-import boto3
+from botocore.exceptions import ClientError
+from subprocess import check_output, CalledProcessError
+from colorama import Fore, Back, Style
+from datetime import datetime
+import __builtin__
 import argparse
+import boto3
 import os
 import sys
 import threading
 import time
-from subprocess import check_output, CalledProcessError
 
 
 class Spinner:
@@ -53,8 +57,9 @@ def update_cf_stack(stack):
             new_parameters.append({'ParameterKey': p['ParameterKey'], 'UsePreviousValue': True})
 
     stack.update(
-        TemplateURL='https://s3.amazonaws.com/biometrix-infrastructure-{region}/cloudformation/preprocessing-environment.yaml'.format(
+        TemplateURL='https://s3.amazonaws.com/biometrix-infrastructure-{region}/cloudformation/preprocessing-{environment}/preprocessing-environment.yaml'.format(
             region=args.region,
+            environment=args.environment,
         ),
         Parameters=new_parameters,
         Capabilities=['CAPABILITY_NAMED_IAM'],
@@ -69,6 +74,7 @@ def await_stack_update(stack):
         'UPDATE_ROLLBACK_COMPLETE'
     ]
     success_statuses = ['UPDATE_COMPLETE', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS']
+    cutoff = datetime.now()
 
     spinner = Spinner()
     spinner.start()
@@ -79,16 +85,26 @@ def await_stack_update(stack):
 
         spinner.stop()
         sys.stdout.write("\033[K")  # Clear the line
-        print("\rStack status: {} ".format(status), end="")
 
         if status in fail_statuses:
-            print()  # Newline
-            print(stack.stack_status_reason)
-            raise Exception("Update failed!")
+            print("\rStack status: {}                        ".format(status), colour=Fore.RED)
+            failure_resource_statuses = [
+                'UPDATE_ROLLBACK_IN_PROGRESS',
+                'CREATE_FAILED',
+                'UPDATE_FAILED',
+                'DELETE_FAILED'
+            ]
+            failure_events = [e for e in stack.events.all()
+                              if e.timestamp.replace(tzinfo=None) > cutoff
+                              and e.resource_status in failure_resource_statuses
+                              and e.resource_status_reason is not None]
+            print('\n'.join([e.resource_status_reason for e in failure_events]), colour=Fore.RED)
+            return False
         elif status in success_statuses:
-            print('                           ')  # Newline
-            return
+            print("\rStack status: {}                        ".format(status), colour=Fore.GREEN)
+            return True
         else:
+            print("\rStack status: {} ".format(status), colour=Fore.CYAN, end="")
             spinner.start()
             time.sleep(15)
             continue
@@ -100,8 +116,23 @@ def update_git_branch():
         os.system("git -C {} branch -f {}-{} {}".format(git_dir, args.environment, args.region, args.batchjob_version))
         os.system("git -C {} push origin {}-{}".format(git_dir, args.environment, args.region))
     except CalledProcessError as e:
-        print(e.output)
+        print(e.output, colour=Fore.RED)
         raise
+
+
+def print(*args, **kwargs):
+    if 'colour' in kwargs:
+        __builtin__.print(kwargs['colour'], end="")
+        del kwargs['colour']
+
+        end = kwargs.get('end', '\n')
+        kwargs['end'] = ''
+        __builtin__.print(*args, **kwargs)
+
+        __builtin__.print(Style.RESET_ALL, end=end)
+
+    else:
+        __builtin__.print(*args, **kwargs)
 
 
 def main():
@@ -110,8 +141,13 @@ def main():
 
     update_git_branch()
     if not args.noupdate:
-        update_cf_stack(stack)
-        await_stack_update(stack)
+        try:
+            update_cf_stack(stack)
+        except ClientError as e:
+            print(e, colour=Fore.RED)
+            exit(1)
+
+        exit(await_stack_update(stack))
 
 
 if __name__ == '__main__':

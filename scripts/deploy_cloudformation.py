@@ -4,13 +4,13 @@ from __future__ import print_function
 from botocore.exceptions import ClientError
 from colorama import Fore, Back, Style
 from datetime import datetime
+import __builtin__
 import argparse
 import boto3
-import __builtin__
 import os
+import sys
 import threading
 import time
-import sys
 
 
 class Spinner:
