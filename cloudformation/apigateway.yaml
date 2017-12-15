@@ -191,9 +191,6 @@ Resources:
                                 requestTemplates:
                                     application/json: "{\"statusCode\": 200}"
                                 type: "mock"
-      }
-    }
-  }
 
     ApiDeployment:
         Type: "AWS::ApiGateway::Deployment"
