@@ -22,6 +22,10 @@ Parameters:
         Type: "String"
         Description: "The ARN of the Lambda function to be invoked"
 
+    CustomAuthLambdaArn:
+        Type: "String"
+        Description: "The ARN of the Lambda function to be invoked for custom authentication"
+
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
@@ -47,6 +51,14 @@ Resources:
         Properties:
             Action: "lambda:invokeFunction"
             FunctionName: { Ref: "LambdaArn" }
+            Principal: "apigateway.amazonaws.com"
+            SourceArn: { "Fn::Sub": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*" }
+
+    CustomAuthLambdaPermission:
+        Type: "AWS::Lambda::Permission"
+        Properties:
+            Action: "lambda:invokeFunction"
+            FunctionName: { Ref: "CustomAuthLambdaArn" }
             Principal: "apigateway.amazonaws.com"
             SourceArn: { "Fn::Sub": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*" }
 
@@ -101,12 +113,16 @@ Resources:
                                         Access-Control-Allow-Origin: { type: "string" }
                                         Access-Control-Allow-Methods: { type: "string" }
                                         Access-Control-Allow-Headers: { type: "string" }
+                            security: [ { CustomAuth: [] } ]
                             x-amazon-apigateway-integration:
                                 requestTemplates:
                                     "application/json": |
                                         {
                                             "endpoint": "$input.params().get('path').get('endpoint')",
-                                            "auth": { "jwt": "$input.params().get('header').get('Authorization')" },
+                                            "auth": {
+                                                "principal": "$context.authorizer.principalId",
+                                                "jwt": "$input.params().get('header').get('Authorization')"
+                                            },
                                             "body-json" : $input.json('$'),
 
                                             "stage-variables" : {
@@ -131,6 +147,7 @@ Resources:
                                             }
                                         }
                                 uri: { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations" }
+                                passthroughBehavior: "never"
                                 responses:
                                     InvalidAuthentication:
                                         statusCode: '400'
@@ -179,6 +196,7 @@ Resources:
                                         Access-Control-Allow-Origin: { type: "string" }
                                         Access-Control-Allow-Methods: { type: "string" }
                                         Access-Control-Allow-Headers: { type: "string" }
+                            security: [ { CustomAuth: [] } ]
                             x-amazon-apigateway-integration:
                                 responses:
                                     default:
@@ -187,10 +205,21 @@ Resources:
                                             method.response.header.Access-Control-Allow-Methods: "'DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'"
                                             method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
                                             method.response.header.Access-Control-Allow-Origin: "'*'"
-                                passthroughBehavior: "when_no_match"
+                                passthroughBehavior: "never"
                                 requestTemplates:
                                     application/json: "{\"statusCode\": 200}"
                                 type: "mock"
+                securityDefinitions:
+                    CustomAuth:
+                        type: "apiKey"
+                        name: "Authorization"
+                        in: "header"
+                        x-amazon-apigateway-authtype: "oauth2"
+                        x-amazon-apigateway-authorizer:
+                            type: "token"
+                            authorizerUri: { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CustomAuthLambdaArn}/invocations" }
+                            identityValidationExpression: ""
+                            authorizerResultTtlInSeconds: 60
 
     ApiDeployment:
         Type: "AWS::ApiGateway::Deployment"
