@@ -260,6 +260,8 @@ Resources:
                                 # https://app.asana.com/0/419313112177425/449967103403639
                                 # Occasionally a packet is uploaded with no suffix, so if the un-suffixed filename appears
                                 # in the packet list, and there is one suffix missing, rename it to fill in the gap
+                                old_file = prefix
+                                new_file = missing_packets[0]
                                 s3_client.copy_object(Bucket=bucket, CopySource="{}/{}".format(bucket, old_file), Key=new_file)
                                 s3_client.delete_object(Bucket=bucket, Key=old_file)
 
