@@ -106,7 +106,7 @@ def await_stack_update(stack):
         else:
             print("\rStack status: {} ".format(status), colour=Fore.CYAN, end="")
             spinner.start()
-            time.sleep(15)
+            time.sleep(5)
             continue
 
 

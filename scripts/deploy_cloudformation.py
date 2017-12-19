@@ -115,7 +115,7 @@ def await_stack_update(stack):
         else:
             print("\rStack status: {} ".format(status), colour=Fore.CYAN, end="")
             spinner.start()
-            time.sleep(15)
+            time.sleep(5)
             continue
 
 
@@ -171,7 +171,7 @@ if __name__ == '__main__':
                         help='AWS Region')
     parser.add_argument('--project', '-p',
                         type=str,
-                        choices=['preprocessing', 'infrastructure', 'statsapi', 'alerts'],
+                        choices=['preprocessing', 'infrastructure', 'statsapi', 'alerts', 'users'],
                         help='The project being deployed')
     parser.add_argument('--environment', '-e',
                         type=str,
