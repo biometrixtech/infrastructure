@@ -482,8 +482,8 @@ Resources:
                                     **event["ReadDatabase"],
                                     **{
                                         "Filename": f,
-                                        "BodyFrameTransforms": event['TransformAndPlacement']['Output']['Normalisation'],
-                                        "HipNeutralYaw": event['TransformAndPlacement']['Output']['Normalisation'],
+                                        "BodyFrameTransforms": event['TransformAndPlacement']['Output']['BodyFrameTransforms'],
+                                        "HipNeutralYaw": event['TransformAndPlacement']['Output']['HipNeutralYaw'],
                                         "Placement": event['TransformAndPlacement']['Output']['Placement'],
                                     }
                                 }
