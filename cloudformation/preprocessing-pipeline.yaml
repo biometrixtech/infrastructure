@@ -146,6 +146,11 @@ Resources:
                         Effect: "Allow"
                         Resource: "*"
 
+                      - Action:
+                          - "sns:Publish"
+                        Effect: "Allow"
+                        Resource: { "Fn::Sub": "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:alerts-${Environment}-trigger" }
+
             RoleName: { "Fn::Sub": "preprocessing-${Environment}-execute-${AWS::Region}" }
 
     ##########################################################################################################
@@ -378,14 +383,14 @@ Resources:
                         )
                         ret = {
                             "SensorDataFilename": sensor_data_filename,
-                            "SensorDataFileVersion": event['SourceEvent']['SensorDataFilename'],  # TODO get this from db
+                            "SensorDataFileVersion": event['SourceEvent']['SensorDataFileVersion'],  # TODO get this from db
                             "SessionEventId": query_results.get('session_event_id', None),
                             "EventDate": query_results.get('event_date', None),
                             "TrainingSessionLogId": query_results.get('training_session_log_id', None),
                             "HipNTransform": query_results.get('hip_n_transform', None),
                             "TrainingGroupId": query_results.get('training_group_ids', None),
                             "UserId": query_results.get('user_id', None),
-                            "UserMass": query_results.get('weight', None),
+                            "UserMass": query_results.get('weight', None) or 160,
                             "TeamId": query_results.get('team_id', None),
                             "SessionType": query_results.get('session_type', None) or 1,
                         }
@@ -769,7 +774,7 @@ Resources:
                                 }
                             ],
                             "Input": event["ReadDatabase"],
-                            "LinearityGroup": event["ReadDatabase"]["TrainingGroupId"][0]
+                            "LinearityGroup": event["ReadDatabase"]["TrainingGroupId"][0] if len(event["ReadDatabase"]["TrainingGroupId"]) else ''
                         }
             Handler: "index.handler"
             Runtime: "python3.6"
