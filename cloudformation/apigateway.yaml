@@ -196,7 +196,6 @@ Resources:
                                         Access-Control-Allow-Origin: { type: "string" }
                                         Access-Control-Allow-Methods: { type: "string" }
                                         Access-Control-Allow-Headers: { type: "string" }
-                            security: [ { CustomAuth: [] } ]
                             x-amazon-apigateway-integration:
                                 responses:
                                     default:
