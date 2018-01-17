@@ -17,7 +17,7 @@ Resources:
             BucketName: { "Fn::Sub": "biometrix-infrastructure-${AWS::Region}" }
             Tags:
               - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "infra" }
+              - { Key: "Project", Value: "infrastructure" }
               - { Key: "Environment", Value: "infra" }
         # Don't delete this if we accidentally delete the stack (which would fail anyway unless the bucket is empty)
         DeletionPolicy : "Retain"
@@ -94,6 +94,7 @@ Resources:
                             else:
                                 print('Skipping Tag {}'.format(t['Key']))
                         return temp_tags
+
 
             Environment:
                 Variables:
