@@ -20,6 +20,7 @@ Parameters:
         Description: "The ACM Certificate ARN for *.<env>.fathomai.com wildcard cert in us-east-1"
         Type: "String"
         Default: ""
+        AllowedPattern: "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
     # CloudFormation (and indeed the AWS CLI) currently doesn't support retrieving the required DNS validation
     # CNAME record, which is required to support renewing the certificate
