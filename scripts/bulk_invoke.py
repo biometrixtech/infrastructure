@@ -22,6 +22,8 @@ def process_file(s3_bucket, basename):
 def list_s3_files(s3_bucket, prefix, marker=''):
     ret = []
     resp = s3_client.list_objects(Bucket=bucket, Prefix=prefix, Marker=marker)
+    if 'Contents' not in resp:
+        raise Exception('File {} not present in S3')
     ret.extend([(x['Key'], x['LastModified']) for x in resp['Contents'] if x['Key'][-8:] != 'combined'])
     if resp['IsTruncated']:
         ret.extend(list_s3_files(bucket, prefix, ret[-1]))
