@@ -16,7 +16,7 @@ def invoke_lambda(s3_bucket, s3_key, timestamp):
 
 def process_file(s3_bucket, basename):
     for s3_file, last_modified in list_s3_files(s3_bucket, basename):
-        invoke_lambda(s3_bucket, s3_file, last_modified.isoformat()[:-6] + 'Z')
+        invoke_lambda(s3_bucket, s3_file, last_modified.isoformat().rsplit('+', 1)[0])
 
 
 def list_s3_files(s3_bucket, prefix, marker=''):
