@@ -10,18 +10,33 @@ def chunk_list(l, n):
         yield l[i:i + n]
 
 
-def load_parameters(keys, environment, region):
-    if len(keys) > 0:
-        print('Retrieving configuration for [{}] from SSM'.format(", ".join(keys)))
-        ssm_client = boto3.client('ssm', region_name=region)
+def get_all_ssm_keys(environment, region, next_token=None):
+    ssm_client = boto3.client('ssm', region_name=region)
+    if next_token is not None:
+        response = ssm_client.describe_parameters(
+            ParameterFilters=[{'Key': "Name", 'Values': ["preprocessing.{}.".format(environment)], 'Option': "BeginsWith"}],
+            MaxResults=50,
+            NextToken=next_token,
+        )
+    else:
+        response = ssm_client.describe_parameters(
+            ParameterFilters=[{'Key': "Name", 'Values': ["preprocessing.{}.".format(environment)], 'Option': "BeginsWith"}],
+            MaxResults=50
+        )
+    return [p['Name'] for p in response['Parameters']] + (get_all_ssm_keys(environment, region, response['NextToken']) if 'NextToken' in response else [])
 
-        for key_batch in chunk_list(keys, 10):
-            response = ssm_client.get_parameters(
-                Names=['preprocessing.{}.{}'.format(environment, key.lower()) for key in key_batch],
-                WithDecryption=True
-            )
-            for p in response['Parameters']:
-                yield (p['Name'].split('.')[-1].lower(), p['Value'])
+
+def load_parameters(keys, environment, region):
+    print('Retrieving configuration for [{}] from SSM'.format(", ".join(keys)))
+    ssm_client = boto3.client('ssm', region_name=region)
+
+    for key_batch in chunk_list(keys, 10):
+        response = ssm_client.get_parameters(
+            Names=['preprocessing.{}.{}'.format(environment, key.lower()) for key in key_batch],
+            WithDecryption=True
+        )
+        for p in response['Parameters']:
+            yield (p['Name'].split('.')[-1].lower(), p['Value'])
 
 
 def set_parameters(keys):
@@ -39,6 +54,39 @@ def set_parameters(keys):
             KeyId='alias/preprocessing/{}'.format(args.environment),
             Overwrite=True,
         )
+
+
+def main():
+
+    if not args.environment:
+        print("Must specify an environment")
+        return
+    if not args.region:
+        print("Must specify a region")
+        return
+    cf_environment = args.copy_from_environment or args.environment
+    cf_region = args.copy_from_region or args.region
+
+    if len(args.configs) == 0:
+        print('Must specify a configuration key to set, or "*" to copy all keys')
+        return
+    elif len(args.configs) == 1 and args.configs[0] == '*':
+        if args.copy_from_environment:
+            print("Listing keys from {}/{} environment".format(cf_region, cf_environment))
+            keys = [k.split('.')[-1] for k in get_all_ssm_keys(args.copy_from_environment, cf_region)]
+            config_values = {k: '' for k in keys}
+        else:
+            print('Must specify --copy-from-region to load all keys')
+            return
+    else:
+        config_values = {c.split('=', 1)[0].lower(): c.split('=', 1)[-1] for c in args.configs}
+
+    if args.copy_from_environment or args.copy_from_region:
+        print("Copying values from {}/{} environment".format(cf_region, cf_environment))
+        for key, value in load_parameters(config_values.keys(), cf_environment, cf_region):
+            config_values[key] = value
+
+    set_parameters(config_values)
 
 
 if __name__ == '__main__':
@@ -63,21 +111,4 @@ if __name__ == '__main__':
                         help='Region to copy values from')
 
     args = parser.parse_args()
-
-    if not args.environment:
-        print("Must specify an environment")
-        exit(1)
-    if not args.region:
-        print("Must specify a region")
-        exit(1)
-
-    config_values = {c.split('=', 1)[0].lower(): c.split('=', 1)[-1] for c in args.configs}
-
-    if args.copy_from_environment or args.copy_from_region:
-        cf_environment = args.copy_from_environment or args.environment
-        cf_region = args.copy_from_region or args.region
-        print("Copying values from {}/{} environment".format(cf_region, cf_environment))
-        for key, value in load_parameters(config_values.keys(), cf_environment, cf_region):
-            config_values[key] = value
-
-    set_parameters(config_values)
+    main()
