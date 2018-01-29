@@ -50,7 +50,7 @@ cat <<EOF > install-globalmodels.json
         "image": "faisyl/alpine-nfs",
         "vcpus": 1,
         "memory": 128,
-        "jobRoleArn": "arn:aws:iam::887689817172:role/preprocessing-batchjob-$REGION",
+        "jobRoleArn": "arn:aws:iam::887689817172:role/preprocessing-$ENVIRONMENT-execute-$REGION",
         "command": [
             "/bin/sh", "-c", 
             " \
@@ -66,10 +66,10 @@ cat <<EOF > install-globalmodels.json
     }
 }
 EOF
-aws batch register-job-definition --region $REGION --cli-input-json file://install-globalmodels.json
+VERSION=$(aws batch register-job-definition --region $REGION --cli-input-json file://install-globalmodels.json | jq .revision -r)
 aws batch submit-job \
     --region $REGION \
     --job-name install-globalmodels \
     --job-queue preprocessing-$ENVIRONMENT-compute \
-    --job-definition arn:aws:batch:$REGION:887689817172:job-definition/install-globalmodels:4
+    --job-definition arn:aws:batch:$REGION:887689817172:job-definition/install-globalmodels:$VERSION
 ```
