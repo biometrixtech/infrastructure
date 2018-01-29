@@ -80,13 +80,21 @@
           - 'python-pip'
           - 'python3-pip'
 
-      - name: 'Install aws-mfa tool'
+      - name: 'Install pip tools (python 2)'
         pip:
             name: '{{item}}'
             state: latest
         with_items:
           - 'aws-mfa'
           - 'awscli'
+          - 'boto3'
+
+      - name: 'Install pip tools (python 3)'
+        pip3:
+            name: '{{item}}'
+            state: latest
+        with_items:
+          - 'boto3'
 
       - name: 'Create AWS config directory'
         file:
