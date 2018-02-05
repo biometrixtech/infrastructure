@@ -95,6 +95,63 @@ Resources:
         Condition: "CreateFathomaiSslCertificateVirginiaValidation"
 
     ##########################################################################################################
+    ##  QUERYPOSTGRES
+    ##########################################################################################################
+
+    QuerypostgresExecutionRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "lambda.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+            Policies:
+              - PolicyName: "default"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Action: "ssm:DescribeParameters"
+                        Effect: "Allow"
+                        Resource: "*"
+
+                      - Action:
+                          - "ssm:GetParameters"
+                        Effect: "Allow"
+                        Resource: { "Fn::Sub": "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/preprocessing.${Environment}.*" }
+
+                      - Action:
+                          - "kms:Decrypt"
+                        Effect: "Allow"
+                        Resource:
+                          - "*" # TODO this should be segregated by environment somehow
+            RoleName: { "Fn::Sub": "infrastructure-${Environment}-querypostgres-${AWS::Region}" }
+
+    QuerypostgresLambda:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                S3Bucket: { "Fn::ImportValue": "InfrastructureBucketName" }
+                S3Key: { "Fn::Sub": "lambdas/infrastructure-${Environment}/execute_postgres_query.zip" }
+            Environment:
+                Variables:
+                    ENVIRONMENT: { Ref: "Environment" }
+            FunctionName: { "Fn::Sub": "infrastructure-${Environment}-querypostgres" }
+            Handler: "execute_postgres_query.handler"
+            Role: { "Fn::GetAtt" : [ "QuerypostgresExecutionRole", "Arn" ] }
+            Runtime: "python3.6"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "infrastructure-${Environment}-querypostgres" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "infrastructure" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Environment", Value: "querypostgres" }
+            Timeout: "30"
+
+    ##########################################################################################################
     ##  OUTPUTS
     ##########################################################################################################
 
@@ -111,3 +168,9 @@ Outputs:
         Value: { "Fn::Sub": "arn:aws:acm:us-east-1:${AWS::AccountId}:certificate/${FathomaiSslCertificateArnVirginia}" }
         Export:
             Name: { "Fn::Sub": "FathomaiSslCertificateArnVirginia-${Environment}" }
+
+    QuerypostgresLambdaArn:
+        Description: "The ARN of the query-postgres Lambda"
+        Value: { "Fn::GetAtt": [ "QuerypostgresLambda", "Arn" ] }
+        Export:
+            Name: { "Fn::Sub": "QuerypostgresLambdaArn-${Environment}" }

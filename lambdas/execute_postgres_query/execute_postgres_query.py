@@ -25,7 +25,7 @@ def load_parameters(keys, environment):
     return params
 
 
-def handler(event, context):
+def handler(event, _):
     """
     We expect an event with the following structure:
         {
@@ -46,6 +46,8 @@ def handler(event, context):
     """
     try:
         environment = event.get('Config', {}).get('ENVIRONMENT')
+        if environment != os.environ['ENVIRONMENT']:
+            raise Exception("Query attempted for wrong environment")
         config = load_parameters(['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'], environment)
         print("Connecting to '{}'".format(config['DB_HOST']))
         connection_string = "dbname='{name}' user='{user}' host='{host}' password='{password}'".format(
@@ -62,10 +64,11 @@ def handler(event, context):
         for query in event.get("Queries", []):
             try:
                 cursor.execute(query.get("Query"), query.get("Parameters", {}))
-                results.append(cursor.fetchall())
+                results.append(cursor.fetchall() if cursor.description is not None else None)
                 errors.append(None)
                 connection.commit()
             except psycopg2.Error as e:
+                print(e)
                 results.append(None)
                 errors.append(e.pgerror)
 

@@ -1,1 +1,7 @@
 *.zip
+
+# Exclude python libraries from VCS, people should install them themselves from pip_requirements
+*/*/
+
+# Except in execute_postgres_query, where the psycopg2 'library' is actually a special build for Lambda
+!execute_postgres_query/psycopg2/
