@@ -7,9 +7,9 @@ import argparse
 import time
 
 
-def register_job_definition():
+def register_job_definition(job_name, commands):
     res = batch_client.register_job_definition(
-        jobDefinitionName="initialise-efs",
+        jobDefinitionName=job_name,
         type="container",
         containerProperties={
             "image": "faisyl/alpine-nfs",
@@ -20,12 +20,8 @@ def register_job_definition():
                 " \
                     mkdir /net /net/efs ; \
                     mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=10,retrans=2 efs.internal:/ /net/efs 2>&1 ; \
-                    mkdir -p \
-                        /net/efs/preprocessing \
-                        /net/efs/globalmodels \
-                        /net/efs/globalscalers \
-                    ; \
-                "
+                    {commands}; \
+                ".format(commands=commands)
             ],
             "readonlyRootFilesystem": False,
             "privileged": True
@@ -35,16 +31,16 @@ def register_job_definition():
     return res['jobDefinitionArn']
 
 
-def get_latest_job_definition():
-    res = batch_client.describe_job_definitions(jobDefinitionName='initialise-efs')
+def get_latest_job_definition(job_name):
+    res = batch_client.describe_job_definitions(jobDefinitionName=job_name)
     revisions = sorted([(jd['revision'], jd['jobDefinitionArn']) for jd in res['jobDefinitions']])
     return revisions[-1][1]
 
 
-def submit_job(job_definition_arn):
+def submit_job(job_definition_arn, job_name):
     print("Submitting job")
     res = batch_client.submit_job(
-        jobName='initialise-efs',
+        jobName=job_name,
         jobQueue='preprocessing-{}-compute'.format(args.environment),
         jobDefinition=job_definition_arn,
     )
@@ -86,10 +82,21 @@ if __name__ == '__main__':
     batch_client = boto3.client('batch', region_name=args.region)
 
     if args.noregister:
-        jd_arn = get_latest_job_definition()
+        initialise_arn = get_latest_job_definition('maintenance-initialiseefs')
+        install_arn = get_latest_job_definition('maintenance-downloadmodels')
     else:
-        jd_arn = register_job_definition()
-    print('Running job {}'.format(jd_arn))
+        initialise_arn = register_job_definition(
+            'maintenance-initialiseefs',
+            'mkdir -p /net/efs/preprocessing /net/efs/globalmodels /net/efs/globalscalers'
+        )
+        install_arn = register_job_definition(
+            'maintenance-downloadmodels',
+            'aws s3 cp s3://biometrix-globalmodels/dev/grf_model_v2_0.h5 /net/efs/globalmodels/grf_model_v2_0.h5; ' +
+            'aws s3 cp s3://biometrix-globalmodels/dev/scaler_model_v2_0.pkl /net/efs/globalscalers/scaler_model_v2_0.pkl ;'
+        )
+    print('Running job {}'.format(initialise_arn))
 
-    j_id = submit_job(jd_arn)
-    await_job(j_id)
+    initialise_id = submit_job(initialise_arn, '00000000-0000-0000-0000-maintenance-initialiseefs')
+    await_job(initialise_id)
+    install_id = submit_job(install_arn, '00000000-0000-0000-0000-maintenance-downloadmodels')
+    await_job(install_id)
