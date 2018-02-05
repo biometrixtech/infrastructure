@@ -52,18 +52,8 @@ def get_boto3_resource(resource):
     )
 
 
-def upload_cf_stack(template):
-    print('Uploading stack')
-    s3_resource = get_boto3_resource('s3')
-    data = open(template, 'rb')
-    s3_full_path = '{}/{}'.format(s3_base_path, os.path.basename(template))
-    s3_resource.Bucket(s3_bucket).put_object(Key=s3_full_path, Body=data)
-    return s3_full_path
-
-
 def update_cf_stack(stack, s3_path):
-    print('Updating CloudFormation stack')
-
+    print('Updating stack {} using template {}'.format(stack.stack_name, s3_path))
     stack.update(
         TemplateURL='https://s3.amazonaws.com/{bucket}/{template}'.format(
             region=args.region,
@@ -135,15 +125,18 @@ def print(*args, **kwargs):
 
 
 def main():
-    s3_full_path = upload_cf_stack(args.template)
-    print('Uploaded template to s3://{}/{}'.format(s3_bucket, s3_full_path), colour=Fore.GREEN)
+    templates = map_templates(args.project, args.environment, args.service)
+    s3_resource = get_boto3_resource('s3')
+    for source, dest in templates:
+        s3_resource.Bucket(s3_bucket).put_object(Key=dest, Body=open(source, 'rb'))
+        print('Uploaded template from {} to {}'.format(source, dest), colour=Fore.GREEN)
 
     if not args.noupdate and args.stack:
         cf_resource = get_boto3_resource('cloudformation')
         stack = cf_resource.Stack(args.stack)
 
         try:
-            update_cf_stack(stack, s3_full_path)
+            update_cf_stack(stack, templates[-1][1])
         except ClientError as e:
             if 'No updates are to be performed' in str(e):
                 print('No updates are to be performed', colour=Fore.YELLOW)
@@ -154,17 +147,57 @@ def main():
 
         exit(await_stack_update(stack))
 
+def map_templates(project, environment, service):
+    if service in ['vpc', 'apigateway']:
+        # These services, in any project, are drawn from the infrastructure repo
+        project = 'infrastructure'
+        return [(
+            '/vagrant/Infrastructure/cloudformation/{service}.yaml'.format(service=service),
+            'cloudformation/infrastructure-{environment}/{service}.yaml'.format(environment=environment, service=service),
+        )]
+    else:
+        base_paths = {
+            'alerts': '/vagrant/Alerts/cloudformation',
+            'infrastructure': '/vagrant/Infrastructure/cloudformation',
+            'preprocessing': '/vagrant/PreProcessing/cloudformation',
+            'statsapi': '/vagrant/StatsAPI/serverless',
+            'users': '/vagrant/Users/cloudformation',
+        }
+        valid_services = {
+            'alerts': ['pipeline'],
+            'infrastructure': [],
+            'preprocessing': ['compute', 'ingest', 'monitoring', 'pipeline'],
+            'statsapi': [],
+            'users': [],
+        }
+        if project in valid_services:
+            if service in valid_services[project] or service == 'environment':
+                templates = [(
+                    '{basepath}/{project}-{service}.yaml'.format(basepath=base_paths[project], project=project, service=service),
+                    'cloudformation/{project}-{environment}/{project}-{service}.yaml'.format(project=project, environment=environment, service=service)
+                )]
+                if service == 'environment' and project != 'infrastructure':
+                    # For non-infrastructure projects, updating the environment means updating all the child stacks
+                    templates += [t for s in valid_services[project] for t in map_templates(project, environment, s)]
+                return templates
+            else:
+                print('Invalid service for project', colour=Fore.RED)
+                exit(1)
+        else:
+                print('Invalid project', colour=Fore.RED)
+                exit(1)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Upload a template to S3, and maybe update a CF stack using it')
-    parser.add_argument('template',
-                        type=str,
-                        help='the name of a template file')
+    # parser.add_argument('template',
+    #                     type=str,
+    #                     help='the name of a template file')
     parser.add_argument('stack',
                         type=str,
                         nargs='?',
                         default='',
-                        help='the name of a CF stack')
+                        help='the name of a CF stack to update')
     parser.add_argument('--region', '-r',
                         type=str,
                         choices=['us-east-1', 'us-west-2'],
@@ -177,6 +210,12 @@ if __name__ == '__main__':
                         type=str,
                         choices=['infra', 'dev', 'qa', 'production'],
                         help='Environment')
+    parser.add_argument('--service', '-s',
+                        type=str,
+                        help='Service')
+    parser.add_argument('--template-file',
+                        type=str,
+                        help='Override template file')
     parser.add_argument('--no-update',
                         action='store_true',
                         dest='noupdate',

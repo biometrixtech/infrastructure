@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 # Zip and upload a Lambda bundle
+from __future__ import print_function
+from colorama import Fore, Back, Style
+import __builtin__
+import argparse
+import boto3
+import os
 import shutil
 import zipfile
-
-import boto3
-import argparse
-import os
-
-template_s3_bucket = 'biometrix-infrastructure'
-template_s3_path = 'lambdas/'
 
 
 def get_boto3_resource(resource):
@@ -19,10 +18,12 @@ def get_boto3_resource(resource):
 
 
 def upload_bundle(bundle):
-    print('Uploading bundle')
+    s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
+    s3_path = 'lambdas/{}-{}/{}'.format(args.project, args.environment, os.path.basename(bundle))
     s3_resource = get_boto3_resource('s3')
     data = open(bundle, 'rb')
-    s3_resource.Bucket(args.bucket + '-' + args.region).put_object(Key=template_s3_path + os.path.basename(bundle), Body=data)
+    s3_resource.Bucket(s3_bucket).put_object(Key=s3_path, Body=data)
+    print('Uploaded {} to s3://{}/{}'.format(bundle, s3_bucket, s3_path))
 
 
 def zip_bundle(filename):
@@ -37,18 +38,37 @@ def zip_bundle(filename):
     return output_filename + '.zip'
 
 
+def print(*pargs, **kwargs):
+    if 'colour' in kwargs:
+        __builtin__.print(kwargs['colour'], end="")
+        del kwargs['colour']
+
+        end = kwargs.get('end', '\n')
+        kwargs['end'] = ''
+        __builtin__.print(*pargs, **kwargs)
+
+        __builtin__.print(Style.RESET_ALL, end=end)
+
+    else:
+        __builtin__.print(*pargs, **kwargs)
+
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Upload a Lambda bundle to S3')
+    parser = argparse.ArgumentParser(description='Zip and upload a Lambda bundle to S3')
     parser.add_argument('bundle',
                         type=str,
-                        help='the name of a Lambda python file')
-    parser.add_argument('--bucket', '-b',
-                        type=str,
-                        default=template_s3_bucket,
-                        help='S3 Bucket')
+                        help='the name of a Lambda python file or directory')
     parser.add_argument('--region', '-r',
                         type=str,
                         help='AWS Region')
+    parser.add_argument('--project', '-p',
+                        type=str,
+                        choices=['preprocessing', 'infrastructure', 'statsapi', 'alerts', 'users'],
+                        help='The project being deployed')
+    parser.add_argument('--environment', '-e',
+                        type=str,
+                        choices=['infra', 'dev', 'qa', 'production'],
+                        help='Environment')
 
     args = parser.parse_args()
 
