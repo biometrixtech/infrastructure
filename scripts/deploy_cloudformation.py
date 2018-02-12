@@ -98,10 +98,10 @@ def await_stack_update(stack):
                               and e.resource_status in failure_resource_statuses
                               and e.resource_status_reason is not None]
             print('\n'.join([e.resource_status_reason for e in failure_events]), colour=Fore.RED)
-            return False
+            return 1
         elif status in success_statuses:
             print("\rStack status: {}                        ".format(status), colour=Fore.GREEN)
-            return True
+            return 0
         else:
             print("\rStack status: {} ".format(status), colour=Fore.CYAN, end="")
             spinner.start()
