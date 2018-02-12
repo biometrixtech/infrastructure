@@ -136,7 +136,7 @@ def main():
         stack = cf_resource.Stack(args.stack)
 
         try:
-            update_cf_stack(stack, templates[-1][1])
+            update_cf_stack(stack, templates[0][1])
         except ClientError as e:
             if 'No updates are to be performed' in str(e):
                 print('No updates are to be performed', colour=Fore.YELLOW)
