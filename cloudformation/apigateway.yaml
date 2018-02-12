@@ -246,6 +246,7 @@ Resources:
             Stage: 'v1'
         DependsOn:
           - "ApiDeployment"
+          - "CustomDomainName"
 
     CustomDomainCnameRecords:
         Type: "AWS::Route53::RecordSet"
