@@ -87,7 +87,11 @@ def get_postgres_connection():
         password=config['DB_PASSWORD'],
         name=config['DB_NAME'],
     )
-    connection = psycopg2.connect(connection_string, cursor_factory=psycopg2.extras.RealDictCursor)
+    connection = psycopg2.connect(
+        connection_string,
+        cursor_factory=psycopg2.extras.RealDictCursor,
+        connect_timeout=5
+    )
     return connection
 
 
