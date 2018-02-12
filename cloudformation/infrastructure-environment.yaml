@@ -30,6 +30,16 @@ Parameters:
         Type: "String"
         Default: ""
 
+    QuerypostgresVpcId:
+        Type: "String"
+        Default: ""
+        Description: "The ID of the VPC to launch the querypostgres lambda functions in"
+
+    QuerypostgresSubnetIds:
+        Type: "CommaDelimitedList"
+        Default: ""
+        Description: "The IDs of the subnets to launch the querypostgres lambda functions in"
+
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
@@ -40,14 +50,21 @@ Metadata:
             Parameters:
               - "FathomaiSslCertificateArnVirginia"
               - "FathomaiSslCertificateVirginiaValidation"
+          - Label: { default: "querypostgres" }
+            Parameters:
+              - "QuerypostgresVpcId"
+              - "QuerypostgresSubnetIds"
 
         ParameterLabels:
             Environment: { default: "Environment" }
             FathomaiSslCertificateArnVirginia: { default: "ACM Certificate ID (us-east-1)" }
             FathomaiSslCertificateVirginiaValidation: { default: "ACM CNAME validation (us-east-1)" }
+            QuerypostgresVpcId: { default: "VPC ID" }
+            QuerypostgresSubnetIds: { default: "Subnet IDs" }
 
 Conditions:
     CreateFathomaiSslCertificateVirginiaValidation: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "FathomaiSslCertificateVirginiaValidation" }, "" ] } ] }
+    QuerypostgresCreateVpc: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "QuerypostgresVpcId" }, "" ] } ] }
 
 Resources:
 
@@ -131,6 +148,26 @@ Resources:
                           - "*" # TODO this should be segregated by environment somehow
             RoleName: { "Fn::Sub": "infrastructure-${Environment}-querypostgres-${AWS::Region}" }
 
+    QuerypostgresVpcSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupDescription: "Security group which allows access for AWS Lambda"
+            GroupName: { "Fn::Sub": "preprocessing-${Environment}-apigateway-execute" }
+            SecurityGroupIngress:
+                # All ports open from internal access
+              - IpProtocol: "tcp"
+                FromPort: "0"
+                ToPort: "65535"
+                CidrIp: "0.0.0.0/0"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "infrastructure-${Environment}-querypostgres" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "infrastructure" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "querypostgres" }
+            VpcId: { Ref: "QuerypostgresVpcId" }
+        Condition: "QuerypostgresCreateVpc"
+
     QuerypostgresLambda:
         Type: "AWS::Lambda::Function"
         Properties:
@@ -153,6 +190,14 @@ Resources:
             Timeout: "30"
             TracingConfig:
                 Mode: "Active"
+            VpcConfig: { "Fn::If": [
+                "QuerypostgresCreateVpc",
+                {
+                    SubnetIds: { Ref: "QuerypostgresSubnetIds" },
+                    SecurityGroupIds: [ { Ref: "QuerypostgresVpcSecurityGroup" } ]
+                },
+                { Ref: "AWS::NoValue" }
+            ]}
 
     QuerypostgresExecutionPolicy:
         Type: "AWS::IAM::ManagedPolicy"
