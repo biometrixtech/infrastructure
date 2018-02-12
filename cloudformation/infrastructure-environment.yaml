@@ -151,6 +151,22 @@ Resources:
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Environment", Value: "querypostgres" }
             Timeout: "30"
+            TracingConfig:
+                Mode: "Active"
+
+    QuerypostgresExecutionPolicy:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            Description: "Allows entities to query the Postgres databaase"
+            ManagedPolicyName: { "Fn::Sub": "infrastructure-${Environment}-querypostgres" }
+            Path: "/"
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Action:
+                      - "lambda:InvokeFunction"
+                    Effect: "Allow"
+                    Resource: { "Fn::GetAtt": [ "QuerypostgresLambda", "Arn" ] }
 
     ##########################################################################################################
     ##  OUTPUTS
