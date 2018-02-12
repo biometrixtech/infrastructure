@@ -7,7 +7,11 @@ import os
 import json
 from datetime import datetime, date
 
+from aws_xray_sdk.core import xray_recorder, patch_all
+patch_all()
 
+
+@xray_recorder.capture('execute_postgres_query.load_parameters')
 def load_parameters(keys, environment):
     """
     Load configuration from SSM
@@ -25,6 +29,7 @@ def load_parameters(keys, environment):
     return params
 
 
+@xray_recorder.capture('execute_postgres_query.handler')
 def handler(event, _):
     """
     We expect an event with the following structure:
@@ -48,15 +53,8 @@ def handler(event, _):
         environment = event.get('Config', {}).get('ENVIRONMENT')
         if environment != os.environ['ENVIRONMENT']:
             raise Exception("Query attempted for wrong environment")
-        config = load_parameters(['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'], environment)
-        print("Connecting to '{}'".format(config['DB_HOST']))
-        connection_string = "dbname='{name}' user='{user}' host='{host}' password='{password}'".format(
-            host=config['DB_HOST'],
-            user=config['DB_USER'],
-            password=config['DB_PASSWORD'],
-            name=config['DB_NAME'],
-        )
-        connection = psycopg2.connect(connection_string, cursor_factory=psycopg2.extras.RealDictCursor)
+
+        connection = get_postgres_connection()
         cursor = connection.cursor()
 
         results = []
@@ -77,6 +75,20 @@ def handler(event, _):
 
     except:
         raise
+
+
+@xray_recorder.capture('execute_postgres_query.get_postgres_connection')
+def get_postgres_connection():
+    config = load_parameters(['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'], os.environ['ENVIRONMENT'])
+    print("Connecting to '{}'".format(config['DB_HOST']))
+    connection_string = "dbname='{name}' user='{user}' host='{host}' password='{password}'".format(
+        host=config['DB_HOST'],
+        user=config['DB_USER'],
+        password=config['DB_PASSWORD'],
+        name=config['DB_NAME'],
+    )
+    connection = psycopg2.connect(connection_string, cursor_factory=psycopg2.extras.RealDictCursor)
+    return connection
 
 
 def json_serial(obj):
