@@ -63,7 +63,14 @@ if __name__ == '__main__':
                         help='AWS Region')
     parser.add_argument('--project', '-p',
                         type=str,
-                        choices=['preprocessing', 'infrastructure', 'statsapi', 'alerts', 'users'],
+                        choices=[
+                            'alerts',
+                            'infrastructure',
+                            'hardware',
+                            'preprocessing',
+                            'statsapi',
+                            'users',
+                        ],
                         help='The project being deployed')
     parser.add_argument('--environment', '-e',
                         type=str,

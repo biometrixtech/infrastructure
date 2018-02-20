@@ -159,6 +159,7 @@ def map_templates(project, environment, service):
         base_paths = {
             'alerts': '/vagrant/Alerts/cloudformation',
             'infrastructure': '/vagrant/Infrastructure/cloudformation',
+            'hardware': '/vagrant/Hardware/cloudformation',
             'preprocessing': '/vagrant/PreProcessing/cloudformation',
             'statsapi': '/vagrant/StatsAPI/serverless',
             'users': '/vagrant/Users/cloudformation',
@@ -166,6 +167,7 @@ def map_templates(project, environment, service):
         valid_services = {
             'alerts': ['pipeline'],
             'infrastructure': [],
+            'hardware': [],
             'preprocessing': ['compute', 'ingest', 'monitoring', 'pipeline'],
             'statsapi': [],
             'users': [],
@@ -204,7 +206,14 @@ if __name__ == '__main__':
                         help='AWS Region')
     parser.add_argument('--project', '-p',
                         type=str,
-                        choices=['preprocessing', 'infrastructure', 'statsapi', 'alerts', 'users'],
+                        choices=[
+                            'alerts',
+                            'infrastructure',
+                            'hardware',
+                            'preprocessing',
+                            'statsapi',
+                            'users',
+                        ],
                         help='The project being deployed')
     parser.add_argument('--environment', '-e',
                         type=str,
