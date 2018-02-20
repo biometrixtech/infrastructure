@@ -236,3 +236,9 @@ Outputs:
         Value: { "Fn::GetAtt": [ "QuerypostgresLambda", "Arn" ] }
         Export:
             Name: { "Fn::Sub": "QuerypostgresLambdaArn-${Environment}" }
+
+    QuerypostgresPolicyArn:
+        Description: "The ARN of the query-postgres IAM Policy"
+        Value: { Ref: "QuerypostgresExecutionPolicy" }
+        Export:
+            Name: { "Fn::Sub": "QuerypostgresPolicyArn-${Environment}" }
