@@ -1,5 +1,7 @@
 # Installation
 
+NOTE: this is all out-of-date as of March 2018.
+
 ## Setting up a new environment / region
 
 ### Infrastructure
@@ -13,14 +15,19 @@ TODO
 This creates the S3 bucket `biometrix-preprocessing-infrastructure-<REGION>`.  Now upload the SFN-Batch custom integration lambda and create a new CF stack `preprocessing-aws-sfn-batch` 
 
 ```shell
-./deploy_lambda.py --region us-west-2 /vagrant/aws-sfn-batch/lambdas/sfn_batch.py
+./deploy_lambda.py \
+    --region us-west-2 \
+    --project preprocessing \
+    --environment <env>
+    /vagrant/aws-sfn-batch/lambdas/sfn_batch.py
 
-./deploy_cloudformation.py --region us-west-2 /vagrant/aws-sfn-batch/cloudformation/sfn-batch.template
+./deploy_cloudformation.py \
+    --region us-west-2 /vagrant/aws-sfn-batch/cloudformation/sfn-batch.template
 
 aws cloudformation create-stack \
     --region us-west-2 \
     --stack-name preprocessing-aws-sfn-batch \
-    --template-url https://s3.amazonaws.com/biometrix-preprocessing-infrastructure-<REGION>/cloudformation/sfn-batch.template \
+    --template-url https://s3.amazonaws.com/biometrix-infrastructure-<REGION>/cloudformation/sfn-batch.template \
     --parameters '[{"ParameterKey":"S3Bucket","ParameterValue":"biometrix-preprocessing-infrastructure-<REGION>"},{"ParameterKey":"Project","ParameterValue":"preprocessing"}]' \
     --capabilities CAPABILITY_NAMED_IAM \
     --tags '[{"Key":"Project","Value":"preprocessing"},{"Key":"Environment","Value":"infra"}]'

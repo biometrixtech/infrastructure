@@ -21,6 +21,8 @@ To deploy a new version of the Pipeline to an environment
 STACK_NAME=aws cloudformation describe-stack-resource --stack-name preprocessing-dev --logical-resource-id PipelineCluster | jq -r '.StackResourceDetail.PhysicalResourceId | split("/")[1]'`
 scripts/deploy_cloudfromation.py \
 	--region us-west-2 \
-	/vagrant/Infrastructure/scripts/preprocessing-pipeline.yaml \
+	--service preprocessing \
+	--environment <env> \
+	--service pipeline \
 	$STACK_NAME	
 ```
