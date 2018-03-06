@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Get a matrix of daily spends by Project and Environment
 # Copyright 2018 Melon Software Ltd (UK).  Used under license
 from __future__ import print_function

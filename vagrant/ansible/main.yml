@@ -95,6 +95,7 @@
             state: latest
         with_items:
           - 'boto3'
+          - 'pandas' # Needed for get_cost_breakdown.py
 
       - name: 'Create AWS config directory'
         file:
