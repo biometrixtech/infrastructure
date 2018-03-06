@@ -1,17 +1,9 @@
 #!/usr/bin/env python
 # Find the Batch logs for a particular execution
 from __future__ import print_function
-from botocore.exceptions import ClientError
-from colorama import Fore, Back, Style
 from datetime import datetime
-import __builtin__
 import argparse
 import boto3
-import os
-import sys
-import threading
-import time
-
 
 
 def get_boto3_client(resource):
@@ -43,8 +35,14 @@ def describe_jobs(jobs):
 
 
 def main():
-    all_jobs_with_status = list_jobs(args.queue, args.status)
-    matching_jobs = [j for j in all_jobs_with_status if args.sensorfile in j['jobName'] and args.task in j['jobName']]
+    def filter_function(j):
+        if args.sensorfile != '' and args.sensorfile not in j['jobName']:
+            return False
+        if args.task != '' and args.task not in j['jobName']:
+            return False
+        return True
+
+    matching_jobs = filter(filter_function, list_jobs(args.queue, args.status))
     job_details = describe_jobs([j['jobId'] for j in matching_jobs])
 
     jobs_by_startdate = []
@@ -67,21 +65,23 @@ if __name__ == '__main__':
     parser.add_argument('--region', '-r',
                         type=str,
                         choices=['us-east-1', 'us-west-2'],
+                        default='us-west-2',
                         help='AWS Region')
     parser.add_argument('queue',
                         type=str,
                         help='The queue to search')
-    parser.add_argument('sensorfile',
-                        type=str,
-                        help='Sensor file filter')
-    parser.add_argument('task',
-                        type=str,
-                        help='Task filter')
-    parser.add_argument('--status',
+    parser.add_argument('status',
                         type=str,
                         choices=['SUCCEEDED', 'FAILED'],
-                        default='SUCCEEDED',
                         help='Job status filter')
+    parser.add_argument('--sensorfile',
+                        type=str,
+                        default='',
+                        help='Sensor file filter')
+    parser.add_argument('--task',
+                        type=str,
+                        default='',
+                        help='Task filter')
     parser.add_argument('--count',
                         type=int,
                         default=1,
