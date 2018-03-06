@@ -19,7 +19,7 @@ def get_boto3_resource(resource):
 
 def upload_bundle(bundle):
     s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
-    s3_path = 'lambdas/{}-{}/{}'.format(args.project, args.environment, os.path.basename(bundle))
+    s3_path = 'lambdas/{}-{}/{}'.format(args.service, args.environment, os.path.basename(bundle))
     s3_resource = get_boto3_resource('s3')
     data = open(bundle, 'rb')
     s3_resource.Bucket(s3_bucket).put_object(Key=s3_path, Body=data)
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('--region', '-r',
                         type=str,
                         help='AWS Region')
-    parser.add_argument('--project', '-p',
+    parser.add_argument('--service',
                         type=str,
                         choices=[
                             'alerts',
@@ -71,7 +71,7 @@ if __name__ == '__main__':
                             'statsapi',
                             'users',
                         ],
-                        help='The project being deployed')
+                        help='The service being deployed')
     parser.add_argument('--environment', '-e',
                         type=str,
                         choices=['infra', 'dev', 'qa', 'production'],

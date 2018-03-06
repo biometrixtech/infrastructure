@@ -125,7 +125,7 @@ def print(*args, **kwargs):
 
 
 def main():
-    templates = map_templates(args.project, args.environment, args.service)
+    templates = map_templates(args.service, args.environment, args.subservice)
     s3_resource = get_boto3_resource('s3')
     for source, dest in templates:
         s3_resource.Bucket(s3_bucket).put_object(Key=dest, Body=open(source, 'rb'))
@@ -147,13 +147,12 @@ def main():
 
         exit(await_stack_update(stack))
 
-def map_templates(project, environment, service):
-    if service in ['vpc', 'apigateway']:
-        # These services, in any project, are drawn from the infrastructure repo
-        project = 'infrastructure'
+def map_templates(service, environment, subservice):
+    if subservice in ['vpc', 'apigateway']:
+        # These subservices, in any service, are drawn from the infrastructure repo
         return [(
-            '/vagrant/Infrastructure/cloudformation/{service}.yaml'.format(service=service),
-            'cloudformation/infrastructure-{environment}/{service}.yaml'.format(environment=environment, service=service),
+            '/vagrant/Infrastructure/cloudformation/{subservice}.yaml'.format(subservice=subservice),
+            'cloudformation/infrastructure-{environment}/{subservice}.yaml'.format(environment=environment, subservice=subservice),
         )]
     else:
         base_paths = {
@@ -164,7 +163,7 @@ def map_templates(project, environment, service):
             'statsapi': '/vagrant/StatsAPI/serverless',
             'users': '/vagrant/Users/cloudformation',
         }
-        valid_services = {
+        valid_subservices = {
             'alerts': ['pipeline'],
             'infrastructure': [],
             'hardware': [],
@@ -172,21 +171,21 @@ def map_templates(project, environment, service):
             'statsapi': [],
             'users': [],
         }
-        if project in valid_services:
-            if service in valid_services[project] or service == 'environment':
+        if service in valid_subservices:
+            if subservice in valid_subservices[service] or subservice == 'environment':
                 templates = [(
-                    '{basepath}/{project}-{service}.yaml'.format(basepath=base_paths[project], project=project, service=service),
-                    'cloudformation/{project}-{environment}/{project}-{service}.yaml'.format(project=project, environment=environment, service=service)
+                    '{basepath}/{service}-{subservice}.yaml'.format(basepath=base_paths[service], service=service, subservice=subservice),
+                    'cloudformation/{service}-{environment}/{service}-{subservice}.yaml'.format(service=service, environment=environment, subservice=subservice)
                 )]
-                if service == 'environment' and project != 'infrastructure':
-                    # For non-infrastructure projects, updating the environment means updating all the child stacks
-                    templates += [t for s in valid_services[project] for t in map_templates(project, environment, s)]
+                if subservice == 'environment' and service != 'infrastructure':
+                    # For non-infrastructure services, updating the environment means updating all the child stacks
+                    templates += [t for s in valid_subservices[service] for t in map_templates(service, environment, s)]
                 return templates
             else:
-                print('Invalid service for project', colour=Fore.RED)
+                print('Invalid subservice for service', colour=Fore.RED)
                 exit(1)
         else:
-                print('Invalid project', colour=Fore.RED)
+                print('Invalid service', colour=Fore.RED)
                 exit(1)
 
 
@@ -204,7 +203,7 @@ if __name__ == '__main__':
                         type=str,
                         choices=['us-east-1', 'us-west-2'],
                         help='AWS Region')
-    parser.add_argument('--project', '-p',
+    parser.add_argument('--service',
                         type=str,
                         choices=[
                             'alerts',
@@ -214,12 +213,12 @@ if __name__ == '__main__':
                             'statsapi',
                             'users',
                         ],
-                        help='The project being deployed')
+                        help='The service being deployed')
     parser.add_argument('--environment', '-e',
                         type=str,
                         choices=['infra', 'dev', 'qa', 'production'],
                         help='Environment')
-    parser.add_argument('--service', '-s',
+    parser.add_argument('--subservice',
                         type=str,
                         help='Service')
     parser.add_argument('--template-file',
@@ -233,5 +232,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
-    s3_base_path = 'cloudformation/{}-{}'.format(args.project, args.environment)
+    s3_base_path = 'cloudformation/{}-{}'.format(args.service, args.environment)
     main()
