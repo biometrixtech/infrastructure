@@ -217,3 +217,13 @@ Resources:
             Type: "CNAME"
             TTL: "600"
             ResourceRecords: [ { "Fn::GetAtt": [ "CustomDomainName", "DistributionDomainName" ] } ]
+
+    ApiDomainBasePathMapping:
+        Type: "AWS::ApiGateway::BasePathMapping"
+        Properties:
+            BasePath: { Ref: "Project" }
+            DomainName: { "Fn::Sub": "apis.${Environment}.fathomai.com" }
+            RestApiId: { Ref: "RestApi" }
+            Stage: 'v1'
+        DependsOn:
+          - "ApiDeployment"

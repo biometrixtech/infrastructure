@@ -112,6 +112,26 @@ Resources:
         Condition: "CreateFathomaiSslCertificateVirginiaValidation"
 
     ##########################################################################################################
+    ##  API GATEWAY
+    ##########################################################################################################
+
+    ApiCustomDomainName:
+        Type: 'AWS::ApiGateway::DomainName'
+        Properties:
+            DomainName: { "Fn::Sub": "apis.${Environment}.fathomai.com" }
+            CertificateArn: { "Fn::Sub": "arn:aws:acm:us-east-1:${AWS::AccountId}:certificate/${FathomaiSslCertificateArnVirginia}" }
+
+    ApisCustomDomainCnameRecords:
+        Type: "AWS::Route53::RecordSet"
+        Properties:
+            HostedZoneId: { "Fn::ImportValue": { "Fn::Sub": "FathomaiHostedZoneId-${Environment}" } }
+            Comment: "Stats API"
+            Name: { "Fn::Sub": "apis.${Environment}.fathomai.com." }
+            Type: "CNAME"
+            TTL: "600"
+            ResourceRecords: [ { "Fn::GetAtt": [ "ApiCustomDomainName", "DistributionDomainName" ] } ]
+
+    ##########################################################################################################
     ##  QUERYPOSTGRES
     ##########################################################################################################
 
