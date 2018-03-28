@@ -20,10 +20,10 @@ def get_boto3_resource(resource):
 def upload_bundle(bundle):
     s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
     s3_path = 'lambdas/{}-{}/{}'.format(args.service, args.environment, os.path.basename(bundle))
+    print('Uploading {} to s3://{}/{}'.format(bundle, s3_bucket, s3_path))
     s3_resource = get_boto3_resource('s3')
     data = open(bundle, 'rb')
     s3_resource.Bucket(s3_bucket).put_object(Key=s3_path, Body=data)
-    print('Uploaded {} to s3://{}/{}'.format(bundle, s3_bucket, s3_path))
 
 
 def zip_bundle(filename):
