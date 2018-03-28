@@ -90,9 +90,10 @@
           - 'boto3'
 
       - name: 'Install pip tools (python 3)'
-        pip3:
+        pip:
             name: '{{item}}'
             state: latest
+            executable: 'pip3'
         with_items:
           - 'boto3'
           - 'pandas' # Needed for get_cost_breakdown.py
