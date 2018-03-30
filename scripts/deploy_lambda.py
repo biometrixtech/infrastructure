@@ -17,9 +17,21 @@ def get_boto3_resource(resource):
     )
 
 
+def update_function(bundle, lambda_function_name):
+    s3_bucket, s3_path = get_s3_paths(bundle)
+    s3_path += '.zip'
+    lambda_function_name = lambda_function_name.format(environment=args.environment)
+    print('Updating function {} with s3://{}/{}'.format(lambda_function_name, s3_bucket, s3_path))
+    boto3.client('lambda', region_name=args.region).update_function_code(
+        FunctionName=lambda_function_name,
+        S3Bucket=s3_bucket,
+        S3Key=s3_path,
+        Publish=True,
+    )
+
+
 def upload_bundle(bundle):
-    s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
-    s3_path = 'lambdas/{}-{}/{}'.format(args.service, args.environment, os.path.basename(bundle))
+    s3_bucket, s3_path = get_s3_paths(bundle)
     print('Uploading {} to s3://{}/{}'.format(bundle, s3_bucket, s3_path))
     s3_resource = get_boto3_resource('s3')
     data = open(bundle, 'rb')
@@ -36,6 +48,27 @@ def zip_bundle(filename):
         output_filename = filename
         shutil.make_archive(output_filename, 'zip', filename)
     return output_filename + '.zip'
+
+
+def map_bundle(service, subservice):
+    bundles = {
+        ('alerts', 'apigateway'): ('/vagrant/Alerts/apigateway', 'alerts-{environment}-apigateway-execute'),
+        ('hardware', 'apigateway'): ('/vagrant/Hardware/apigateway', 'hardware-{environment}-apigateway-execute'),
+        ('preprocessing', 'apigateway'): ('/vagrant/PreProcessing/apigateway', 'preprocessing-{environment}-apigateway-execute'),
+        ('statsapi', 'apigateway'): ('/vagrant/StatsAPI/apigateway', 'statsapi-{environment}-apigateway-execute'),
+        ('users', 'apigateway'): ('/vagrant/Users/apigateway', 'users-{environment}-apigateway-execute'),
+    }
+    if (service, subservice) in bundles:
+        return bundles[(service, subservice)]
+    else:
+        print('Unrecognised service/subservice combination', colour=Fore.RED)
+        exit(1)
+
+
+def get_s3_paths(bundle):
+    s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
+    s3_path = 'lambdas/{}-{}/{}'.format(args.service, args.environment, os.path.basename(bundle))
+    return s3_bucket, s3_path
 
 
 def print(*pargs, **kwargs):
@@ -55,13 +88,10 @@ def print(*pargs, **kwargs):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Zip and upload a Lambda bundle to S3')
-    parser.add_argument('bundle',
-                        type=str,
-                        help='the name of a Lambda python file or directory')
-    parser.add_argument('--region', '-r',
+    parser.add_argument('region',
                         type=str,
                         help='AWS Region')
-    parser.add_argument('--service',
+    parser.add_argument('service',
                         type=str,
                         choices=[
                             'alerts',
@@ -72,13 +102,25 @@ if __name__ == '__main__':
                             'users',
                         ],
                         help='The service being deployed')
-    parser.add_argument('--environment', '-e',
+    parser.add_argument('environment',
                         type=str,
                         choices=['infra', 'dev', 'qa', 'production'],
                         help='Environment')
+    parser.add_argument('subservice',
+                        type=str,
+                        choices=['apigateway'],
+                        help='Subservice')
+    parser.add_argument('--no-update',
+                        action='store_true',
+                        dest='noupdate',
+                        help='Skip updating lambda function')
 
     args = parser.parse_args()
 
-    zip_filename = zip_bundle(args.bundle)
+    bundle_filename, function_name = map_bundle(args.service, args.subservice)
+
+    zip_filename = zip_bundle(bundle_filename)
     upload_bundle(zip_filename)
 
+    if not args.noupdate:
+        update_function(bundle_filename, function_name)

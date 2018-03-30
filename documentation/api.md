@@ -21,14 +21,10 @@ The Hardware, Preprocessing, Alerts and User APIs all use Lambda functions which
 Edits to application code should be made in the relevant codebase and committed to GitHub.  The infrastructure script:
 
 ```
-deploy_lambda.py \
-    --region <region> \
-    --service <service> \
-    --environment <env> \
-    /path/to/lambda/code/folder
+deploy_lambda.py <region> <service> <environment> apigateway --no-update
 ```
 
-will zip the current working copy and deploy it to S3.  The resulting .zip file can also be used to update the lambda function directly.
+will zip the current working copy and deploy it to S3.  Omitting `--no-update` will cause the Lambda function code to be updated with the new bundle.
 
 Having deployed a new zip archive, the script:
 
@@ -41,12 +37,4 @@ deploy_cloudformation.py \
     <service>-<env>
 ```
 
-Will update the CloudFormation stack and should deploy the new code to the lambda function.  If that update does not work (eg if CloudFormation thinks that the Lambda function does not need updating), you can update the function manually:
-
-```
-aws lambda update-function-code \
-    --function-name <service>-<env>-apigateway-execute
-    --zip-file fileb://path/to/lambda/code/zipfile
-```
-
-Alternatively, small edits can be made to the Lambda code directly in the AWS Console.  These edits __must__ be copied back into the git codebase and committed, or they _will_ be lost in future updates.
+Will update the CloudFormation stack and should deploy the new code to the lambda function as part of the deployment, along with any other changes (eg adding environment variables) or adding other resources).

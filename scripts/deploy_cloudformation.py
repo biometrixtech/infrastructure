@@ -160,7 +160,7 @@ def map_templates(service, environment, subservice):
             'infrastructure': '/vagrant/Infrastructure/cloudformation',
             'hardware': '/vagrant/Hardware/cloudformation',
             'preprocessing': '/vagrant/PreProcessing/cloudformation',
-            'statsapi': '/vagrant/StatsAPI/serverless',
+            'statsapi': '/vagrant/StatsAPI/cloudformation',
             'users': '/vagrant/Users/cloudformation',
         }
         valid_subservices = {
@@ -191,19 +191,11 @@ def map_templates(service, environment, subservice):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Upload a template to S3, and maybe update a CF stack using it')
-    # parser.add_argument('template',
-    #                     type=str,
-    #                     help='the name of a template file')
-    parser.add_argument('stack',
-                        type=str,
-                        nargs='?',
-                        default='',
-                        help='the name of a CF stack to update')
-    parser.add_argument('--region', '-r',
+    parser.add_argument('region',
                         type=str,
                         choices=['us-east-1', 'us-west-2'],
                         help='AWS Region')
-    parser.add_argument('--service',
+    parser.add_argument('service',
                         type=str,
                         choices=[
                             'alerts',
@@ -214,16 +206,18 @@ if __name__ == '__main__':
                             'users',
                         ],
                         help='The service being deployed')
-    parser.add_argument('--environment', '-e',
+    parser.add_argument('environment',
                         type=str,
                         choices=['infra', 'dev', 'qa', 'production'],
                         help='Environment')
-    parser.add_argument('--subservice',
+    parser.add_argument('subservice',
                         type=str,
                         help='Service')
-    parser.add_argument('--template-file',
+    parser.add_argument('stack',
                         type=str,
-                        help='Override template file')
+                        nargs='?',
+                        default='',
+                        help='the name of a CF stack to update')
     parser.add_argument('--no-update',
                         action='store_true',
                         dest='noupdate',
