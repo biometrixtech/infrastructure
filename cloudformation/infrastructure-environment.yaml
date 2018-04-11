@@ -31,6 +31,12 @@ Parameters:
         Type: "String"
         Default: ""
 
+    SslCertificateValidated:
+        Description: "Whether the SSL certificate has been validated"
+        Type: "String"
+        AllowedValues: [ "true", "false" ]
+        Default: "false"
+
     QuerypostgresVpcId:
         Type: "String"
         Default: ""
@@ -41,16 +47,23 @@ Parameters:
         Default: ""
         Description: "The IDs of the subnets to launch the querypostgres lambda functions in"
 
+Mappings:
+    TemplateVersion:
+        Self: { Commit: "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
+        Infrastructure: { Commit: "884e29d8a90da73844b6702bcf8b5a60e87ecf58" }
+
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
           - Label: { default: "Environment" }
             Parameters:
               - "Environment"
+
           - Label: { default: "ACM" }
             Parameters:
               - "FathomaiSslCertificateArnVirginia"
               - "FathomaiSslCertificateVirginiaValidation"
+
           - Label: { default: "querypostgres" }
             Parameters:
               - "QuerypostgresVpcId"
@@ -65,7 +78,9 @@ Metadata:
 
 Conditions:
     CreateFathomaiSslCertificateVirginiaValidation: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "FathomaiSslCertificateVirginiaValidation" }, "" ] } ] }
+    CreateApiGateway: { "Fn::Equals": [ { Ref: "SslCertificateValidated" }, "true" ] }
     QuerypostgresCreateVpc: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "QuerypostgresVpcId" }, "" ] } ] }
+    CreateAlertsService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "AlertsServiceVersion" }, "" ] } ] }
 
 Resources:
 
@@ -121,16 +136,18 @@ Resources:
         Properties:
             DomainName: { "Fn::Sub": "apis.${Environment}.fathomai.com" }
             CertificateArn: { "Fn::Sub": "arn:aws:acm:us-east-1:${AWS::AccountId}:certificate/${FathomaiSslCertificateArnVirginia}" }
+        Condition: "CreateApiGateway"
 
     ApisCustomDomainCnameRecords:
         Type: "AWS::Route53::RecordSet"
         Properties:
-            HostedZoneId: { "Fn::ImportValue": { "Fn::Sub": "FathomaiHostedZoneId-${Environment}" } }
+            HostedZoneId: { Ref: "PublicHostedZone" }
             Comment: "Stats API"
             Name: { "Fn::Sub": "apis.${Environment}.fathomai.com." }
             Type: "CNAME"
             TTL: "600"
             ResourceRecords: [ { "Fn::GetAtt": [ "ApiCustomDomainName", "DistributionDomainName" ] } ]
+        Condition: "CreateApiGateway"
 
     ##########################################################################################################
     ##  QUERYPOSTGRES
@@ -194,7 +211,9 @@ Resources:
         Properties:
             Code:
                 S3Bucket: { "Fn::ImportValue": "InfrastructureBucketName" }
-                S3Key: { "Fn::Sub": "lambdas/infrastructure-${Environment}/execute_postgres_query.zip" }
+                S3Key: { "Fn::Sub": [ "lambdas/infrastructure/${TemplateVersion}/execute_postgres_query.zip", {
+                    TemplateVersion: { "Fn::FindInMap": [ "TemplateVersion", "Infrastructure", "Commit" ] }
+                } ] }
             Environment:
                 Variables:
                     ENVIRONMENT: { Ref: "Environment" }
