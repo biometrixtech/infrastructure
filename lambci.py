@@ -28,7 +28,7 @@ def upload_cf_template(template, s3_bucket):
 
 
 def upload_lambda_bundle(filename, s3_bucket):
-    filename = os.path.join(os.environ['SHALLOW_DIR'], filename)
+    filename = os.path.join(os.environ['SHALLOW_DIR'], 'lambdas', filename)
     print('Zipping bundle')
     if filename[-3:] == '.py':
         # Zipping one file
@@ -59,7 +59,8 @@ def main():
         upload_cf_template(file_name, s3_bucket)
 
     print("Deploying Lambda functions")
-    upload_lambda_bundle('apigateway', s3_bucket)
+    upload_lambda_bundle('execute_postgres_query', s3_bucket)
+    upload_lambda_bundle('sfn_batch_schedule', s3_bucket)
 
 
 if __name__ == '__main__':
