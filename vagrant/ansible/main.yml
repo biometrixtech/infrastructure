@@ -79,6 +79,7 @@
           - 'jq'
           - 'python-pip'
           - 'python3-pip'
+          - 'ntpdate'
 
       - name: 'Install pip tools (python 2)'
         pip:
