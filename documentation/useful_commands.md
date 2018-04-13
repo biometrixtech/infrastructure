@@ -16,13 +16,9 @@ scripts/deploy_newversion.py \
 	<GIT_VERSION>
 ```
 
-To deploy a new version of the Pipeline to an environment
+To deploy a new version of a service to an environment:
 ```shell
-STACK_NAME=aws cloudformation describe-stack-resource --stack-name preprocessing-dev --logical-resource-id PipelineCluster | jq -r '.StackResourceDetail.PhysicalResourceId | split("/")[1]'`
-scripts/deploy_cloudfromation.py \
-	--region us-west-2 \
-	--service preprocessing \
-	--environment <env> \
-	--service pipeline \
-	$STACK_NAME	
+scripts/deploy_service.py <service> <environment> environment <version>
 ```
+
+Where `version` must be a 40-hex-digit Git hash.
