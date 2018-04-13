@@ -67,7 +67,7 @@ def map_bundle(service, subservice):
 
 def get_s3_paths(bundle):
     s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
-    s3_path = 'lambdas/{}-{}/{}'.format(args.service, args.environment, os.path.basename(bundle))
+    s3_path = 'lambdas/{}/{}/{}'.format(args.service, '0' * 40, os.path.basename(bundle))
     return s3_bucket, s3_path
 
 
@@ -88,8 +88,10 @@ def print(*pargs, **kwargs):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Zip and upload a Lambda bundle to S3')
-    parser.add_argument('region',
+    parser.add_argument('--region',
                         type=str,
+                        choices=['us-east-1', 'us-west-2'],
+                        default='us-west-2',
                         help='AWS Region')
     parser.add_argument('service',
                         type=str,
