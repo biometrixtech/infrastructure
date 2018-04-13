@@ -139,7 +139,10 @@ Resources:
                           - 's3:GetObject'
                           - 's3:PutObject'
                           - 's3:PutObjectAcl'
-                        Resource: { 'Fn::Sub': 'arn:aws:s3:::${BuildResults}/*' }
+                        Resource:
+                          - { 'Fn::Sub': 'arn:aws:s3:::${BuildResults}/*' }
+                          - { 'Fn::Sub': 'arn:aws:s3:::biometrix-infrastructure-us-west-2/cloudformation/*'}
+                          - { 'Fn::Sub': 'arn:aws:s3:::biometrix-infrastructure-us-west-2/lambdas/*'}
               - PolicyName: 'ReadTables'
                 PolicyDocument:
                     Statement:
