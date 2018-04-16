@@ -27,6 +27,12 @@ Parameters:
         Type: "String"
         Description: "The ARN of the Lambda function to be invoked for custom authentication"
 
+    CreateCustomDomain:
+        Type: "String"
+        Description: "Whether to mount the API Gateway at <service>.<env>.fathomai.com"
+        AllowedValues: [ "true", "false" ]
+        Default: "false"
+
 Metadata:
     "AWS::CloudFormation::Interface":
         ParameterGroups:
@@ -44,6 +50,10 @@ Metadata:
             Environment: { default: "Environment" }
             Service: { default: "Service" }
             LambdaArn: { default: "Lambda ARN" }
+
+Conditions:
+    CreateCustomDomain: { "Fn::Equals": [ { Ref: "CreateCustomDomain" }, "true" ] }
+
 
 Resources:
 
@@ -197,6 +207,7 @@ Resources:
         Properties:
             DomainName: { "Fn::Sub": "${Project}.${Environment}.fathomai.com" }
             CertificateArn: { "Fn::ImportValue": { "Fn::Sub": "FathomaiSslCertificateArnVirginia-${Environment}" } }
+        Condition: "CreateCustomDomain"
 
     CustomDomainBasePathMapping:
         Type: "AWS::ApiGateway::BasePathMapping"
@@ -205,6 +216,7 @@ Resources:
             DomainName: { "Fn::Sub": "${Project}.${Environment}.fathomai.com" }
             RestApiId: { Ref: "RestApi" }
             Stage: 'v1'
+        Condition: "CreateCustomDomain"
         DependsOn:
           - "ApiDeployment"
           - "CustomDomainName"
@@ -218,6 +230,7 @@ Resources:
             Type: "CNAME"
             TTL: "600"
             ResourceRecords: [ { "Fn::GetAtt": [ "CustomDomainName", "DistributionDomainName" ] } ]
+        Condition: "CreateCustomDomain"
 
     ApiDomainBasePathMapping:
         Type: "AWS::ApiGateway::BasePathMapping"
