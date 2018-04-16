@@ -47,6 +47,69 @@ Parameters:
         Default: ""
         Description: "The IDs of the subnets to launch the querypostgres lambda functions in"
 
+    AlertsServiceVersion:
+        Type: "String"
+        Description: "The git commit hash of the Alerts service to deploy"
+        AllowedPattern: "^[a-f0-9]{40}$|^$"
+        ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+
+    HardwareServiceVersion:
+        Type: "String"
+        Description: "The git commit hash of the Hardware service to deploy"
+        AllowedPattern: "^[a-f0-9]{40}$|^$"
+        ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+
+    StatsapiServiceVersion:
+        Type: "String"
+        Description: "The git commit hash of the Statsapi service to deploy"
+        AllowedPattern: "^[a-f0-9]{40}$|^$"
+        ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+    StatsapiMongoDbPeeringVpc:
+        Type: "String"
+        Default: ""
+        Description: "The ID of the VPC to peer to for MongoDB connections"
+    StatsapiMongoDbPeeringCidr:
+        Type: "String"
+        Description: "The CIDR range in the peered VPC to route"
+        Default: ""
+        AllowedPattern: "^((\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2}))|$"
+        ConstraintDescription: "Must be a valid IP CIDR range of the form x.x.x.x/x."
+    StatsapiMongodbHostSession:
+        Description: "The MongoDB host for session"
+        Type: "String"
+        Default: ""
+    StatsapiMongodbHostTwomin:
+        Description: "The MongoDB host for twomin"
+        Type: "String"
+        Default: ""
+    StatsapiMongodbUser:
+        Description: "The MongoDB user"
+        Type: "String"
+        Default: ""
+    StatsapiMongodbPassword:
+        Description: "The MongoDB password"
+        Type: "String"
+        Default: ""
+        NoEcho: true
+    StatsapiMongodbReplicasetSession:
+        Description: "The MongoDB replica set for session"
+        Type: "String"
+        Default: "---"
+    StatsapiMongodbReplicasetTwomin:
+        Description: "The MongoDB replica set for twomin"
+        Type: "String"
+        Default: "---"
+    StatsapiMongodbCollectionSuffix:
+        Description: "The suffix for mongodb collections"
+        Type: "String"
+        Default: ""
+
+    UsersServiceVersion:
+        Type: "String"
+        Description: "The git commit hash of the Users service to deploy"
+        AllowedPattern: "^[a-f0-9]{40}$|^$"
+        ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+
 Mappings:
     TemplateVersion:
         Self: { Commit: "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
@@ -63,24 +126,72 @@ Metadata:
             Parameters:
               - "FathomaiSslCertificateArnVirginia"
               - "FathomaiSslCertificateVirginiaValidation"
+              - "SslCertificateValidated"
 
           - Label: { default: "querypostgres" }
             Parameters:
               - "QuerypostgresVpcId"
               - "QuerypostgresSubnetIds"
 
+          - Label: { default: "Alerts" }
+            Parameters:
+              - "AlertsServiceVersion"
+
+          - Label: { default: "Hardware" }
+            Parameters:
+              - "HardwareServiceVersion"
+
+          - Label: { default: "Stats Api" }
+            Parameters:
+              - "StatsapiServiceVersion"
+              - "StatsapiMongoDbPeeringVpc"
+              - "StatsapiMongoDbPeeringCidr"
+              - "StatsapiMongodbHostSession"
+              - "StatsapiMongodbHostTwomin"
+              - "StatsapiMongodbUser"
+              - "StatsapiMongodbPassword"
+              - "StatsapiMongodbReplicasetSession"
+              - "StatsapiMongodbReplicasetTwomin"
+              - "StatsapiMongodbCollectionSuffix"
+
+          - Label: { default: "Users" }
+            Parameters:
+              - "UsersServiceVersion"
+
         ParameterLabels:
             Environment: { default: "Environment" }
             FathomaiSslCertificateArnVirginia: { default: "ACM Certificate ID (us-east-1)" }
             FathomaiSslCertificateVirginiaValidation: { default: "ACM CNAME validation (us-east-1)" }
+            SslCertificateValidated: { default: "ACM Certificates validated?" }
+
             QuerypostgresVpcId: { default: "VPC ID" }
             QuerypostgresSubnetIds: { default: "Subnet IDs" }
+
+            AlertsServiceVersion: { default: "Alerts service version" }
+
+            HardwareServiceVersion: { default: "Hardware service version" }
+
+            StatsapiServiceVersion: { default: "Stats API service version" }
+            StatsapiMongoDbPeeringVpc: { default: "MongoDB peering VPC ID" }
+            StatsapiMongoDbPeeringCidr: { default: "MongoDB peering CIDR" }
+            StatsapiMongodbHostSession: { default: "MongoDB host (session)" }
+            StatsapiMongodbHostTwomin: { default: "MongoDB host (twomin)" }
+            StatsapiMongodbUser: { default: "MongoDB user" }
+            StatsapiMongodbPassword: { default: "MongoDB password" }
+            StatsapiMongodbReplicasetSession: { default: "MongoDB replicaset (session)" }
+            StatsapiMongodbReplicasetTwomin: { default: "MongoDB replicaset (twomin)" }
+            StatsapiMongodbCollectionSuffix: { default: "MongoDB collection suffix" }
+
+            UsersServiceVersion: { default: "Users service version" }
 
 Conditions:
     CreateFathomaiSslCertificateVirginiaValidation: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "FathomaiSslCertificateVirginiaValidation" }, "" ] } ] }
     CreateApiGateway: { "Fn::Equals": [ { Ref: "SslCertificateValidated" }, "true" ] }
     QuerypostgresCreateVpc: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "QuerypostgresVpcId" }, "" ] } ] }
     CreateAlertsService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "AlertsServiceVersion" }, "" ] } ] }
+    CreateHardwareService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "HardwareServiceVersion" }, "" ] } ] }
+    CreateStatsapiService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "StatsapiServiceVersion" }, "" ] } ] }
+    CreateUsersService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "UsersServiceVersion" }, "" ] } ] }
 
 Resources:
 
@@ -252,6 +363,105 @@ Resources:
                       - "lambda:InvokeFunction"
                     Effect: "Allow"
                     Resource: { "Fn::GetAtt": [ "QuerypostgresLambda", "Arn" ] }
+
+    ##########################################################################################################
+    ##  ALERTS
+    ##########################################################################################################
+
+    AlertsService:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "alerts-${Environment}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "alerts" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/alerts/${TemplateVersion}/alerts-environment.yaml", {
+                InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                TemplateVersion: { Ref: "AlertsServiceVersion" }
+            } ] }
+            TimeoutInMinutes: 30
+        Condition: "CreateAlertsService"
+        DependsOn:
+          - "UsersService"
+
+    ##########################################################################################################
+    ##  HARDWARE
+    ##########################################################################################################
+
+    HardwareService:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "hardware-${Environment}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "hardware" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/hardware/${TemplateVersion}/hardware-environment.yaml", {
+                InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                TemplateVersion: { Ref: "HardwareServiceVersion" }
+            } ] }
+            TimeoutInMinutes: 30
+        Condition: "CreateHardwareService"
+        DependsOn:
+          - "UsersService"
+
+    ##########################################################################################################
+    ##  STATS API
+    ##########################################################################################################
+
+    StatsapiService:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+                MongoDbPeeringVpc: { Ref: "StatsapiMongoDbPeeringVpc" }
+                MongoDbPeeringCidr: { Ref: "StatsapiMongoDbPeeringCidr" }
+                MongodbHostSession: { Ref: "StatsapiMongodbHostSession" }
+                MongodbHostTwomin: { Ref: "StatsapiMongodbHostTwomin" }
+                MongodbUser: { Ref: "StatsapiMongodbUser" }
+                MongodbPassword: { Ref: "StatsapiMongodbPassword" }
+                MongodbReplicasetSession: { Ref: "StatsapiMongodbReplicasetSession" }
+                MongodbReplicasetTwomin: { Ref: "StatsapiMongodbReplicasetTwomin" }
+                MongodbCollectionSuffix: { Ref: "StatsapiMongodbCollectionSuffix" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "statsapi-${Environment}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "statsapi" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/statsapi/${TemplateVersion}/statsapi-environment.yaml", {
+                InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                TemplateVersion: { Ref: "StatsapiServiceVersion" }
+            } ] }
+            TimeoutInMinutes: 30
+        Condition: "CreateStatsapiService"
+        DependsOn:
+          - "UsersService"
+
+    ##########################################################################################################
+    ##  USERS
+    ##########################################################################################################
+
+    UsersService:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "users-${Environment}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "users" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/users/${TemplateVersion}/users-environment.yaml", {
+                InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                TemplateVersion: { Ref: "UsersServiceVersion" }
+            } ] }
+            TimeoutInMinutes: 30
+        Condition: "CreateUsersService"
 
     ##########################################################################################################
     ##  OUTPUTS
