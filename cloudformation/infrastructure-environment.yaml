@@ -59,6 +59,21 @@ Parameters:
         AllowedPattern: "^[a-f0-9]{40}$|^$"
         ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
 
+    PreprocessingServiceVersion:
+        Type: "String"
+        Description: "The git commit hash of the Preprocessing service to deploy"
+        AllowedPattern: "^[a-f0-9]{40}$|^$"
+        ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+    PreprocessingAutoscalingSchedule:
+        Type: "String"
+        Default: ""
+        Description: "A definition JSON string for autoscaling the compute cluster"
+    PreprocessingDynamodbWriteCapacity:
+        Default: 1
+        Description: "The write capacity of the DynamoDb table"
+        MinValue: 1
+        Type: "Number"
+
     StatsapiServiceVersion:
         Type: "String"
         Description: "The git commit hash of the Statsapi service to deploy"
@@ -141,6 +156,12 @@ Metadata:
             Parameters:
               - "HardwareServiceVersion"
 
+          - Label: { default: "Preprocessing" }
+            Parameters:
+              - "PreprocessingServiceVersion"
+              - "PreprocessingAutoscalingSchedule"
+              - "PreprocessingDynamodbWriteCapacity"
+
           - Label: { default: "Stats Api" }
             Parameters:
               - "StatsapiServiceVersion"
@@ -171,6 +192,10 @@ Metadata:
 
             HardwareServiceVersion: { default: "Hardware service version" }
 
+            PreprocessingServiceVersion: { default: "Preprocessing service version" }
+            PreprocessingAutoscalingSchedule: { default: "Autoscaling schedule" }
+            PreprocessingDynamodbWriteCapacity: { default: "DynamoDB WCUs" }
+
             StatsapiServiceVersion: { default: "Stats API service version" }
             StatsapiMongoDbPeeringVpc: { default: "MongoDB peering VPC ID" }
             StatsapiMongoDbPeeringCidr: { default: "MongoDB peering CIDR" }
@@ -190,6 +215,7 @@ Conditions:
     QuerypostgresCreateVpc: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "QuerypostgresVpcId" }, "" ] } ] }
     CreateAlertsService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "AlertsServiceVersion" }, "" ] } ] }
     CreateHardwareService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "HardwareServiceVersion" }, "" ] } ] }
+    CreatePreprocessingService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PreprocessingServiceVersion" }, "" ] } ] }
     CreateStatsapiService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "StatsapiServiceVersion" }, "" ] } ] }
     CreateUsersService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "UsersServiceVersion" }, "" ] } ] }
 
@@ -407,6 +433,40 @@ Resources:
             } ] }
             TimeoutInMinutes: 30
         Condition: "CreateHardwareService"
+        DependsOn:
+          - "UsersService"
+
+    ##########################################################################################################
+    ##  PREPROCESSING
+    ##########################################################################################################
+
+    PreprocessingService:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+                CreateVpc: "true"
+                CreateCompute: "true"
+                CreatePipeline: "true"
+                CreateIngest: "true"
+                PollerVersion: "15901c4"
+                MultiAz: "true"
+                VpnCidr: 0
+                MongoDbPeeringVpc: { Ref: "StatsapiMongoDbPeeringVpc" }
+                MongoDbPeeringCidr: { Ref: "StatsapiMongoDbPeeringCidr" }
+                AutoscalingSchedule: { Ref: "PreprocessingAutoscalingSchedule" }
+                DynamodbWriteCapacity: { Ref: "PreprocessingDynamodbWriteCapacity" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "preprocessing-${Environment}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "preprocessing" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/preprocessing/${TemplateVersion}/preprocessing-environment.yaml", {
+                InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                TemplateVersion: { Ref: "PreprocessingServiceVersion" }
+            } ] }
+            TimeoutInMinutes: 30
+        Condition: "CreatePreprocessingService"
         DependsOn:
           - "UsersService"
 
