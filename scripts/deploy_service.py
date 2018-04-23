@@ -144,6 +144,15 @@ def await_stack_update(stack):
 
 def update_git_branch(branch_name):
     try:
+        git_dir = get_git_dir()
+        os.system("git -C {} update-ref refs/heads/{} {}".format(git_dir, branch_name, args.version))
+        os.system("git -C {} push origin {} --force".format(git_dir, branch_name))
+    except CalledProcessError as e:
+        print(e.output, colour=Fore.RED)
+        raise
+
+
+def get_git_dir():
         git_repo_name = {
             'alerts': 'Alerts',
             'hardware': 'Hardware',
@@ -152,13 +161,7 @@ def update_git_branch(branch_name):
             'statsapi': 'StatsAPI',
             'users': 'Users',
         }[args.service]
-        git_dir = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../{}'.format(git_repo_name)))
-
-        os.system("git -C {} update-ref refs/heads/{} {}".format(git_dir, branch_name, args.version))
-        os.system("git -C {} push origin {} --force".format(git_dir, branch_name))
-    except CalledProcessError as e:
-        print(e.output, colour=Fore.RED)
-        raise
+        return os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../{}'.format(git_repo_name)))
 
 
 def print(*args, **kwargs):
