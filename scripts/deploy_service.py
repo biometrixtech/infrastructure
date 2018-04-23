@@ -8,6 +8,7 @@ from subprocess import CalledProcessError
 import __builtin__
 import argparse
 import boto3
+import json
 import os
 import re
 import sys
@@ -140,6 +141,18 @@ def await_stack_update(stack):
             spinner.start()
             time.sleep(5)
             continue
+            
+            
+def update_lambda_functions():
+    with open(os.path.join(get_git_dir(), 'resource_index.json'), 'r') as f:
+        config = json.load(f)
+
+    lambda_client = boto3.client('lambda', region_name=args.region)
+    for lambda_bundle in config['lambdas']:
+        lambda_name = lambda_bundle['name'].format(ENVIRONMENT=args.environment)
+        s3_filepath = 'lambdas/{}/{}/{}'.format(args.service, args.version, lambda_bundle['s3_filename'])
+        print('Updating Lambda {} with bundle s3://{}'.format(lambda_name, s3_filepath))
+        lambda_client.update_function_code(FunctionName=lambda_name, S3Bucket=s3_bucket_name, S3Key=s3_filepath)
 
 
 def update_git_branch(branch_name):
@@ -219,6 +232,10 @@ def main():
                 # We also implicitly deployed a new version of the application here
                 update_git_branch('{}-{}-app'.format(args.environment, args.region))
             pass
+
+        # Explicitly deploy lambda functions to make sure they update
+        if args.subservice == 'environment':
+            update_lambda_functions()
 
         exit(res)
 
