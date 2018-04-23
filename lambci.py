@@ -37,7 +37,7 @@ def upload_lambda_bundle(filename, s3_bucket):
     else:
         # A whole bundle; install pip requirements first
         os.chdir(filename)
-        subprocess.check_call('pip install -t . -r pip_requirements', shell=True)
+        subprocess.check_call('python3 -m pip install -t . -r pip_requirements', shell=True)
         os.chdir(os.environ['SHALLOW_DIR'])
         shutil.make_archive(filename, 'zip', filename)
         output_filename = filename + '.zip'
