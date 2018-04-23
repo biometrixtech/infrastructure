@@ -302,7 +302,9 @@ if __name__ == '__main__':
                         help='Environment')
     parser.add_argument('subservice',
                         type=str,
-                        help='Service')
+                        nargs='?',
+                        default='environment',
+                        help='Sub-service')
     parser.add_argument('version',
                         type=git_commit,
                         help='the version to deploy')
@@ -316,6 +318,11 @@ if __name__ == '__main__':
                         help='Parameters to drop from the template, comma-delimited')
 
     args = parser.parse_args()
+    
+    if args.version == '0' * 40:
+        if args.environment != 'dev':
+            print('Working copy can only be deployed to dev', colour=Fore.RED)
+            exit(1)
 
     s3_bucket_name = 'biometrix-infrastructure-{}'.format(args.region)
     main()
