@@ -68,7 +68,7 @@
           - "{{infrastructure_directory}}/vagrant/ansible/authorized_keys/*.azk"
 
     ##########################################################################################################
-    ## AWS
+    ## AWS & PYTHON
     ##########################################################################################################
 
       - name: 'Install AWS CLI and related tools'
@@ -118,6 +118,14 @@
         with_items:
           - "config"
           - "credentials"
+
+      - name: 'Install supython'
+        copy:
+            src: '{{infrastructure_directory}}/vagrant/ansible/files/supython3'
+            dest: '/usr/bin/supython3'
+            owner: 'root'
+            group: 'root'
+            mode: '0755'
 
     ##########################################################################################################
     ## GIT
