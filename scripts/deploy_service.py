@@ -5,7 +5,6 @@ from botocore.exceptions import ClientError
 from colorama import Fore, Style
 from datetime import datetime
 from subprocess import CalledProcessError
-import __builtin__
 import argparse
 import boto3
 import json
@@ -14,6 +13,11 @@ import re
 import sys
 import threading
 import time
+
+try:
+    import builtins as __builtin__
+except ImportError:
+    import __builtin__
 
 subservice_stack_mapping = {
     'preprocessing': {
@@ -207,8 +211,9 @@ def main():
 
     else:
         # Check that the CF templates have actually been uploaded
+        print('Checking that s3://{}/{} exists'.format(s3_bucket.name, templates[0][1]),)
         s3_bucket.Object(templates[0][1]).wait_until_exists()
-        print('Template exists')
+        print('Template exists', colour=Fore.GREEN)
 
     if not args.noupdate:
         stack = boto3.resource('cloudformation', region_name=args.region).Stack(get_stack_name())
@@ -342,4 +347,9 @@ if __name__ == '__main__':
             exit(1)
 
     s3_bucket_name = 'biometrix-infrastructure-{}'.format(args.region)
-    main()
+
+    try:
+        main()
+    except KeyboardInterrupt:
+        print('Exiting', colour=Fore.YELLOW)
+        exit(1)
