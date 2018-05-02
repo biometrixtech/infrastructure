@@ -2,12 +2,16 @@
 # Zip and upload a Lambda bundle
 from __future__ import print_function
 from colorama import Fore, Back, Style
-import __builtin__
 import argparse
 import boto3
 import os
 import shutil
 import zipfile
+
+try:
+    import builtins as __builtin__
+except ImportError:
+    import __builtin__
 
 
 def get_boto3_resource(resource):
