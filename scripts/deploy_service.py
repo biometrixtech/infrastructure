@@ -10,6 +10,7 @@ import boto3
 import json
 import os
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -196,7 +197,36 @@ def print(*args, **kwargs):
         __builtin__.print(*args, **kwargs)
 
 
+def validate_git_commit(x):
+    if re.match('^0{8,}$', x):
+        # All zeroes
+        print('Deploying working copy', colour=Fore.YELLOW)
+        return '0' * 40
+    elif re.match('^[0-9a-f]{40}$', x):
+        # Git hash
+        try:
+            subprocess.check_call('git branch --contains {}'.format(x), cwd=get_git_dir(), shell=True)
+        except CalledProcessError:
+            print('Commit {} does not exist'.format(x), colour=Fore.RED)
+            exit(1)
+        return x
+    else:
+        try:
+            # Parse the value as a branch name and get the associated git commit hash
+            x2 = subprocess.check_output('git rev-parse {}'.format(x), cwd=get_git_dir(), shell=True).decode('utf-8').strip()
+            print("Branch '{}' has commit hash {}".format(x, x2), colour=Fore.GREEN)
+            return x2
+        except CalledProcessError:
+            print('Version must be a 40-hex-digit git hash or valid branch name', colour=Fore.RED)
+            exit(1)
+
+
 def main():
+
+    if args.version == '0' * 40 and args.environment != 'dev':
+        print('Working copy can only be deployed to dev', colour=Fore.RED)
+        exit(1)
+
     templates = map_templates(args.service, args.environment, args.subservice, args.version)
 
     s3_bucket = boto3.resource('s3').Bucket(s3_bucket_name)
@@ -296,19 +326,13 @@ def map_templates(service, environment, subservice, version):
 
 
 if __name__ == '__main__':
-    def git_commit(x):
-        if not re.match('^[0-9a-f]{40}$', x):
-            raise argparse.ArgumentTypeError('Version number must be a 40-hex-digit git hash')
-        return x
 
     parser = argparse.ArgumentParser(description='Upload a template to S3, and maybe update a CF stack using it')
     parser.add_argument('--region',
-                        type=str,
                         choices=['us-east-1', 'us-west-2'],
                         default='us-west-2',
                         help='AWS Region')
     parser.add_argument('service',
-                        type=str,
                         choices=[
                             'alerts',
                             'infrastructure',
@@ -319,16 +343,13 @@ if __name__ == '__main__':
                         ],
                         help='The service being deployed')
     parser.add_argument('environment',
-                        type=str,
                         choices=['infra', 'dev', 'qa', 'production'],
                         help='Environment')
     parser.add_argument('subservice',
-                        type=str,
                         nargs='?',
                         default='environment',
                         help='Sub-service')
     parser.add_argument('version',
-                        type=git_commit,
                         help='the version to deploy')
     parser.add_argument('--no-update',
                         action='store_true',
@@ -340,11 +361,8 @@ if __name__ == '__main__':
                         help='Parameters to drop from the template, comma-delimited')
 
     args = parser.parse_args()
-    
-    if args.version == '0' * 40:
-        if args.environment != 'dev':
-            print('Working copy can only be deployed to dev', colour=Fore.RED)
-            exit(1)
+    # Need to post-process the version because validation depends on the args.service value
+    args.version = validate_git_commit(args.version)
 
     s3_bucket_name = 'biometrix-infrastructure-{}'.format(args.region)
 
