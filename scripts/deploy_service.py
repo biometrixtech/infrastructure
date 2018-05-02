@@ -20,6 +20,12 @@ try:
 except ImportError:
     import __builtin__
 
+# input() in Python 3, raw_input() in Python 2
+try:
+    input = raw_input
+except NameError:
+    pass
+
 subservice_stack_mapping = {
     'preprocessing': {
         'compute': 'ComputeCluster',
@@ -221,11 +227,26 @@ def validate_git_commit(x):
             exit(1)
 
 
+def confirm(question='', count=0):
+    reply = str(input(question)).lower().strip()
+    if reply[:1] == 'y':
+        return True
+    if reply[:1] == 'n' or count >= 3:
+        return False
+    else:
+        return confirm('Please type "yes" or "no": ', count + 1)
+
+
 def main():
 
     if args.version == '0' * 40 and args.environment != 'dev':
         print('Working copy can only be deployed to dev', colour=Fore.RED)
         exit(1)
+
+    if args.environment == 'production':
+        print('Are you sure you want to deploy to production?! (y/n)', colour=Fore.YELLOW)
+        if not confirm():
+            exit(0)
 
     templates = map_templates(args.service, args.environment, args.subservice, args.version)
 
