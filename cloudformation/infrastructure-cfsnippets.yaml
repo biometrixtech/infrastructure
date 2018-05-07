@@ -123,8 +123,8 @@ Resources:
                                 os.environ.update(environment)
                                 # It goes without saying that it would be crazy to run this with user-controllable
                                 # input.  Just Don't Do That.
-                                locals = {}
-                                exec(code, {'os': os}, locals)
+                                locals = {'os': os}
+                                exec(code, locals, locals)
                             finally:
                                 os.environ = old_environment
                             return str(locals.get('physical_resource_id', self.physical_resource_id)), locals.get('data')
