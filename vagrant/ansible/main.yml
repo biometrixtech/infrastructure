@@ -89,6 +89,7 @@
           - 'aws-mfa'
           - 'awscli'
           - 'boto3'
+          - 'colorama'
 
       - name: 'Install pip tools (python 3)'
         pip:
@@ -98,6 +99,7 @@
         with_items:
           - 'boto3'
           - 'pandas' # Needed for get_cost_breakdown.py
+          - 'colorama'
 
       - name: 'Create AWS config directory'
         file:
@@ -226,7 +228,7 @@
     ## RUBY
     ##########################################################################################################
 
-      - name: Latest version of Ruby is installed
+      - name: 'Latest version of Ruby is installed'
         apt:
             name: '{{ item }}'
             state: latest
