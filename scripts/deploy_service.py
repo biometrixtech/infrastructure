@@ -143,10 +143,10 @@ def await_stack_update(stack):
                               and e.resource_status in failure_resource_statuses
                               and e.resource_status_reason is not None]
             print('\n'.join([e.resource_status_reason for e in failure_events]), colour=Fore.RED)
-            return 1
+            exit(1)
         elif status in success_statuses:
             print("\rStack status: {}                        ".format(status), colour=Fore.GREEN)
-            return 0
+            return
         else:
             print("\rStack status: {} ".format(status), colour=Fore.CYAN, end="")
             spinner.start()
@@ -278,8 +278,9 @@ def main():
                 print(e, colour=Fore.RED)
                 exit(1)
 
-        res = await_stack_update(stack)
-        if res == 0 and args.subservice == 'environment':
+        await_stack_update(stack)
+
+        if args.subservice == 'environment':
             # Update git reference
             # TODO
             print('Updating git reference')
@@ -293,7 +294,7 @@ def main():
         if args.subservice == 'environment':
             update_lambda_functions()
 
-        exit(res)
+        exit(0)
 
 
 def map_templates(service, environment, subservice, version):
