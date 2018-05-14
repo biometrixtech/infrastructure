@@ -167,8 +167,6 @@ Resources:
                                             type: "string"
                                         Access-Control-Allow-Headers:
                                             type: "string"
-                            security:
-                              - CustomAuth: []
                             x-amazon-apigateway-integration:
                                 responses:
                                     default:
@@ -179,17 +177,6 @@ Resources:
                                 type: "aws_proxy"
                 x-amazon-apigateway-binary-media-types:
                   - "application/octet-stream"
-                securityDefinitions:
-                    CustomAuth:
-                        type: "apiKey"
-                        name: "Authorization"
-                        in: "header"
-                        x-amazon-apigateway-authtype: "oauth2"
-                        x-amazon-apigateway-authorizer:
-                            type: "token"
-                            authorizerUri: { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CustomAuthLambdaArn}/invocations" }
-                            identityValidationExpression: ""
-                            authorizerResultTtlInSeconds: 60
 
     ApiDeployment:
         Type: "AWS::ApiGateway::Deployment"
