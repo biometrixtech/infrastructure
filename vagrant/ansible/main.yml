@@ -67,9 +67,24 @@
         with_fileglob:
           - "{{infrastructure_directory}}/vagrant/ansible/authorized_keys/*.azk"
 
+      - name: 'Add scripts directories to path'
+        lineinfile:
+            dest: '/etc/environment'
+            state: present
+            backrefs: yes
+            regexp: 'PATH=(["]*)((?!.*?{{item}}).*?)(["]*)$'
+            line: 'PATH=\1\2:{{item}}\3'
+        with_items:
+          - '/vagrant/Infrastructure/scripts:/vagrant/PreProcessing/scripts'
+
     ##########################################################################################################
     ## AWS & PYTHON
     ##########################################################################################################
+
+      - name: 'Add apt repository for python 3.6'
+        apt_repository:
+            repo: 'ppa:deadsnakes/ppa'
+            state: present
 
       - name: 'Install AWS CLI and related tools'
         apt:
@@ -78,8 +93,18 @@
         with_items:
           - 'jq'
           - 'python-pip'
+          - 'python3.6'
           - 'python3-pip'
           - 'ntpdate'
+
+      - name: 'Make python 3.6 the default'
+        file:
+            src: '{{ item.src }}'
+            dest: '{{ item.dest }}'
+            state: link
+            force: true
+        with_items:
+            - { src: 'python3.6', dest: '/usr/bin/python3' }
 
       - name: 'Install pip tools (python 2)'
         pip:
