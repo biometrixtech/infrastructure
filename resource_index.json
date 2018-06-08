@@ -1,21 +1,20 @@
 {
     "templates": [
-        { "s3_filename": "preprocessing-compute.yaml", "src": "cloudformation/preprocessing-compute.yaml" },
-        { "s3_filename": "preprocessing-environment.yaml", "src": "cloudformation/preprocessing-environment.yaml" },
-        { "s3_filename": "preprocessing-ingest.yaml", "src": "cloudformation/preprocessing-ingest.yaml" },
-        { "s3_filename": "preprocessing-monitoring.yaml", "src": "cloudformation/preprocessing-monitoring.yaml" },
-        { "s3_filename": "preprocessing-pipeline.yaml", "src": "cloudformation/preprocessing-pipeline.yaml" }
+        { "s3_filename": "apigateway.yaml", "src": "cloudformation/apigateway.yaml" },
+        { "s3_filename": "fargateecs.yaml", "src": "cloudformation/fargateecs.yaml" },
+        { "s3_filename": "infrastructure.yaml", "src": "cloudformation/infrastructure.yaml" },
+        { "s3_filename": "infrastructure-cfsnippets.yaml", "src": "cloudformation/infrastructure-cfsnippets.yaml" },
+        { "s3_filename": "infrastructure-lambci.yaml", "src": "cloudformation/infrastructure-lambci.yaml" },
+        { "s3_filename": "time-environment.yaml", "src": "cloudformation/time-environment.yaml" },
+        { "s3_filename": "vpc.yaml", "src": "cloudformation/vpc.yaml" }
     ],
     "lambdas": [
         {
-            "name": "preprocessing-{ENVIRONMENT}-apigateway-execute",
-            "s3_filename": "apigateway.zip",
-            "src": "apigateway",
+            "name": "infrastructure-{ENVIRONMENT}-querypostgres",
+            "s3_filename": "execute_postgres_query.zip",
+            "src": "lambdas/execute_postgres_query",
             "pip": true
         }
     ],
-    "datastores": [
-        { "type": "dynamodb.table", "name": "preprocessing-{ENVIRONMENT}-ingest-sessions" },
-        { "type": "s3.bucket", "name": "biometrix-preprocessing-{ENVIRONMENT}-{REGION}" }
-    ]
+    "datastores": []
 }
