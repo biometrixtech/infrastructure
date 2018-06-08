@@ -121,37 +121,40 @@ def await_stack_update(stack):
     cutoff = datetime.now()
 
     spinner = Spinner()
-    spinner.start()
 
-    while True:
-        stack.reload()
-        status = stack.stack_status
+    try:
+        spinner.start()
+        while True:
+            stack.reload()
+            status = stack.stack_status
 
+            spinner.stop()
+            sys.stdout.write("\033[K")  # Clear the line
+
+            if status in fail_statuses:
+                print("\rStack status: {}                        ".format(status), colour=Fore.RED)
+                failure_resource_statuses = [
+                    'UPDATE_ROLLBACK_IN_PROGRESS',
+                    'CREATE_FAILED',
+                    'UPDATE_FAILED',
+                    'DELETE_FAILED'
+                ]
+                failure_events = [e for e in stack.events.all()
+                                  if e.timestamp.replace(tzinfo=None) > cutoff
+                                  and e.resource_status in failure_resource_statuses
+                                  and e.resource_status_reason is not None]
+                print('\n'.join([e.resource_status_reason for e in failure_events]), colour=Fore.RED)
+                exit(1)
+            elif status in success_statuses:
+                print("\rStack status: {}                        ".format(status), colour=Fore.GREEN)
+                return
+            else:
+                print("\rStack status: {} ".format(status), colour=Fore.CYAN, end="")
+                spinner.start()
+                time.sleep(5)
+                continue
+    finally:
         spinner.stop()
-        sys.stdout.write("\033[K")  # Clear the line
-
-        if status in fail_statuses:
-            print("\rStack status: {}                        ".format(status), colour=Fore.RED)
-            failure_resource_statuses = [
-                'UPDATE_ROLLBACK_IN_PROGRESS',
-                'CREATE_FAILED',
-                'UPDATE_FAILED',
-                'DELETE_FAILED'
-            ]
-            failure_events = [e for e in stack.events.all()
-                              if e.timestamp.replace(tzinfo=None) > cutoff
-                              and e.resource_status in failure_resource_statuses
-                              and e.resource_status_reason is not None]
-            print('\n'.join([e.resource_status_reason for e in failure_events]), colour=Fore.RED)
-            exit(1)
-        elif status in success_statuses:
-            print("\rStack status: {}                        ".format(status), colour=Fore.GREEN)
-            return
-        else:
-            print("\rStack status: {} ".format(status), colour=Fore.CYAN, end="")
-            spinner.start()
-            time.sleep(5)
-            continue
             
             
 def update_lambda_functions():
@@ -274,6 +277,10 @@ def main():
         except ClientError as e:
             if 'No updates are to be performed' in str(e):
                 print('No updates are to be performed', colour=Fore.YELLOW)
+            elif 'is in UPDATE_IN_PROGRESS state' in str(e):
+                print('Stack is already updating', colour=Fore.YELLOW)
+                await_stack_update(stack)
+                exit(1)
             else:
                 print(e, colour=Fore.RED)
                 exit(1)
