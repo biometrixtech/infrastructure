@@ -1,0 +1,38 @@
+# A template that creates an ECS cluster hosted on AWS Fargate
+#
+# Copyright 2018 Melon Software Ltd (UK), all rights reserved
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates an ECS cluster hosted on AWS Fargate"
+
+Parameters:
+
+    Project:
+        Description: "The name of the project"
+        Type: "String"
+    Environment:
+        Description: "The name of the environment"
+        Type: "String"
+    Service:
+        Description: "The name of the service"
+        Type: "String"
+
+    # Passed nested parameters
+    Vpc:
+        Description: "The ID of the VPC"
+        Type: "AWS::EC2::VPC::Id"
+    PublicSubnets:
+        Description: "The IDs of the subnets to launch containers in"
+        Type: "List<AWS::EC2::Subnet::Id>"
+
+
+Resources:
+
+    ##########################################################################################################
+    ##  ECS
+    ##########################################################################################################
+
+    EcsCluster:
+        Type: "AWS::ECS::Cluster"
+        Properties:
+            ClusterName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }

@@ -443,6 +443,13 @@ Outputs:
             ""
         ]}
 
+    PrivateSubnetIds:
+        Description: "The ids of the private subnets"
+        Value: { "Fn::If": [ "MultiAz",
+            { "Fn::Sub": "${PrivateSubnetAlpha},${PrivateSubnetBeta}" },
+            { Ref: "PrivateSubnetAlpha" }
+        ]}
+
     PublicSubnetAlphaId:
         Description: "The id of public subnet alpha"
         Value: { Ref: "PublicSubnetAlpha" }
@@ -454,11 +461,11 @@ Outputs:
             ""
         ]}
 
-    PrivateSubnetIds:
+    PublicSubnetIds:
         Description: "The ids of the private subnets"
         Value: { "Fn::If": [ "MultiAz",
-            { "Fn::Sub": "${PrivateSubnetAlpha},${PrivateSubnetBeta}" },
-            { Ref: "PrivateSubnetAlpha" }
+            { "Fn::Sub": "${PublicSubnetAlpha},${PublicSubnetBeta}" },
+            { Ref: "PublicSubnetAlpha" }
         ]}
 
     PrivateHostedZoneId:
