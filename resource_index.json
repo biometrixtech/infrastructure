@@ -1,0 +1,21 @@
+{
+    "templates": [
+        { "s3_filename": "preprocessing-compute.yaml", "src": "cloudformation/preprocessing-compute.yaml" },
+        { "s3_filename": "preprocessing-environment.yaml", "src": "cloudformation/preprocessing-environment.yaml" },
+        { "s3_filename": "preprocessing-ingest.yaml", "src": "cloudformation/preprocessing-ingest.yaml" },
+        { "s3_filename": "preprocessing-monitoring.yaml", "src": "cloudformation/preprocessing-monitoring.yaml" },
+        { "s3_filename": "preprocessing-pipeline.yaml", "src": "cloudformation/preprocessing-pipeline.yaml" }
+    ],
+    "lambdas": [
+        {
+            "name": "preprocessing-{ENVIRONMENT}-apigateway-execute",
+            "s3_filename": "apigateway.zip",
+            "src": "apigateway",
+            "pip": true
+        }
+    ],
+    "datastores": [
+        { "type": "dynamodb.table", "name": "preprocessing-{ENVIRONMENT}-ingest-sessions" },
+        { "type": "s3.bucket", "name": "biometrix-preprocessing-{ENVIRONMENT}-{REGION}" }
+    ]
+}
