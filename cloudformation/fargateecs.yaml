@@ -18,10 +18,10 @@ Parameters:
         Type: "String"
 
     # Passed nested parameters
-    Vpc:
+    VpcId:
         Description: "The ID of the VPC"
         Type: "AWS::EC2::VPC::Id"
-    PublicSubnets:
+    PublicSubnetIds:
         Description: "The IDs of the subnets to launch containers in"
         Type: "List<AWS::EC2::Subnet::Id>"
 
@@ -101,7 +101,7 @@ Resources:
               - { Key: "Project", Value: { Ref: "Project" } }
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: { Ref: "Service" } }
-            VpcId: { Ref: "Vpc" }
+            VpcId: { Ref: "VpcId" }
 
     EcsSecurityGroupIngressFromPublicALB:
         Type: 'AWS::EC2::SecurityGroupIngress'
@@ -139,7 +139,7 @@ Resources:
               - { Key: "Project", Value: { Ref: "Project" } }
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: { Ref: "Service" } }
-            VpcId: { Ref: 'Vpc' }
+            VpcId: { Ref: 'VpcId' }
 
     Alb:
         Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
@@ -150,7 +150,7 @@ Resources:
             Name: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
             Scheme: 'internet-facing'
             SecurityGroups: [ { Ref: 'AlbSecurityGroup' } ]
-            Subnets: { Ref: 'PublicSubnets' }
+            Subnets: { Ref: 'PublicSubnetIds' }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" } }
               - { Key: "Management", Value: "managed" }
@@ -171,7 +171,7 @@ Resources:
             Port: 80
             Protocol: 'HTTP'
             UnhealthyThresholdCount: 2
-            VpcId: { Ref: "Vpc" }
+            VpcId: { Ref: "VpcId" }
 
     AlbListener:
         Type: 'AWS::ElasticLoadBalancingV2::Listener'
@@ -242,6 +242,6 @@ Resources:
                 AwsvpcConfiguration:
                     AssignPublicIp: 'ENABLED'
                     SecurityGroups: [ { Ref: "EcsSecurityGroup" } ]
-                    Subnets: { Ref: "PublicSubnets" }
+                    Subnets: { Ref: "PublicSubnetIds" }
             ServiceName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
             TaskDefinition: { Ref: "TaskDefinition" }
