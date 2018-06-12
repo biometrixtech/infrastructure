@@ -25,6 +25,35 @@ Parameters:
         Description: "The IDs of the subnets to launch containers in"
         Type: "List<AWS::EC2::Subnet::Id>"
 
+    # Container configuration
+    ContainerImage:
+        Type: 'String'
+        Default: 'nginx'
+        Description: 'The url of a docker image that contains the application process that
+                     will handle the traffic for this service'
+    ContainerPort:
+        Type: 'Number'
+        Default: 80
+        Description: 'What port number the application inside the docker container is binding to'
+    ContainerCpu:
+        Type: 'Number'
+        AllowedValues: [ 256, 512, 1024, 2048 ]
+        Default: 256
+        Description: 'How much CPU to give the container. 1024 is 1 CPU'
+    ContainerMemory:
+        Type: 'Number'
+        AllowedValues: [ 512, 1024, 2048, 4096, 8192 ]
+        Default: 512
+        Description: 'How much memory in megabytes to give the container'
+    ContainerRoleArn:
+        Type: 'String'
+        Default: ""
+        Description: "(Optional) An IAM role to give the service's containers access to other AWS resources"
+
+
+Conditions:
+  HasCustomRole: { "Fn::Not": [ { "Fn::Equals": [ { Ref: 'ContainerRoleArn' }, '' ] } ] }
+
 
 Resources:
 
@@ -129,6 +158,31 @@ Resources:
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: { Ref: "Service" } }
 
+    AlbTargetGroup:
+        Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+        Properties:
+            HealthCheckIntervalSeconds: 30
+            HealthCheckPath: '/'
+            HealthCheckProtocol: 'HTTP'
+            HealthCheckTimeoutSeconds: 5
+            HealthyThresholdCount: 2
+            TargetType: 'ip'
+            Name: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            Port: 80
+            Protocol: 'HTTP'
+            UnhealthyThresholdCount: 2
+            VpcId: { Ref: "Vpc" }
+
+    AlbListener:
+        Type: 'AWS::ElasticLoadBalancingV2::Listener'
+        Properties:
+            DefaultActions:
+              - TargetGroupArn: { Ref: 'AlbTargetGroup' }
+                Type: 'forward'
+            LoadBalancerArn: { Ref: 'Alb' }
+            Port: 80
+            Protocol: 'HTTP'
+
     ##########################################################################################################
     ##  ECS
     ##########################################################################################################
@@ -137,3 +191,57 @@ Resources:
         Type: "AWS::ECS::Cluster"
         Properties:
             ClusterName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+
+    CloudwatchLogsGroup:
+        Type: "AWS::Logs::LogGroup"
+        Properties:
+            LogGroupName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            RetentionInDays: 14
+
+    TaskDefinition:
+        Type: "AWS::ECS::TaskDefinition"
+        Properties:
+            Cpu: { Ref: 'ContainerCpu' }
+            ContainerDefinitions:
+              - Cpu: { Ref: 'ContainerCpu' }
+                Environment:
+                  - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
+                Image: { Ref: 'ContainerImage' }
+                LogConfiguration:
+                    LogDriver: "awslogs"
+                    Options:
+                        awslogs-group: { Ref: "CloudwatchLogsGroup" }
+                        awslogs-region: { Ref: "AWS::Region" }
+                        awslogs-stream-prefix: { Ref: "Service" }
+                Memory: { Ref: 'ContainerMemory' }
+                Name: { Ref: "Service" }
+                PortMappings:
+                 - ContainerPort: { Ref: 'ContainerPort' }
+            ExecutionRoleArn: { Ref: 'EcsContainerRole' }
+            Family: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            Memory: { Ref: 'ContainerMemory' }
+            NetworkMode: 'awsvpc'
+            RequiresCompatibilities:
+              - 'FARGATE'
+            TaskRoleArn: { "Fn::If": [ 'HasCustomRole',  { Ref: 'ContainerRoleArn' },  { Ref: "AWS::NoValue" } ] }
+
+    EcsService:
+        Type: "AWS::ECS::Service"
+        Properties:
+            DeploymentConfiguration:
+                MaximumPercent: 200
+                MinimumHealthyPercent: 75
+            DesiredCount: 2
+            Cluster: { Ref: "EcsCluster" }
+            LaunchType: 'FARGATE'
+            LoadBalancers:
+              - ContainerName: { Ref: "Service" }
+                ContainerPort: { Ref: 'ContainerPort' }
+                TargetGroupArn: { Ref: 'AlbTargetGroup' }
+            NetworkConfiguration:
+                AwsvpcConfiguration:
+                    AssignPublicIp: 'ENABLED'
+                    SecurityGroups: [ { Ref: "EcsSecurityGroup" } ]
+                    Subnets: { Ref: "PublicSubnets" }
+            ServiceName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            TaskDefinition: { Ref: "TaskDefinition" }
