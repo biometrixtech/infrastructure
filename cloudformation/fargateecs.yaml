@@ -170,6 +170,8 @@ Resources:
             HealthCheckProtocol: 'HTTP'
             HealthCheckTimeoutSeconds: 5
             HealthyThresholdCount: 2
+            Matcher:
+                HttpCode: '200-299'
             TargetType: 'ip'
             Name: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
             Port: 80
