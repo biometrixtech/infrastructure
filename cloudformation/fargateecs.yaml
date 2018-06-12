@@ -80,7 +80,7 @@ Resources:
             Description: 'Ingress from the ALB'
             GroupId: { Ref: 'EcsSecurityGroup' }
             IpProtocol: -1
-            SourceSecurityGroupId: { Ref: 'PublicLoadBalancerSG' }
+            SourceSecurityGroupId: { Ref: 'AlbSecurityGroup' }
 
     EcsSecurityGroupIngressFromSelf:
         Type: 'AWS::EC2::SecurityGroupIngress'
@@ -95,7 +95,7 @@ Resources:
     ##  ALB
     ##########################################################################################################
 
-    PublicLoadBalancerSG:
+    AlbSecurityGroup:
         Type: 'AWS::EC2::SecurityGroup'
         Properties:
             GroupName: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
@@ -112,7 +112,7 @@ Resources:
               - { Key: "Service", Value: { Ref: "Service" } }
             VpcId: { Ref: 'Vpc' }
 
-    PublicLoadBalancer:
+    Alb:
         Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
         Properties:
             LoadBalancerAttributes:
@@ -120,7 +120,7 @@ Resources:
                 Value: '30'
             Name: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
             Scheme: 'internet-facing'
-            SecurityGroups: [ { Ref: 'PublicLoadBalancerSG' } ]
+            SecurityGroups: [ { Ref: 'AlbSecurityGroup' } ]
             Subnets: { Ref: 'PublicSubnets' }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" } }
