@@ -170,6 +170,8 @@ Resources:
             HealthCheckProtocol: 'HTTP'
             HealthCheckTimeoutSeconds: 5
             HealthyThresholdCount: 2
+            Matcher:
+                HttpCode: '200-299'
             TargetType: 'ip'
             Name: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
             Port: 80
@@ -207,7 +209,12 @@ Resources:
         Properties:
             Cpu: { Ref: 'ContainerCpu' }
             ContainerDefinitions:
-              - Cpu: { Ref: 'ContainerCpu' }
+              - Command: { "Fn::If": [
+                    'OverrideContainerCommand',
+                    { "Fn::Split": [ "|", { Ref: 'ContainerCommand' } ] },
+                    { Ref: "AWS::NoValue" }
+                ] }
+                Cpu: { Ref: 'ContainerCpu' }
                 Environment:
                   - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
                 Image: { Ref: 'ContainerImage' }
