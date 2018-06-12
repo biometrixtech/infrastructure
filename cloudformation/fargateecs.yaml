@@ -207,12 +207,7 @@ Resources:
         Properties:
             Cpu: { Ref: 'ContainerCpu' }
             ContainerDefinitions:
-              - Command: { "Fn::If": [
-                    'OverrideContainerCommand',
-                    { "Fn::Split": [ "|", { Ref: 'ContainerCommand' } ] },
-                    { Ref: "AWS::NoValue" }
-                ] }
-                Cpu: { Ref: 'ContainerCpu' }
+              - Cpu: { Ref: 'ContainerCpu' }
                 Environment:
                   - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
                 Image: { Ref: 'ContainerImage' }
