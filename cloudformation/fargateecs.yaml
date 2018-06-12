@@ -29,6 +29,78 @@ Parameters:
 Resources:
 
     ##########################################################################################################
+    ##  SECURITY
+    ##########################################################################################################
+
+    EcsSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupName: { "Fn::Sub": "${Project}-${Environment}-${Service}-fargate" }
+            GroupDescription: "Security group for Fargate containers"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-fargate" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+            VpcId: { Ref: "Vpc" }
+
+    EcsSecurityGroupIngressFromPublicALB:
+        Type: 'AWS::EC2::SecurityGroupIngress'
+        Properties:
+            Description: 'Ingress from the ALB'
+            GroupId: { Ref: 'EcsSecurityGroup' }
+            IpProtocol: -1
+            SourceSecurityGroupId: { Ref: 'PublicLoadBalancerSG' }
+
+    EcsSecurityGroupIngressFromSelf:
+        Type: 'AWS::EC2::SecurityGroupIngress'
+        Properties:
+            Description: 'Ingress from other containers in the same security group'
+            GroupId: { Ref: 'EcsSecurityGroup' }
+            IpProtocol: -1
+            SourceSecurityGroupId: { Ref: 'EcsSecurityGroup' }
+
+
+    ##########################################################################################################
+    ##  ALB
+    ##########################################################################################################
+
+    PublicLoadBalancerSG:
+        Type: 'AWS::EC2::SecurityGroup'
+        Properties:
+            GroupName: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
+            GroupDescription: 'Access to the public facing load balancer'
+            SecurityGroupIngress:
+              # Allow access to ALB from anywhere on the internet
+              - CidrIp: '0.0.0.0/0'
+                IpProtocol: -1
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+            VpcId: { Ref: 'Vpc' }
+
+    PublicLoadBalancer:
+        Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+        Properties:
+            LoadBalancerAttributes:
+              - Key: 'idle_timeout.timeout_seconds'
+                Value: '30'
+            Name: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
+            Scheme: 'internet-facing'
+            SecurityGroups: [ { Ref: 'PublicLoadBalancerSG' } ]
+            Subnets: { Ref: 'PublicSubnets' }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+
+    ##########################################################################################################
     ##  ECS
     ##########################################################################################################
 
