@@ -15,7 +15,7 @@ Parameters:
 Mappings:
     TemplateVersion:
         Self: { Commit: "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
-        Infrastructure: { Commit: "596479b1f9ef6da8a932a181060532ecc5452b94" }
+        Infrastructure: { Commit: "7a75316110a1369db475b75622f5b135ea82b7d0" }
 
 Resources:
 
