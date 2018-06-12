@@ -15,7 +15,7 @@ Parameters:
 Mappings:
     TemplateVersion:
         Self: { Commit: "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
-        Infrastructure: { Commit: "7b8c5a69587da30709294eaac1a2b9e819293013 " }
+        Infrastructure: { Commit: "7a75316110a1369db475b75622f5b135ea82b7d0" }
 
 Resources:
 
@@ -53,7 +53,7 @@ Resources:
                 Service: "fargate"
                 PublicSubnetIds: { "Fn::GetAtt": [ "VpcStack", "Outputs.PublicSubnetIds" ] }
                 VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
-                ContainerCommand: "'/bin/sh'|'-c'|\"echo 'events {} http { map \\$msec \\$sec { ~^(?P<_sec>.+)\\. \\$_sec; } server { add_header X-Time \\$sec; return 204; } }' > /etc/nginx/nginx.conf; nginx -g 'daemon off;'\""
+                ContainerCommand: "/bin/sh|-c|echo 'events {} http { map $msec $sec { ~^(?P<_sec>.+)\\. $_sec; } server { add_header X-Time $sec; return 204; } }' > /etc/nginx/nginx.conf; nginx -g 'daemon off;'"
                 ContainerImage: 'nginx'
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "time-${Environment}-fargate" } }
