@@ -15,7 +15,7 @@ Parameters:
 Mappings:
     TemplateVersion:
         Self: { Commit: "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
-        Infrastructure: { Commit: "7b21cb69de4a118a4b775620d6e10fba61098499" }
+        Infrastructure: { Commit: "b9f76f51659fe6eb7527f7453cf3e495dd17217c" }
 
 Resources:
 
@@ -51,7 +51,7 @@ Resources:
                 Project: "time"
                 Environment: { Ref: "Environment" }
                 Service: "fargate"
-                PublicSubnets: { "Fn::GetAtt": [ "VpcStack", "Outputs.PublicSubnetIds" ] }
+                PublicSubnetIds: { "Fn::GetAtt": [ "VpcStack", "Outputs.PublicSubnetIds" ] }
                 VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "time-${Environment}-fargate" } }
