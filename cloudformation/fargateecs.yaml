@@ -32,6 +32,35 @@ Resources:
     ##  SECURITY
     ##########################################################################################################
 
+    EcsServiceRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                  - Effect: "Allow"
+                    Principal:
+                        Service: [ "ecs.amazonaws.com" ]
+                    Action:
+                      - "sts:AssumeRole"
+            Path: "/"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+            RoleName: { "Fn::Sub": "${Project}-${Environment}-${Service}-ecsservicerole-${AWS::Region}" }
+
+    EcsContainerRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            Path: "/"
+            ManagedPolicyArns:
+              - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+            RoleName: { "Fn::Sub": "${Project}-${Environment}-${Service}-ecscontainer-${AWS::Region}" }
+
     EcsSecurityGroup:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
@@ -51,7 +80,7 @@ Resources:
             Description: 'Ingress from the ALB'
             GroupId: { Ref: 'EcsSecurityGroup' }
             IpProtocol: -1
-            SourceSecurityGroupId: { Ref: 'PublicLoadBalancerSG' }
+            SourceSecurityGroupId: { Ref: 'AlbSecurityGroup' }
 
     EcsSecurityGroupIngressFromSelf:
         Type: 'AWS::EC2::SecurityGroupIngress'
@@ -66,7 +95,7 @@ Resources:
     ##  ALB
     ##########################################################################################################
 
-    PublicLoadBalancerSG:
+    AlbSecurityGroup:
         Type: 'AWS::EC2::SecurityGroup'
         Properties:
             GroupName: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
@@ -83,7 +112,7 @@ Resources:
               - { Key: "Service", Value: { Ref: "Service" } }
             VpcId: { Ref: 'Vpc' }
 
-    PublicLoadBalancer:
+    Alb:
         Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
         Properties:
             LoadBalancerAttributes:
@@ -91,7 +120,7 @@ Resources:
                 Value: '30'
             Name: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
             Scheme: 'internet-facing'
-            SecurityGroups: [ { Ref: 'PublicLoadBalancerSG' } ]
+            SecurityGroups: [ { Ref: 'AlbSecurityGroup' } ]
             Subnets: { Ref: 'PublicSubnets' }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" } }
