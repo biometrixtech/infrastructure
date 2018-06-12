@@ -35,6 +35,10 @@ Parameters:
         Type: 'Number'
         Default: 80
         Description: 'What port number the application inside the docker container is binding to'
+    ContainerCommand:
+        Type: 'String'
+        Default: ''
+        Description: '(Optional) The command to run on the container'
     ContainerCpu:
         Type: 'Number'
         AllowedValues: [ 256, 512, 1024, 2048 ]
@@ -52,8 +56,8 @@ Parameters:
 
 
 Conditions:
-  HasCustomRole: { "Fn::Not": [ { "Fn::Equals": [ { Ref: 'ContainerRoleArn' }, '' ] } ] }
-
+    HasCustomRole: { "Fn::Not": [ { "Fn::Equals": [ { Ref: 'ContainerRoleArn' }, '' ] } ] }
+    OverrideContainerCommand: { "Fn::Not": [ { "Fn::Equals": [ { Ref: 'ContainerCommand' }, '' ] } ] }
 
 Resources:
 
@@ -203,7 +207,12 @@ Resources:
         Properties:
             Cpu: { Ref: 'ContainerCpu' }
             ContainerDefinitions:
-              - Cpu: { Ref: 'ContainerCpu' }
+              - Command: { "Fn::If": [
+                    'OverrideContainerCommand',
+                    { "Fn::Split": [ "|", { Ref: 'ContainerCommand' } ] },
+                    { Ref: "AWS::NoValue" }
+                ] }
+                Cpu: { Ref: 'ContainerCpu' }
                 Environment:
                   - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
                 Image: { Ref: 'ContainerImage' }
