@@ -15,7 +15,7 @@ Parameters:
 Mappings:
     TemplateVersion:
         Self: { Commit: "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
-        Infrastructure: { Commit: "7a75316110a1369db475b75622f5b135ea82b7d0" }
+        Infrastructure: { Commit: "4681bd598a01ffe186377c0751deb8fb89cc2f10" }
 
 Resources:
 
@@ -55,6 +55,7 @@ Resources:
                 VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
                 ContainerCommand: "/bin/sh|-c|echo 'events {} http { map $msec $sec { ~^(?P<_sec>.+)\\. $_sec; } server { add_header X-Time $sec; return 204; } }' > /etc/nginx/nginx.conf; nginx -g 'daemon off;'"
                 ContainerImage: 'nginx'
+                HostedZoneId: { "Fn::ImportValue": { "Fn::Sub": "FathomaiHostedZoneId-${Environment}" } }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "time-${Environment}-fargate" } }
               - { Key: "Management", Value: "managed" }
