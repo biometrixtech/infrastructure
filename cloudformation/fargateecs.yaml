@@ -24,6 +24,9 @@ Parameters:
     PublicSubnetIds:
         Description: "The IDs of the subnets to launch containers in"
         Type: "List<AWS::EC2::Subnet::Id>"
+    HostedZoneId:
+        Type: "String"
+        Description: "The ID of the Route53 hosted zone"
 
     # Container configuration
     ContainerImage:
@@ -256,3 +259,17 @@ Resources:
                     Subnets: { Ref: "PublicSubnetIds" }
             ServiceName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
             TaskDefinition: { Ref: "TaskDefinition" }
+
+    ##########################################################################################################
+    ##  ROUTE53
+    ##########################################################################################################
+
+    CustomDomainCnameRecords:
+        Type: "AWS::Route53::RecordSet"
+        Properties:
+            HostedZoneId: { Ref: "HostedZoneId" }
+            Comment: "Stats API"
+            Name: { "Fn::Sub": "${Project}.${Environment}.fathomai.com." }
+            Type: "CNAME"
+            TTL: "600"
+            ResourceRecords: [ { "Fn::GetAtt": [ "Alb", "DNSName" ] } ]
