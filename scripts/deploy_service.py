@@ -32,6 +32,9 @@ subservice_stack_mapping = {
         'ingest': 'IngestStack',
         'monitoring': 'MonitoringCluster',
         'pipeline': 'PipelineCluster',
+    },
+    'time': {
+        'fargateecs': 'FargateStack',
     }
 }
 
@@ -180,15 +183,19 @@ def update_git_branch(branch_name):
 
 
 def get_git_dir():
+    try:
         git_repo_name = {
             'alerts': 'Alerts',
             'hardware': 'Hardware',
             'infrastructure': 'Infrastructure',
             'preprocessing': 'PreProcessing',
             'statsapi': 'StatsAPI',
+            'time': 'Infrastructure',
             'users': 'Users',
         }[args.service]
         return os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../{}'.format(git_repo_name)))
+    except KeyError:
+        return None
 
 
 def print(*args, **kwargs):
@@ -280,14 +287,13 @@ def main():
             elif 'is in UPDATE_IN_PROGRESS state' in str(e):
                 print('Stack is already updating', colour=Fore.YELLOW)
                 await_stack_update(stack)
-                exit(1)
             else:
                 print(e, colour=Fore.RED)
-                exit(1)
+            exit(1)
 
         await_stack_update(stack)
 
-        if args.subservice == 'environment':
+        if args.subservice == 'environment' and args.service != 'time':
             # Update git reference
             # TODO
             print('Updating git reference')
@@ -295,17 +301,15 @@ def main():
             if args.service == 'preprocessing':
                 # We also implicitly deployed a new version of the application here
                 update_git_branch('{}-{}-app'.format(args.environment, args.region))
-            pass
 
-        # Explicitly deploy lambda functions to make sure they update
-        if args.subservice == 'environment':
+            # Explicitly deploy lambda functions to make sure they update
             update_lambda_functions()
 
         exit(0)
 
 
 def map_templates(service, environment, subservice, version):
-    if subservice in ['vpc', 'apigateway']:
+    if subservice in ['vpc', 'apigateway', 'fargateecs']:
         # These subservices, in any service, are drawn from the infrastructure repo
         return [(
             '/vagrant/Infrastructure/cloudformation/{subservice}.yaml'.format(subservice=subservice),
@@ -318,14 +322,16 @@ def map_templates(service, environment, subservice, version):
             'hardware': '/vagrant/Hardware/cloudformation',
             'preprocessing': '/vagrant/PreProcessing/cloudformation',
             'statsapi': '/vagrant/StatsAPI/cloudformation',
+            'time': '/vagrant/Infrastructure/cloudformation',
             'users': '/vagrant/Users/cloudformation',
         }
         valid_subservices = {
             'alerts': ['pipeline'],
-            'infrastructure': ['timeserver', 'gitsync', 'lambci'],
+            'infrastructure': ['lambci'],
             'hardware': [],
             'preprocessing': ['compute', 'ingest', 'monitoring', 'pipeline'],
             'statsapi': [],
+            'time': ['fargateecs'],
             'users': [],
         }
         if service in valid_subservices:
@@ -336,7 +342,8 @@ def map_templates(service, environment, subservice, version):
                         service=service,
                         subservice=subservice
                     ),
-                    'cloudformation/{service}/{version}/{service}-{subservice}.yaml'.format(
+                    'cloudformation/{repo}/{version}/{service}-{subservice}.yaml'.format(
+                        repo='infrastructure' if service == 'time' else service,
                         service=service,
                         version=version,
                         subservice=subservice
@@ -368,6 +375,7 @@ if __name__ == '__main__':
                             'hardware',
                             'preprocessing',
                             'statsapi',
+                            'time',
                             'users',
                         ],
                         help='The service being deployed')
