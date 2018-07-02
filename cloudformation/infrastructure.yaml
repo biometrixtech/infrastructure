@@ -271,25 +271,10 @@ Resources:
                 TTL: "900"
                 ResourceRecords: [ 'rails-app-v2-alb-472858714.us-west-2.elb.amazonaws.com' ]
 
-              - Name: "rails-db.biometrixtech.com."
-                Type: "CNAME"
-                TTL: "900"
-                ResourceRecords: [ 'ec2-35-162-107-177.us-west-2.compute.amazonaws.com' ]
-
               - Name: "sites.biometrixtech.com."
                 Type: "CNAME"
                 TTL: "900"
                 ResourceRecords: [ 'ghs.googlehosted.com' ]
-
-              - Name: "stats-api-dev.biometrixtech.com."
-                Type: "CNAME"
-                TTL: "900"
-                ResourceRecords: [ 'biometrixstatsapi-dev.us-west-2.elasticbeanstalk.com' ]
-
-              - Name: "stats-api.biometrixtech.com."
-                Type: "CNAME"
-                TTL: "900"
-                ResourceRecords: [ 'biometrixstatsapi-prod.us-west-2.elasticbeanstalk.com' ]
 
               - Name: "sysops.biometrixtech.com."
                 Type: "CNAME"
@@ -348,8 +333,9 @@ Resources:
             RecordSets:
               - Name: "fathomai.com."
                 Type: "A"
-                TTL: "900"
-                ResourceRecords: [ '54.148.17.2' ]
+                AliasTarget:
+                    HostedZoneId: 'Z1H1FL5HABSF5'
+                    DNSName: "wordpress-prod-1136385471.us-west-2.elb.amazonaws.com"
 
               - Name: "_domainconnect.fathomai.com."
                 Type: "CNAME"
