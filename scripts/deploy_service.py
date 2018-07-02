@@ -94,18 +94,35 @@ def get_stack_name():
         exit(1)
 
 
+def map_parameters(old_parameters):
+    param_map = [a.split('->') for a in filter(None, args.param_map.split(','))]
+    param_map = dict(param_map)
+
+    parameters = []
+    for old_parameter in old_parameters:
+        old_parameter_name = old_parameter['ParameterKey']
+        if old_parameter_name in param_map:
+            if param_map[old_parameter_name] == '':
+                print('Removing parameter {}'.format(old_parameter_name))
+                continue
+            else:
+                print('Renaming parameter {} to {}'.format(old_parameter_name, param_map[old_parameter_name]))
+                parameters.append({'ParameterKey': param_map[old_parameter_name], 'ParameterValue': old_parameter['ParameterValue']})
+        else:
+            parameters.append({'ParameterKey': old_parameter_name, 'UsePreviousValue': True})
+
+    return parameters
+
+
 def update_cf_stack(stack, s3_path):
     print('Updating stack {} using template s3://{}/{}'.format(stack.stack_name, s3_bucket_name, s3_path))
-    drop_params = args.drop_params.split(',')
     stack.update(
         TemplateURL='https://s3.amazonaws.com/{bucket}/{template}'.format(
             region=args.region,
             bucket=s3_bucket_name,
             template=s3_path,
         ),
-        Parameters=[{'ParameterKey': p['ParameterKey'], 'UsePreviousValue': True}
-                    for p in stack.parameters or {}
-                    if p['ParameterKey'] not in drop_params],
+        Parameters=map_parameters(stack.parameters),
         Capabilities=['CAPABILITY_NAMED_IAM'],
     )
 
@@ -384,10 +401,10 @@ if __name__ == '__main__':
                         action='store_true',
                         dest='noupdate',
                         help='Skip updating CF stack')
-    parser.add_argument('--drop-params',
-                        dest='drop_params',
+    parser.add_argument('--param-map',
+                        dest='param_map',
                         default='',
-                        help='Parameters to drop from the template, comma-delimited')
+                        help='Parameters to rename ("oldparamname->newparamname,...") or drop ("oldparamname->,...")')
 
     args = parser.parse_args()
     # Need to post-process the version because validation depends on the args.service value
