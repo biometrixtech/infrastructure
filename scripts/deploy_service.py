@@ -201,6 +201,7 @@ def get_git_dir():
             'alerts': 'Alerts',
             'hardware': 'Hardware',
             'infrastructure': 'Infrastructure',
+            'plans': 'Plans',
             'preprocessing': 'PreProcessing',
             'statsapi': 'StatsAPI',
             'users': 'Users',
@@ -306,7 +307,6 @@ def main():
 
         if args.subservice == 'environment':
             # Update git reference
-            # TODO
             print('Updating git reference')
             update_git_branch('{}-{}'.format(args.environment, args.region))
             if args.service == 'preprocessing':
@@ -333,6 +333,7 @@ def map_templates(service, environment, subservice, version):
             'alerts': '/vagrant/Alerts/cloudformation',
             'infrastructure': '/vagrant/Infrastructure/cloudformation',
             'hardware': '/vagrant/Hardware/cloudformation',
+            'plans': '/vagrant/Plans/cloudformation',
             'preprocessing': '/vagrant/PreProcessing/cloudformation',
             'statsapi': '/vagrant/StatsAPI/cloudformation',
             'users': '/vagrant/Users/cloudformation',
@@ -341,6 +342,7 @@ def map_templates(service, environment, subservice, version):
             'alerts': ['pipeline'],
             'infrastructure': ['timeserver', 'gitsync', 'lambci'],
             'hardware': [],
+            'plans': [],
             'preprocessing': ['compute', 'ingest', 'monitoring', 'pipeline'],
             'statsapi': [],
             'users': [],
