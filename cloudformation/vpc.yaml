@@ -32,10 +32,11 @@ Parameters:
         MaxValue: 255
         Description: "The second digit in the IP range (10.xx.0.0/16).  VPNs with overlapping address spaces cannot be peered."
 
-    PeeringVpc:
+    PeeringId:
         Type: "String"
         Default: ""
-        Description: "Peering VPC ID"
+        AllowedPattern: "^(vpc|pcx)-[a-z0-9]+|$"
+        Description: "VPC ID to create a new peering connection to, or Peering Connection ID to add routes to an existing connection"
 
     PeeringCidr:
         Type: "String"
@@ -57,7 +58,7 @@ Metadata:
             Parameters:
               - "MultiAz"
               - "VpnCidr"
-              - "PeeringVpc"
+              - "PeeringId"
               - "PeeringCidr"
 
         ParameterLabels:
@@ -66,15 +67,19 @@ Metadata:
             Service: { default: "Service" }
             MultiAz: { default: "Multi AZ?" }
             VpnCidr: { default: "VPN CIDR block" }
-            PeeringVpc: { default: " VPN ID" }
+            PeeringId: { default: " VPN ID" }
             PeeringCidr: { default: " VPN CIDR" }
 
 Conditions:
     MultiAz: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MultiAz" }, "false" ] } ] }
-    CreatePeeringConnection: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringVpc" }, "" ] } ] }
-    MultiAzAndCreatePeeringConnection: { "Fn::And": [
-        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringVpc" }, "" ] } ] },
+    CreatePeering: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringId" }, "" ] } ] }
+    MultiAzAndCreatePeering: { "Fn::And": [
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringId" }, "" ] } ] },
         { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MultiAz" }, "false" ] } ] }
+    ] }
+    CreatePeeringConnection: { "Fn::Equals": [
+        "vpc",
+        { "Fn::Select": [ 0, { "Fn::Split": [ "-", { Ref: "PeeringId" } ] } ] }
     ] }
 
 Resources:
@@ -111,7 +116,7 @@ Resources:
     PeeringConnection:
         Type: "AWS::EC2::VPCPeeringConnection"
         Properties:
-            PeerVpcId: { Ref: "PeeringVpc" }
+            PeerVpcId: { Ref: "PeeringId" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-peering" } }
               - { Key: "Management", Value: "managed" }
@@ -168,9 +173,12 @@ Resources:
         Type: "AWS::EC2::Route"
         Properties:
             RouteTableId: { Ref: "PublicRouteTableAlpha" }
-            VpcPeeringConnectionId: { Ref: "PeeringConnection" }
+            VpcPeeringConnectionId: { "Fn::If": [
+                "CreatePeeringConnection",
+                { Ref: "PeeringConnection" },
+                { Ref: "PeeringId" } ] }
             DestinationCidrBlock: { Ref: "PeeringCidr" }
-        Condition: "CreatePeeringConnection"
+        Condition: "CreatePeering"
         DependsOn: "InternetGatewayVpcAttachment"
 
     NatGatewayEipAlpha:
@@ -242,9 +250,12 @@ Resources:
         Type: "AWS::EC2::Route"
         Properties:
             RouteTableId: { Ref: "PublicRouteTableBeta" }
-            VpcPeeringConnectionId: { Ref: "PeeringConnection" }
+            VpcPeeringConnectionId: { "Fn::If": [
+                "CreatePeeringConnection",
+                { Ref: "PeeringConnection" },
+                { Ref: "PeeringId" } ] }
             DestinationCidrBlock: { Ref: "PeeringCidr" }
-        Condition: "MultiAzAndCreatePeeringConnection"
+        Condition: "MultiAzAndCreatePeering"
         DependsOn: "InternetGatewayVpcAttachment"
 
     NatGatewayEipBeta:
@@ -313,9 +324,12 @@ Resources:
         Type: "AWS::EC2::Route"
         Properties:
             RouteTableId: { Ref: "PrivateRouteTableAlpha" }
-            VpcPeeringConnectionId: { Ref: "PeeringConnection" }
+            VpcPeeringConnectionId: { "Fn::If": [
+                "CreatePeeringConnection",
+                { Ref: "PeeringConnection" },
+                { Ref: "PeeringId" } ] }
             DestinationCidrBlock: { Ref: "PeeringCidr" }
-        Condition: "CreatePeeringConnection"
+        Condition: "CreatePeering"
         DependsOn: "InternetGatewayVpcAttachment"
 
     ##########################################################################################################
@@ -368,9 +382,12 @@ Resources:
         Type: "AWS::EC2::Route"
         Properties:
             RouteTableId: { Ref: "PrivateRouteTableBeta" }
-            VpcPeeringConnectionId: { Ref: "PeeringConnection" }
+            VpcPeeringConnectionId: { "Fn::If": [
+                "CreatePeeringConnection",
+                { Ref: "PeeringConnection" },
+                { Ref: "PeeringId" } ] }
             DestinationCidrBlock: { Ref: "PeeringCidr" }
-        Condition: "MultiAzAndCreatePeeringConnection"
+        Condition: "MultiAzAndCreatePeering"
         DependsOn: "InternetGatewayVpcAttachment"
 
     ##########################################################################################################
