@@ -20,10 +20,10 @@ Parameters:
         Type: "String"
         Description: "The name of the service"
 
-    MultiAz:
+    SubnetConfiguration:
         Type: "String"
-        AllowedValues: [ "true", "false" ]
-        Description: "Whether to create instances in multiple AZs.  This has an additional cost."
+        AllowedValues: [ "Public A/B, Private A/B", "Public A/B", "Public A" ]
+        Description: "The configuration of public/private subnets"
 
     # The second part of the CIDR block for the VPN (10.xx.0.0/24).
     VpnCidr:
@@ -56,7 +56,7 @@ Metadata:
               - "Service"
           - Label: { default: "Configuration" }
             Parameters:
-              - "MultiAz"
+              - "SubnetConfiguration"
               - "VpnCidr"
               - "PeeringId"
               - "PeeringCidr"
@@ -65,17 +65,26 @@ Metadata:
             Project: { default: "Project" }
             Environment: { default: "Environment" }
             Service: { default: "Service" }
-            MultiAz: { default: "Multi AZ?" }
+            SubnetConfiguration: { default: "Subnet configuration" }
             VpnCidr: { default: "VPN CIDR block" }
-            PeeringId: { default: " VPN ID" }
-            PeeringCidr: { default: " VPN CIDR" }
+            PeeringId: { default: "Peering VPN ID" }
+            PeeringCidr: { default: "Peering VPN CIDR" }
 
 Conditions:
-    MultiAz: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MultiAz" }, "false" ] } ] }
+    CreatePublicBeta: { "Fn::Or": [
+        { "Fn::Equals": [ { Ref: "SubnetConfiguration" }, "Public A/B, Private A/B" ] },
+        { "Fn::Equals": [ { Ref: "SubnetConfiguration" }, "Public A/B" ] }
+    ] }
+    CreatePrivateAlpha: { "Fn::Equals": [ { Ref: "SubnetConfiguration" }, "Public A/B, Private A/B" ] }
+    CreatePrivateBeta: { "Fn::Equals": [ { Ref: "SubnetConfiguration" }, "Public A/B, Private A/B" ] }
     CreatePeering: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringId" }, "" ] } ] }
-    MultiAzAndCreatePeering: { "Fn::And": [
+    CreatePublicBetaAndCreatePeering: { "Fn::And": [
         { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringId" }, "" ] } ] },
-        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "MultiAz" }, "false" ] } ] }
+        { "Condition": "CreatePublicBeta" }
+    ] }
+    CreatePrivateBetaAndCreatePeering: { "Fn::And": [
+        { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PeeringId" }, "" ] } ] },
+        { "Condition": "CreatePrivateBeta" }
     ] }
     CreatePeeringConnection: { "Fn::Equals": [
         "vpc",
@@ -216,7 +225,7 @@ Resources:
               - { Key: "Project", Value: { Ref: "Project" } }
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: { Ref: "Service" } }
-        Condition: "MultiAz"
+        Condition: "CreatePublicBeta"
 
     PublicRouteTableBeta:
         Type: "AWS::EC2::RouteTable"
@@ -228,14 +237,14 @@ Resources:
               - { Key: "Project", Value: { Ref: "Project" } }
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: { Ref: "Service" } }
-        Condition: "MultiAz"
+        Condition: "CreatePublicBeta"
 
     PublicSubnetBetaRouteTableAssociation:
         Type: "AWS::EC2::SubnetRouteTableAssociation"
         Properties:
             SubnetId: { Ref: "PublicSubnetBeta" }
             RouteTableId: { Ref: "PublicRouteTableBeta" }
-        Condition: "MultiAz"
+        Condition: "CreatePublicBeta"
 
     PublicRouteBeta:
         Type: "AWS::EC2::Route"
@@ -243,7 +252,7 @@ Resources:
             RouteTableId: { Ref: "PublicRouteTableBeta" }
             GatewayId: { Ref: "InternetGateway" }
             DestinationCidrBlock: "0.0.0.0/0"
-        Condition: "MultiAz"
+        Condition: "CreatePublicBeta"
         DependsOn: "InternetGatewayVpcAttachment"
 
     PublicBetaPeeringRoute:
@@ -255,28 +264,8 @@ Resources:
                 { Ref: "PeeringConnection" },
                 { Ref: "PeeringId" } ] }
             DestinationCidrBlock: { Ref: "PeeringCidr" }
-        Condition: "MultiAzAndCreatePeering"
+        Condition: "CreatePublicBetaAndCreatePeering"
         DependsOn: "InternetGatewayVpcAttachment"
-
-    NatGatewayEipBeta:
-        Type: "AWS::EC2::EIP"
-        Properties:
-            Domain: "vpc"
-        Condition: "MultiAz"
-
-    NatGatewayBeta:
-        DependsOn: "InternetGatewayVpcAttachment"
-        Type: "AWS::EC2::NatGateway"
-        Properties:
-            AllocationId: { "Fn::GetAtt" : [ "NatGatewayEipBeta", "AllocationId" ] }
-            SubnetId: { Ref: "PublicSubnetBeta" }
-            Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-beta" } }
-              - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: { Ref: "Project" } }
-              - { Key: "Environment", Value: { Ref: "Environment" } }
-              - { Key: "Service", Value: { Ref: "Service" } }
-        Condition: "MultiAz"
 
     ##########################################################################################################
     ##  PRIVATE AZ ALPHA
@@ -348,7 +337,7 @@ Resources:
               - { Key: "Project", Value: { Ref: "Project" } }
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: { Ref: "Service" } }
-        Condition: "MultiAz"
+        Condition: "CreatePrivateBeta"
 
     PrivateRouteTableBeta:
         Type: "AWS::EC2::RouteTable"
@@ -360,22 +349,22 @@ Resources:
               - { Key: "Project", Value: { Ref: "Project" } }
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: { Ref: "Service" } }
-        Condition: "MultiAz"
+        Condition: "CreatePrivateBeta"
 
     PrivateSubnetBetaRouteTableAssociation:
         Type: "AWS::EC2::SubnetRouteTableAssociation"
         Properties:
             SubnetId: { Ref: "PrivateSubnetBeta" }
             RouteTableId: { Ref: "PrivateRouteTableBeta" }
-        Condition: "MultiAz"
+        Condition: "CreatePrivateBeta"
 
     PrivateRouteBeta:
         Type: "AWS::EC2::Route"
         Properties:
             RouteTableId: { Ref: "PrivateRouteTableBeta" }
-            NatGatewayId: { Ref: "NatGatewayBeta" }
+            NatGatewayId: { Ref: "NatGatewayAlpha" }
             DestinationCidrBlock: "0.0.0.0/0"
-        Condition: "MultiAz"
+        Condition: "CreatePrivateBeta"
         DependsOn: "InternetGatewayVpcAttachment"
 
     PrivateBetaPeeringRoute:
@@ -387,7 +376,7 @@ Resources:
                 { Ref: "PeeringConnection" },
                 { Ref: "PeeringId" } ] }
             DestinationCidrBlock: { Ref: "PeeringCidr" }
-        Condition: "MultiAzAndCreatePeering"
+        Condition: "CreatePrivateBetaAndCreatePeering"
         DependsOn: "InternetGatewayVpcAttachment"
 
     ##########################################################################################################
@@ -400,19 +389,11 @@ Resources:
     S3Endpoint:
         Type: "AWS::EC2::VPCEndpoint"
         Properties:
-            RouteTableIds: { "Fn::If": [
-                "MultiAz",
-                [
-                    { Ref: "PublicRouteTableAlpha" },
-                    { Ref: "PrivateRouteTableAlpha" },
-                    { Ref: "PublicRouteTableBeta" },
-                    { Ref: "PrivateRouteTableBeta" }
-                ],
-                [
-                    { Ref: "PublicRouteTableAlpha" },
-                    { Ref: "PrivateRouteTableAlpha" }
-                ]
-            ] }
+            RouteTableIds:
+               - { Ref: "PublicRouteTableAlpha" }
+               - { "Fn::If": [ "CreatePublicBeta", { Ref: "PublicRouteTableBeta" }, { Ref: "AWS::NoValue" } ] }
+               - { "Fn::If": [ "CreatePrivateAlpha", { Ref: "PrivateRouteTableAlpha" }, { Ref: "AWS::NoValue" } ] }
+               - { "Fn::If": [ "CreatePrivateBeta", { Ref: "PrivateRouteTableBeta" }, { Ref: "AWS::NoValue" } ] }
             ServiceName: { "Fn::Sub": "com.amazonaws.${AWS::Region}.s3" }
             VpcId: { Ref: "Vpc" }
 
@@ -451,14 +432,11 @@ Outputs:
 
     PrivateSubnetAlphaId:
         Description: "The id of private subnet alpha"
-        Value: { Ref: "PrivateSubnetAlpha" }
+        Value: { "Fn::If": [ "CreatePrivateAlpha", { Ref: "PrivateSubnetAlpha" }, "" ] }
 
     PrivateSubnetBetaId:
         Description: "The id of private subnet beta"
-        Value: { "Fn::If": [ "MultiAz",
-            { Ref: "PrivateSubnetBeta" },
-            ""
-        ]}
+        Value: { "Fn::If": [ "CreatePrivateBeta", { Ref: "PrivateSubnetBeta" }, "" ]}
 
     PublicSubnetAlphaId:
         Description: "The id of public subnet alpha"
@@ -466,16 +444,13 @@ Outputs:
 
     PublicSubnetBetaId:
         Description: "The id of public subnet beta"
-        Value: { "Fn::If": [ "MultiAz",
-            { Ref: "PublicSubnetBeta" },
-            ""
-        ]}
+        Value: { "Fn::If": [ "CreatePublicBeta", { Ref: "PublicSubnetBeta" }, "" ]}
 
     PrivateSubnetIds:
         Description: "The ids of the private subnets"
-        Value: { "Fn::If": [ "MultiAz",
+        Value: { "Fn::If": [ "CreatePrivateBeta",
             { "Fn::Sub": "${PrivateSubnetAlpha},${PrivateSubnetBeta}" },
-            { Ref: "PrivateSubnetAlpha" }
+            { "Fn::If": [ "CreatePrivateAlpha", { Ref: "PrivateSubnetAlpha" }, "" ] }
         ]}
 
     PrivateHostedZoneId:
