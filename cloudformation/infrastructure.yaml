@@ -72,44 +72,49 @@ Resources:
                     # Copyright Mike Lapidakis, Stephen Poole
                     import boto3, os
 
-                    def handler(event, context):
-                        handler_vpc(event, context)
-                        return
-                        handler_ec2(event, context)
-                        handler_rds(event, context)
+                    def handler(_, __):
+                        handle_vpc()
+                        handle_ec2()
+                        handle_rds()
 
-                    def handler_rds(event, context):
+                    def handle_rds():
                         rds_client = boto3.client('rds', region_name=os.environ['AWS_REGION'])
                         instance_names = [i['DBInstanceIdentifier'] for i in rds_client.describe_db_instances()['DBInstances']]
                         for db_name in instance_names:
                             print('RDS instance {}'.format(db_name))
                             db_arn = 'arn:aws:rds:{}:{}:db:{}'.format(os.environ['AWS_REGION'], '887689817172', db_name)
                             tags = tag_cleanup(rds_client.list_tags_for_resource(ResourceName=db_arn)['TagList'])
-                            print(tags)
-                            snapshot_arns = [snap['DBSnapshotArn'] for snap in rds_client.describe_db_snapshots(DBInstanceIdentifier=db_name)['DBSnapshots']]
-                            for snapshot_arn in snapshot_arns:
-                                print('\t' + snapshot_arn)
-                                rds_client.add_tags_to_resource(ResourceName=snapshot_arn, Tags=tags)
+                            for snapshot in rds_client.describe_db_snapshots(DBInstanceIdentifier=db_name)['DBSnapshots']:
+                                print('\t' + snapshot['DBSnapshotIdentifier'])
+                                rds_client.add_tags_to_resource(ResourceName=snapshot['DBSnapshotArn'], Tags=tags)
 
-                    def handler_ec2(event, context):
+                    def handle_ec2():
                         ec2_resource = boto3.resource('ec2', region_name=os.environ['AWS_REGION'])
                         for instance in ec2_resource.instances.all():
+                            print('EC2 Instance {}'.format(instance.id))
                             for volume in instance.volumes.all():
-                                print(volume.create_tags(Tags=tag_cleanup(instance.tags, '{} (' + volume.attachments[0]['Device'] + ')')))
+                                print('\t' + volume.id)
+                                volume.create_tags(Tags=tag_cleanup(instance.tags, '{} (' + volume.attachments[0]['Device'] + ')'))
                             for eni in instance.network_interfaces:
-                                print(eni.create_tags(Tags=tag_cleanup(instance.tags, "{} (eth" + str(eni.attachment['DeviceIndex']) + ')')))
+                                print('\t' + eni.id)
+                                eni.create_tags(Tags=tag_cleanup(instance.tags, "{} (eth" + str(eni.attachment['DeviceIndex']) + ')'))
 
                         for volume in ec2_resource.volumes.all():
+                            print('EBS Volume {}'.format(volume.id))
                             for snapshot in volume.snapshots.all():
-                                print(snapshot.create_tags(Tags=tag_cleanup(instance.tags, '{} (' + volume.id + ')')))
+                                print('\tSnapshot {}'.format(snapshot.id))
+                                snapshot.create_tags(Tags=tag_cleanup(volume.tags, '{} (' + volume.id + ')'))
 
-                    def handler_vpc(event, context):
+                    def handle_vpc():
                         ec2_client = boto3.client('ec2', region_name=os.environ['AWS_REGION'])
                         for nat_gateway in ec2_client.describe_nat_gateways()['NatGateways']:
                             print('NAT Gateway {}'.format(nat_gateway['NatGatewayId']))
                             for gateway_address in nat_gateway['NatGatewayAddresses']:
                                 print('\t' + gateway_address['NetworkInterfaceId'])
                                 ec2_client.create_tags(Resources=[gateway_address['NetworkInterfaceId']], Tags=tag_cleanup(nat_gateway['Tags'], '{}'))
+                                for eip in ec2_client.describe_addresses(AllocationIds=[gateway_address['AllocationId']])['Addresses']:
+                                    print('\t\t' + eip['AllocationId'])
+                                    ec2_client.create_tags(Resources=[eip['AllocationId']], Tags=tag_cleanup(nat_gateway['Tags'], '{}'))
 
 
                     def tag_cleanup(tags, name_format=None):
@@ -118,10 +123,8 @@ Resources:
                             if t['Key'] == 'Name' and name_format is not None:
                                 temp_tags.append({'Key': 'Name', 'Value': name_format.format(t['Value'])})
                             elif t['Key'] in os.environ['TAGS_TO_COPY'].split(','):
-                                print('Tag {}={}'.format(t['Key'], t['Value']))
                                 temp_tags.append(t)
-                            else:
-                                print('Skipping Tag {}'.format(t['Key']))
+                        print('\t\t\t{' + ','.join(['{}={}'.format(t['Key'], t['Value']) for t in temp_tags]))
                         return temp_tags
 
 
