@@ -48,6 +48,7 @@ Vagrant.configure(2) do |config|
 	config.vm.synced_folder "..", "/vagrant/Infrastructure", id: "infrastructure"
 	config.vm.synced_folder "../../Alerts", "/vagrant/Alerts", id: "alerts"
 	config.vm.synced_folder "../../Hardware", "/vagrant/Hardware", id: "hardware"
+	config.vm.synced_folder "../../Plans", "/vagrant/Plans", id: "plans"
 	config.vm.synced_folder "../../PreProcessing", "/vagrant/PreProcessing", id: "preprocessing"
 	config.vm.synced_folder "../../StatsAPI", "/vagrant/StatsAPI", id: "statsapi"
 	config.vm.synced_folder "../../Users", "/vagrant/Users", id: "users"
