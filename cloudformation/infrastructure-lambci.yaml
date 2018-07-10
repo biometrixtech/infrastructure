@@ -143,6 +143,8 @@ Resources:
                           - { 'Fn::Sub': 'arn:aws:s3:::${BuildResults}/*' }
                           - { 'Fn::Sub': 'arn:aws:s3:::biometrix-infrastructure-us-west-2/cloudformation/*'}
                           - { 'Fn::Sub': 'arn:aws:s3:::biometrix-infrastructure-us-west-2/lambdas/*'}
+                          - { 'Fn::Sub': 'arn:aws:s3:::biometrix-infrastructure-us-east-1/cloudformation/*'}
+                          - { 'Fn::Sub': 'arn:aws:s3:::biometrix-infrastructure-us-east-1/lambdas/*'}
               - PolicyName: 'ReadTables'
                 PolicyDocument:
                     Statement:
