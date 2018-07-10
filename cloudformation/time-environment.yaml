@@ -1,0 +1,71 @@
+# A template that creates a time server
+# Version: da39a3ee5e6b4b0d3255bfef95601890afd80709
+#
+# Copyright 2018 Melon Software Ltd (UK), all rights reserved.  Used under license.
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates a time server"
+
+Parameters:
+
+    Environment:
+        Type: "String"
+        Description: "The name of the environment"
+
+Mappings:
+    TemplateVersion:
+        Self: { Commit: "da39a3ee5e6b4b0d3255bfef95601890afd80709" }
+        Infrastructure: { Commit: "4681bd598a01ffe186377c0751deb8fb89cc2f10" }
+
+Resources:
+
+    ##########################################################################################################
+    ## VPC & NETWORKING
+    ##########################################################################################################
+
+    VpcStack:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+                MultiAz: "true"
+                Project: "time"
+                Service: "compute"
+                VpnCidr: "0"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "time-${Environment}-vpc" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "time" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "vpc" }
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/infrastructure/${TemplateVersion}/vpc.yaml", {
+                InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                TemplateVersion: { "Fn::FindInMap": [ "TemplateVersion", "Infrastructure", "Commit" ] }
+            } ] }
+            TimeoutInMinutes: 10
+
+    FargateStack:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Project: "time"
+                Environment: { Ref: "Environment" }
+                Service: "fargate"
+                PublicSubnetIds: { "Fn::GetAtt": [ "VpcStack", "Outputs.PublicSubnetIds" ] }
+                VpcId: { "Fn::GetAtt": [ "VpcStack", "Outputs.VpcId" ] }
+                ContainerCommand: "/bin/sh|-c|echo 'events {} http { map $msec $sec { ~^(?P<_sec>.+)\\. $_sec; } server { add_header X-Time $sec; return 204; } }' > /etc/nginx/nginx.conf; nginx -g 'daemon off;'"
+                ContainerImage: 'nginx'
+                HostedZoneId: { "Fn::ImportValue": { "Fn::Sub": "FathomaiHostedZoneId-${Environment}" } }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "time-${Environment}-fargate" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "time" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: "fargate" }
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/infrastructure/${TemplateVersion}/fargateecs.yaml", {
+                InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                TemplateVersion: { "Fn::FindInMap": [ "TemplateVersion", "Infrastructure", "Commit" ] }
+            } ] }
+            TimeoutInMinutes: 10
+
+

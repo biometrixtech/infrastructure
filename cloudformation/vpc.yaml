@@ -438,6 +438,13 @@ Outputs:
         Description: "The id of private subnet beta"
         Value: { "Fn::If": [ "CreatePrivateBeta", { Ref: "PrivateSubnetBeta" }, "" ]}
 
+    PrivateSubnetIds:
+        Description: "The ids of the private subnets"
+        Value: { "Fn::If": [ "CreatePrivateBeta",
+            { "Fn::Sub": "${PrivateSubnetAlpha},${PrivateSubnetBeta}" },
+            { "Fn::If": [ "CreatePrivateAlpha", { Ref: "PrivateSubnetAlpha" }, "" ] }
+        ]}
+
     PublicSubnetAlphaId:
         Description: "The id of public subnet alpha"
         Value: { Ref: "PublicSubnetAlpha" }
@@ -446,11 +453,11 @@ Outputs:
         Description: "The id of public subnet beta"
         Value: { "Fn::If": [ "CreatePublicBeta", { Ref: "PublicSubnetBeta" }, "" ]}
 
-    PrivateSubnetIds:
+    PublicSubnetIds:
         Description: "The ids of the private subnets"
-        Value: { "Fn::If": [ "CreatePrivateBeta",
-            { "Fn::Sub": "${PrivateSubnetAlpha},${PrivateSubnetBeta}" },
-            { "Fn::If": [ "CreatePrivateAlpha", { Ref: "PrivateSubnetAlpha" }, "" ] }
+        Value: { "Fn::If": [ "CreatePublicBeta",
+            { "Fn::Sub": "${PublicSubnetAlpha},${PublicSubnetBeta}" },
+            { Ref: "PrivateSubnetAlpha" }
         ]}
 
     PrivateHostedZoneId:

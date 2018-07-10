@@ -1,0 +1,275 @@
+# A template that creates an ECS cluster hosted on AWS Fargate
+#
+# Copyright 2018 Melon Software Ltd (UK), all rights reserved
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates an ECS cluster hosted on AWS Fargate"
+
+Parameters:
+
+    Project:
+        Description: "The name of the project"
+        Type: "String"
+    Environment:
+        Description: "The name of the environment"
+        Type: "String"
+    Service:
+        Description: "The name of the service"
+        Type: "String"
+
+    # Passed nested parameters
+    VpcId:
+        Description: "The ID of the VPC"
+        Type: "AWS::EC2::VPC::Id"
+    PublicSubnetIds:
+        Description: "The IDs of the subnets to launch containers in"
+        Type: "List<AWS::EC2::Subnet::Id>"
+    HostedZoneId:
+        Type: "String"
+        Description: "The ID of the Route53 hosted zone"
+
+    # Container configuration
+    ContainerImage:
+        Type: 'String'
+        Default: 'nginx'
+        Description: 'The url of a docker image that contains the application process that
+                     will handle the traffic for this service'
+    ContainerPort:
+        Type: 'Number'
+        Default: 80
+        Description: 'What port number the application inside the docker container is binding to'
+    ContainerCommand:
+        Type: 'String'
+        Default: ''
+        Description: '(Optional) The command to run on the container'
+    ContainerCpu:
+        Type: 'Number'
+        AllowedValues: [ 256, 512, 1024, 2048 ]
+        Default: 256
+        Description: 'How much CPU to give the container. 1024 is 1 CPU'
+    ContainerMemory:
+        Type: 'Number'
+        AllowedValues: [ 512, 1024, 2048, 4096, 8192 ]
+        Default: 512
+        Description: 'How much memory in megabytes to give the container'
+    ContainerRoleArn:
+        Type: 'String'
+        Default: ""
+        Description: "(Optional) An IAM role to give the service's containers access to other AWS resources"
+
+
+Conditions:
+    HasCustomRole: { "Fn::Not": [ { "Fn::Equals": [ { Ref: 'ContainerRoleArn' }, '' ] } ] }
+    OverrideContainerCommand: { "Fn::Not": [ { "Fn::Equals": [ { Ref: 'ContainerCommand' }, '' ] } ] }
+
+Resources:
+
+    ##########################################################################################################
+    ##  SECURITY
+    ##########################################################################################################
+
+    EcsServiceRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                  - Effect: "Allow"
+                    Principal:
+                        Service: [ "ecs.amazonaws.com" ]
+                    Action:
+                      - "sts:AssumeRole"
+            Path: "/"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+            RoleName: { "Fn::Sub": "${Project}-${Environment}-${Service}-ecsservicerole-${AWS::Region}" }
+
+    EcsContainerRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            Path: "/"
+            ManagedPolicyArns:
+              - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+            RoleName: { "Fn::Sub": "${Project}-${Environment}-${Service}-ecscontainer-${AWS::Region}" }
+
+    EcsSecurityGroup:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupName: { "Fn::Sub": "${Project}-${Environment}-${Service}-fargate" }
+            GroupDescription: "Security group for Fargate containers"
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-fargate" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+            VpcId: { Ref: "VpcId" }
+
+    EcsSecurityGroupIngressFromPublicALB:
+        Type: 'AWS::EC2::SecurityGroupIngress'
+        Properties:
+            Description: 'Ingress from the ALB'
+            GroupId: { Ref: 'EcsSecurityGroup' }
+            IpProtocol: -1
+            SourceSecurityGroupId: { Ref: 'AlbSecurityGroup' }
+
+    EcsSecurityGroupIngressFromSelf:
+        Type: 'AWS::EC2::SecurityGroupIngress'
+        Properties:
+            Description: 'Ingress from other containers in the same security group'
+            GroupId: { Ref: 'EcsSecurityGroup' }
+            IpProtocol: -1
+            SourceSecurityGroupId: { Ref: 'EcsSecurityGroup' }
+
+
+    ##########################################################################################################
+    ##  ALB
+    ##########################################################################################################
+
+    AlbSecurityGroup:
+        Type: 'AWS::EC2::SecurityGroup'
+        Properties:
+            GroupName: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
+            GroupDescription: 'Access to the public facing load balancer'
+            SecurityGroupIngress:
+              # Allow access to ALB from anywhere on the internet
+              - CidrIp: '0.0.0.0/0'
+                IpProtocol: -1
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+            VpcId: { Ref: 'VpcId' }
+
+    Alb:
+        Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+        Properties:
+            LoadBalancerAttributes:
+              - Key: 'idle_timeout.timeout_seconds'
+                Value: '30'
+            Name: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" }
+            Scheme: 'internet-facing'
+            SecurityGroups: [ { Ref: 'AlbSecurityGroup' } ]
+            Subnets: { Ref: 'PublicSubnetIds' }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-alb" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: "Project" } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: "Service" } }
+
+    AlbTargetGroup:
+        Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+        Properties:
+            HealthCheckIntervalSeconds: 30
+            HealthCheckPath: '/'
+            HealthCheckProtocol: 'HTTP'
+            HealthCheckTimeoutSeconds: 5
+            HealthyThresholdCount: 2
+            Matcher:
+                HttpCode: '200-299'
+            TargetType: 'ip'
+            Name: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            Port: 80
+            Protocol: 'HTTP'
+            UnhealthyThresholdCount: 2
+            VpcId: { Ref: "VpcId" }
+
+    AlbListener:
+        Type: 'AWS::ElasticLoadBalancingV2::Listener'
+        Properties:
+            DefaultActions:
+              - TargetGroupArn: { Ref: 'AlbTargetGroup' }
+                Type: 'forward'
+            LoadBalancerArn: { Ref: 'Alb' }
+            Port: 80
+            Protocol: 'HTTP'
+
+    ##########################################################################################################
+    ##  ECS
+    ##########################################################################################################
+
+    EcsCluster:
+        Type: "AWS::ECS::Cluster"
+        Properties:
+            ClusterName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+
+    CloudwatchLogsGroup:
+        Type: "AWS::Logs::LogGroup"
+        Properties:
+            LogGroupName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            RetentionInDays: 14
+
+    TaskDefinition:
+        Type: "AWS::ECS::TaskDefinition"
+        Properties:
+            Cpu: { Ref: 'ContainerCpu' }
+            ContainerDefinitions:
+              - Command: { "Fn::If": [
+                    'OverrideContainerCommand',
+                    { "Fn::Split": [ "|", { Ref: 'ContainerCommand' } ] },
+                    { Ref: "AWS::NoValue" }
+                ] }
+                Cpu: { Ref: 'ContainerCpu' }
+                Environment:
+                  - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
+                Image: { Ref: 'ContainerImage' }
+                LogConfiguration:
+                    LogDriver: "awslogs"
+                    Options:
+                        awslogs-group: { Ref: "CloudwatchLogsGroup" }
+                        awslogs-region: { Ref: "AWS::Region" }
+                        awslogs-stream-prefix: { Ref: "Service" }
+                Memory: { Ref: 'ContainerMemory' }
+                Name: { Ref: "Service" }
+                PortMappings:
+                 - ContainerPort: { Ref: 'ContainerPort' }
+            ExecutionRoleArn: { Ref: 'EcsContainerRole' }
+            Family: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            Memory: { Ref: 'ContainerMemory' }
+            NetworkMode: 'awsvpc'
+            RequiresCompatibilities:
+              - 'FARGATE'
+            TaskRoleArn: { "Fn::If": [ 'HasCustomRole',  { Ref: 'ContainerRoleArn' },  { Ref: "AWS::NoValue" } ] }
+
+    EcsService:
+        Type: "AWS::ECS::Service"
+        Properties:
+            DeploymentConfiguration:
+                MaximumPercent: 200
+                MinimumHealthyPercent: 75
+            DesiredCount: 2
+            Cluster: { Ref: "EcsCluster" }
+            LaunchType: 'FARGATE'
+            LoadBalancers:
+              - ContainerName: { Ref: "Service" }
+                ContainerPort: { Ref: 'ContainerPort' }
+                TargetGroupArn: { Ref: 'AlbTargetGroup' }
+            NetworkConfiguration:
+                AwsvpcConfiguration:
+                    AssignPublicIp: 'ENABLED'
+                    SecurityGroups: [ { Ref: "EcsSecurityGroup" } ]
+                    Subnets: { Ref: "PublicSubnetIds" }
+            ServiceName: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            TaskDefinition: { Ref: "TaskDefinition" }
+
+    ##########################################################################################################
+    ##  ROUTE53
+    ##########################################################################################################
+
+    CustomDomainCnameRecords:
+        Type: "AWS::Route53::RecordSet"
+        Properties:
+            HostedZoneId: { Ref: "HostedZoneId" }
+            Comment: "Stats API"
+            Name: { "Fn::Sub": "${Project}.${Environment}.fathomai.com." }
+            Type: "CNAME"
+            TTL: "600"
+            ResourceRecords: [ { "Fn::GetAtt": [ "Alb", "DNSName" ] } ]
