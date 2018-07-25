@@ -397,6 +397,16 @@ Resources:
             ServiceName: { "Fn::Sub": "com.amazonaws.${AWS::Region}.s3" }
             VpcId: { Ref: "Vpc" }
 
+    SecretsManagerEndpoint:
+        Type: "AWS::EC2::VPCEndpoint"
+        Properties:
+            ServiceName: { "Fn::Sub": "com.amazonaws.${AWS::Region}.secretsmanager" }
+            SubnetIds:
+               - { "Fn::If": [ "CreatePrivateAlpha", { Ref: "PrivateSubnetAlpha" }, { Ref: "PublicSubnetAlpha" } ] }
+               - { "Fn::If": [ "CreatePrivateBeta", { Ref: "PrivateSubnetBeta" }, { Ref: "AWS::NoValue" } ] }
+            VpcEndpointType: "Interface"
+            VpcId: { Ref: "Vpc" }
+
     ##########################################################################################################
     ##  ROUTE53
     ##########################################################################################################
