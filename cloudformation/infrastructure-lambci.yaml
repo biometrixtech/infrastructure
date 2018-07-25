@@ -119,7 +119,9 @@ Resources:
             AssumeRolePolicyDocument:
                 Statement:
                     Effect: 'Allow'
-                    Principal: { Service: 'lambda.amazonaws.com' }
+                    Principal:
+                      - { Service: 'lambda.amazonaws.com' }
+                      - { Service: 'ecs-tasks.amazonaws.com' }
                     Action: 'sts:AssumeRole'
             Policies:
               - PolicyName: 'WriteLogs'
@@ -225,6 +227,70 @@ Resources:
             SnsAccessKey: { Ref: 'SnsAccessKey' }
             SnsSecret: { 'Fn::GetAtt': [ 'SnsAccessKey', 'SecretAccessKey' ] }
             SnsFailuresRole: { 'Fn::GetAtt': [ 'SnsFailures', 'Arn' ] }
+
+    ##########################################################################################################
+    ##  ECS
+    ##########################################################################################################
+
+    EcsContainerRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            Path: "/"
+            ManagedPolicyArns:
+              - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+            RoleName: { "Fn::Sub": "infrastructure-lambci-ecscontainer-${AWS::Region}" }
+
+    EcrRepository:
+        Type: "AWS::ECR::Repository"
+        Properties:
+            RepositoryName: { "Fn::Sub": "lambci/build" }
+
+    EcsCluster:
+        Type: "AWS::ECS::Cluster"
+        Properties:
+            ClusterName: { "Fn::Sub": "infrastructure-lambci" }
+
+    CloudwatchLogsGroup:
+        Type: "AWS::Logs::LogGroup"
+        Properties:
+            LogGroupName: { "Fn::Sub": "infrastructure/lambci" }
+            RetentionInDays: 14
+
+    TaskDefinition:
+        Type: "AWS::ECS::TaskDefinition"
+        Properties:
+            Cpu: 512
+            ContainerDefinitions:
+              - Command: { "Fn::If": [
+                    'OverrideContainerCommand',
+                    { "Fn::Split": [ "|", { Ref: 'ContainerCommand' } ] },
+                    { Ref: "AWS::NoValue" }
+                ] }
+                Cpu: 512
+                Environment:
+                  - { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } }
+                Image: { "Fn::Sub": "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${EcrRepository}:latest" }
+                LogConfiguration:
+                    LogDriver: "awslogs"
+                    Options:
+                        awslogs-group: { Ref: "CloudwatchLogsGroup" }
+                        awslogs-region: { Ref: "AWS::Region" }
+                        awslogs-stream-prefix: 'lambci'
+                Memory: 512
+                Name: "lambci"
+            ExecutionRoleArn: { Ref: 'EcsContainerRole' }
+            Family: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            Memory: 512
+            NetworkMode: 'awsvpc'
+            RequiresCompatibilities:
+              - 'FARGATE'
+            TaskRoleArn: { "Fn::GetAtt": [ 'LambdaExecution', 'Arn' ] }
 
 Outputs:
     S3Bucket:
