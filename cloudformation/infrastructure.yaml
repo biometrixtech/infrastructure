@@ -336,9 +336,8 @@ Resources:
             RecordSets:
               - Name: "fathomai.com."
                 Type: "A"
-                AliasTarget:
-                    HostedZoneId: 'Z1H1FL5HABSF5'
-                    DNSName: "wordpress-prod-1136385471.us-west-2.elb.amazonaws.com"
+                TTL: "900"
+                ResourceRecords: [ '52.38.221.82' ]
 
               - Name: "_domainconnect.fathomai.com."
                 Type: "CNAME"
@@ -383,12 +382,12 @@ Resources:
               - Name: "time.fathomai.com."
                 Type: "CNAME"
                 TTL: "900"
-                ResourceRecords: [ 'ec2-52-11-26-32.us-west-2.compute.amazonaws.com' ]
+                ResourceRecords: [ '35.163.220.1' ]
 
               - Name: "www.fathomai.com."
-                Type: "CNAME"
+                Type: "A"
                 TTL: "900"
-                ResourceRecords: [ 'wordpress-prod-1136385471.us-west-2.elb.amazonaws.com' ]
+                ResourceRecords: [ '52.38.221.82' ]
 
     ##########################################################################################################
     ##  OUTPUTS
