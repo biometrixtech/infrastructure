@@ -201,16 +201,7 @@ def update_git_branch(branch_name):
 
 def get_git_dir():
     try:
-        git_repo_name = {
-            'alerts': 'Alerts',
-            'hardware': 'Hardware',
-            'infrastructure': 'Infrastructure',
-            'plans': 'Plans',
-            'preprocessing': 'PreProcessing',
-            'statsapi': 'StatsAPI',
-            'time': 'Infrastructure',
-            'users': 'Users',
-        }[args.service]
+        git_repo_name = 'infrastructure' if args.service == 'time' else args.service
         return os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../{}'.format(git_repo_name)))
     except KeyError:
         return None
@@ -334,14 +325,14 @@ def map_templates(service, environment, subservice, version):
         )]
     else:
         base_paths = {
-            'alerts': '/vagrant/Alerts/cloudformation',
-            'infrastructure': '/vagrant/Infrastructure/cloudformation',
-            'hardware': '/vagrant/Hardware/cloudformation',
-            'plans': '/vagrant/Plans/cloudformation',
-            'preprocessing': '/vagrant/PreProcessing/cloudformation',
-            'statsapi': '/vagrant/StatsAPI/cloudformation',
-            'time': '/vagrant/Infrastructure/cloudformation',
-            'users': '/vagrant/Users/cloudformation',
+            'alerts': '/vagrant/alerts/cloudformation',
+            'infrastructure': '/vagrant/infrastructure/cloudformation',
+            'hardware': '/vagrant/hardware/cloudformation',
+            'plans': '/vagrant/plans/cloudformation',
+            'preprocessing': '/vagrant/preprocessing/cloudformation',
+            'statsapi': '/vagrant/statsapi/cloudformation',
+            'time': '/vagrant/infrastructure/cloudformation',
+            'users': '/vagrant/users/cloudformation',
         }
         valid_subservices = {
             'alerts': ['pipeline'],

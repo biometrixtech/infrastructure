@@ -6,7 +6,7 @@
     become_user: root
     connection: local
     vars:
-        infrastructure_directory: '/vagrant/Infrastructure'
+        infrastructure_directory: '/vagrant/infrastructure'
         application_directory: '/vagrant'
 
     tasks:
@@ -75,7 +75,7 @@
             regexp: 'PATH=(["]*)((?!.*?{{item}}).*?)(["]*)$'
             line: 'PATH=\1\2:{{item}}\3'
         with_items:
-          - '/vagrant/Infrastructure/scripts:/vagrant/PreProcessing/scripts'
+          - '/vagrant/infrastructure/scripts:/vagrant/preprocessing/scripts:/vagrant/users/scripts'
 
     ##########################################################################################################
     ## AWS & PYTHON
@@ -200,7 +200,7 @@
       - name: "Ensure make is installed to build the binary"
         apt:
             name: "make"
-            state: "installed"
+            state: latest
 
       - name: "Build the binary inside a docker container"
         make:
@@ -238,7 +238,7 @@
       - name: "Ensure unzip is installed"
         apt:
             name: "unzip"
-            state: "installed"
+            state: latest
 
       - name: 'Install Packer'
         unarchive:

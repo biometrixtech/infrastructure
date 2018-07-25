@@ -56,12 +56,12 @@ def zip_bundle(filename):
 
 def map_bundle(service, subservice):
     bundles = {
-        ('alerts', 'apigateway'): ('/vagrant/Alerts/apigateway', 'alerts-{environment}-apigateway-execute'),
-        ('hardware', 'apigateway'): ('/vagrant/Hardware/apigateway', 'hardware-{environment}-apigateway-execute'),
-        ('plans', 'apigateway'): ('/vagrant/Plans/apigateway', 'plans-{environment}-apigateway-execute'),
-        ('preprocessing', 'apigateway'): ('/vagrant/PreProcessing/apigateway', 'preprocessing-{environment}-apigateway-execute'),
-        ('statsapi', 'apigateway'): ('/vagrant/StatsAPI/apigateway', 'statsapi-{environment}-apigateway-execute'),
-        ('users', 'apigateway'): ('/vagrant/Users/apigateway', 'users-{environment}-apigateway-execute'),
+        ('alerts', 'apigateway'): ('/vagrant/alerts/apigateway', 'alerts-{environment}-apigateway-execute'),
+        ('hardware', 'apigateway'): ('/vagrant/hardware/apigateway', 'hardware-{environment}-apigateway-execute'),
+        ('plans', 'apigateway'): ('/vagrant/plans/apigateway', 'plans-{environment}-apigateway-execute'),
+        ('preprocessing', 'apigateway'): ('/vagrant/preprocessing/apigateway', 'preprocessing-{environment}-apigateway-execute'),
+        ('statsapi', 'apigateway'): ('/vagrant/statsapi/apigateway', 'statsapi-{environment}-apigateway-execute'),
+        ('users', 'apigateway'): ('/vagrant/users/apigateway', 'users-{environment}-apigateway-execute'),
     }
     if (service, subservice) in bundles:
         return bundles[(service, subservice)]
