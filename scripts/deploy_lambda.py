@@ -58,6 +58,7 @@ def map_bundle(service, subservice):
     bundles = {
         ('alerts', 'apigateway'): ('/vagrant/Alerts/apigateway', 'alerts-{environment}-apigateway-execute'),
         ('hardware', 'apigateway'): ('/vagrant/Hardware/apigateway', 'hardware-{environment}-apigateway-execute'),
+        ('plans', 'apigateway'): ('/vagrant/Plans/apigateway', 'plans-{environment}-apigateway-execute'),
         ('preprocessing', 'apigateway'): ('/vagrant/PreProcessing/apigateway', 'preprocessing-{environment}-apigateway-execute'),
         ('statsapi', 'apigateway'): ('/vagrant/StatsAPI/apigateway', 'statsapi-{environment}-apigateway-execute'),
         ('users', 'apigateway'): ('/vagrant/Users/apigateway', 'users-{environment}-apigateway-execute'),
@@ -103,6 +104,7 @@ if __name__ == '__main__':
                             'alerts',
                             'infrastructure',
                             'hardware',
+                            'plans',
                             'preprocessing',
                             'statsapi',
                             'users',

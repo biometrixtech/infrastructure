@@ -392,6 +392,7 @@ if __name__ == '__main__':
                             'alerts',
                             'infrastructure',
                             'hardware',
+                            'plans',
                             'preprocessing',
                             'statsapi',
                             'time',
