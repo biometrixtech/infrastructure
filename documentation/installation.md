@@ -1,5 +1,13 @@
 # Installation
 
+## Setting up Atlas peering
+
+1. Create the service with `MongodbPeeringId` and `MongodbPeeringCidr` set to the empty string.  Make sure that you choose a value for `VpcCidr` which does not conflict with any existing peering connections to the Atlas cluster.
+
+2. Update the stack to set `MongodbPeeringCidr` to the correct CIDR range for the Atlas cluster.  This will prompt the service to be placed into a VPC ready for peering.
+
+3. Take the id of the VPC
+
 NOTE: this is all out-of-date as of March 2018.
 
 ## Setting up a new environment / region
