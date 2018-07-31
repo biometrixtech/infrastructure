@@ -190,7 +190,7 @@ def await_s3_upload(s3_path):
         while counts >= 0:
             s3_files = s3_client.list_objects_v2(Bucket=s3_bucket_name, Prefix=s3_path).get('Contents', [])
 
-            if len(s3_files) == 1 and s3_files[1]['Size'] > 0:
+            if len(s3_files) == 1 and s3_files[0]['Size'] > 0:
                 print("\b \r\nTemplate exists                        ", colour=Fore.GREEN)
                 break
 
