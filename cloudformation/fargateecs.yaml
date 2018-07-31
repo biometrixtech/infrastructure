@@ -68,35 +68,6 @@ Resources:
     ##  SECURITY
     ##########################################################################################################
 
-    EcsServiceRole:
-        Type: "AWS::IAM::Role"
-        Properties:
-            AssumeRolePolicyDocument:
-                Statement:
-                  - Effect: "Allow"
-                    Principal:
-                        Service: [ "ecs.amazonaws.com" ]
-                    Action:
-                      - "sts:AssumeRole"
-            Path: "/"
-            ManagedPolicyArns:
-              - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
-            RoleName: { "Fn::Sub": "${Project}-${Environment}-${Service}-ecsservicerole-${AWS::Region}" }
-
-    EcsContainerRole:
-        Type: "AWS::IAM::Role"
-        Properties:
-            AssumeRolePolicyDocument:
-                Version: "2012-10-17"
-                Statement:
-                  - Effect: "Allow"
-                    Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
-                    Action: "sts:AssumeRole"
-            Path: "/"
-            ManagedPolicyArns:
-              - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
-            RoleName: { "Fn::Sub": "${Project}-${Environment}-${Service}-ecscontainer-${AWS::Region}" }
-
     EcsSecurityGroup:
         Type: "AWS::EC2::SecurityGroup"
         Properties:
@@ -231,7 +202,7 @@ Resources:
                 Name: { Ref: "Service" }
                 PortMappings:
                  - ContainerPort: { Ref: 'ContainerPort' }
-            ExecutionRoleArn: { Ref: 'EcsContainerRole' }
+            ExecutionRoleArn: { "Fn::ImportValue": 'ServiceRoleEcsTasks' }
             Family: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
             Memory: { Ref: 'ContainerMemory' }
             NetworkMode: 'awsvpc'
