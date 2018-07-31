@@ -58,7 +58,7 @@ Resources:
               - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
             RoleName: { "Fn::Sub": "nfrastructure-service-ecs-${AWS::Region}" }
 
-    ServiceRoleEcsContainer:
+    ServiceRoleEcsTasks:
         Type: "AWS::IAM::Role"
         Properties:
             AssumeRolePolicyDocument:
@@ -70,7 +70,7 @@ Resources:
             Path: "/"
             ManagedPolicyArns:
               - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
-            RoleName: { "Fn::Sub": "nfrastructure-service-ecscontainer-${AWS::Region}" }
+            RoleName: { "Fn::Sub": "nfrastructure-service-ecstasks-${AWS::Region}" }
 
     ServiceRoleStepFunctions:
         Type: "AWS::IAM::Role"
@@ -208,11 +208,11 @@ Outputs:
         Export:
             Name: "ServiceRoleEcs"
 
-    ServiceRoleEcsContainer:
-        Description: "Service role for ECS Containers"
-        Value: { Ref: "ServiceRoleEcsContainer" }
+    ServiceRoleEcsTasks:
+        Description: "Service role for ECS Tasks"
+        Value: { Ref: "ServiceRoleEcsTasks" }
         Export:
-            Name: "ServiceRoleEcsContainer"
+            Name: "ServiceRoleEcsTasks"
 
     ServiceRoleStepFunctions:
         Description: "Service role for Step Functions"
