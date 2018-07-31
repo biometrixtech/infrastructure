@@ -27,14 +27,17 @@ except NameError:
     pass
 
 subservice_stack_mapping = {
+    'infrastructure': {
+        'security': 'infrastructure-security',
+    },
     'preprocessing': {
-        'compute': 'ComputeCluster',
-        'ingest': 'IngestStack',
-        'monitoring': 'MonitoringCluster',
-        'pipeline': 'PipelineCluster',
+        'compute': 'preprocessing-{environment}-ComputeCluster',
+        'ingest': 'preprocessing-{environment}-IngestStack',
+        'monitoring': 'preprocessing-{environment}-MonitoringCluster',
+        'pipeline': 'preprocessing-{environment}-PipelineCluster',
     },
     'time': {
-        'fargateecs': 'FargateStack',
+        'fargateecs': 'time-{environment}-FargateStack',
     }
 }
 
@@ -81,17 +84,16 @@ def get_stack_name():
                        if s['StackStatus'] != 'DELETE_COMPLETE'
                        and s['StackName'] == '{}-{}'.format(args.service, args.environment)]
     else:
-        stack_prefix = '{}-{}-{}'.format(
-            args.service,
-            args.environment,
-            subservice_stack_mapping[args.service][args.subservice]
-        )
+        stack_prefix = subservice_stack_mapping[args.service][args.subservice].format(environment=args.environment)
         stack_names = [s['StackName'] for s in stacks
                        if s['StackStatus'] != 'DELETE_COMPLETE'
                        and s['StackName'].startswith(stack_prefix)]
 
-    if len(stack_names):
+    if len(stack_names) == 1:
         return stack_names[0]
+    elif len(stack_names) > 1:
+        print('Found multiple possible stacks to update! [{}]'.format(', '.join(stack_names)), colour=Fore.RED)
+        exit(1)
     else:
         print('Could not find stack to update', colour=Fore.RED)
         exit(1)
@@ -358,7 +360,7 @@ def map_templates(service, environment, subservice, version):
         }
         valid_subservices = {
             'alerts': ['pipeline'],
-            'infrastructure': ['lambci'],
+            'infrastructure': ['lambci', 'security'],
             'hardware': [],
             'plans': [],
             'preprocessing': ['compute', 'ingest', 'monitoring', 'pipeline'],
