@@ -92,6 +92,102 @@ Resources:
                         Resource: "*"
             RoleName: { "Fn::Sub": "infrastructure-service-stepfunctions-${AWS::Region}" }
 
+    ##########################################################################################################
+    ##  DEPLOYMENT
+    ##########################################################################################################
+
+    # Allow users to make deployments
+    DeploymentPolicy:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            Description: "Allows entities to make deployments"
+            ManagedPolicyName: { "Fn::Sub": "infrastructure-deployment-production" }
+            Path: "/"
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    # Allow read-only access to CF.  This is copied from the AWSCloudFormationReadOnlyAccess managed policy
+                  - Action:
+                      - "cloudformation:Describe*"
+                      - "cloudformation:EstimateTemplateCost"
+                      - "cloudformation:Get*"
+                      - "cloudformation:List*"
+                      - "cloudformation:ValidateTemplate"
+                    Effect: "Allow"
+                    Resource: "*"
+
+                    # Allow read-only access to S3; this is necessary so we can check that the relevant templates for the
+                    # deployment have been uploaded by LambCI.
+                  - Action:
+                      - "s3:ListBucket"
+                      - "s3:GetObject"
+                    Effect: "Allow"
+                    Resource:
+                      - { 'Fn::Sub': [ 'arn:aws:s3:::${InfrastructureBucketName}', { InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" } } ] }
+                      - { 'Fn::Sub': [ 'arn:aws:s3:::${InfrastructureBucketName}/cloudformation/*', { InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" } } ] }
+                      - { 'Fn::Sub': [ 'arn:aws:s3:::${InfrastructureBucketName}/lambdas/*', { InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" } } ] }
+
+                    # Disallow updating stacks which use a template from anywhere other than the CI artefact repository
+                  - Action:
+                      - "cloudformation:CreateStack"
+                      - "cloudformation:UpdateStack"
+                    Effect: "Deny"
+                    Resource: "*"
+                    Condition:
+                        StringNotLike:
+                            "cloudformation:TemplateUrl":
+                              - { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/*", {
+                                    InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                                } ] }
+
+                    # Disallow updating stacks which do not use an S3-uploaded template
+                  - Action:
+                      - "cloudformation:CreateStack"
+                      - "cloudformation:UpdateStack"
+                    Effect: "Deny"
+                    Resource: "*"
+                    Condition:
+                        "Null":
+                            "cloudformation:TemplateUrl": true
+
+                    # Actually allow deployments
+                  - Action:
+                      - "cloudformation:CreateStack"
+                      - "cloudformation:UpdateStack"
+                    Effect: "Allow"
+                    Resource: { "Fn::Sub": "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*" } # FIXME separate out production
+                    Condition:
+                        "Null":
+                            # Disallow attempts to change the stack's service role.  This is more for durability than
+                            # security, as the user would need iam:PassRole to complete the switch, and the default role
+                            # is the most powerful anyway.
+                            "cloudformation:RoleArn": true
+
+                    # Allow updating lambda function code
+                  - Action:
+                      - "lambda:UpdateFunctionCode"
+                    Effect: "Allow"
+                    Resource: "*" # FIXME separate out production
+
+    # Allow users to make deployments from their working copy.
+    # DANGER!  This is effectively root: a user can write an arbitrary template, upload it to S3, then update a CF stack
+    # to execute the template using the CF Service Role, which has root.
+    DeploymentWorkingcopyPolicy:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            Description: "Allows entities to make deployments from their working copy"
+            ManagedPolicyName: { "Fn::Sub": "infrastructure-deployment-workingcopy" }
+            Path: "/"
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    # Allow uploading to the infrastructure S3 bucket
+                  - Action:
+                      - "s3:PutObject"
+                    Effect: "Allow"
+                    Resource:
+                      - { 'Fn::Sub': [ 'arn:aws:s3:::${InfrastructureBucketName}/*', { InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" } } ] }
+
 Outputs:
 
     ServiceRoleBatch:
