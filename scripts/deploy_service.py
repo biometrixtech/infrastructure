@@ -102,7 +102,7 @@ def map_parameters(old_parameters):
     param_map = dict(param_map)
 
     parameters = []
-    for old_parameter in old_parameters:
+    for old_parameter in old_parameters or {}:
         old_parameter_name = old_parameter['ParameterKey']
         if old_parameter_name in param_map:
             if param_map[old_parameter_name] == '':
@@ -173,6 +173,33 @@ def await_stack_update(stack):
                 spinner.start()
                 time.sleep(5)
                 continue
+    finally:
+        spinner.stop()
+
+
+def await_s3_upload(s3_path):
+    spinner = Spinner()
+    try:
+        s3_client = boto3.client('s3')
+        counts = 12
+        print('Checking that https://s3.amazonaws.com/{}/{} exists '.format(s3_bucket_name, s3_path), colour=Fore.CYAN, end="")
+        spinner.start()
+
+        while counts >= 0:
+            s3_files = s3_client.list_objects_v2(Bucket=s3_bucket_name, Prefix=s3_path).get('Contents', [])
+
+            if len(s3_files) == 1 and s3_files[1]['Size'] > 0:
+                print("\b \r\nTemplate exists                        ", colour=Fore.GREEN)
+                break
+
+            else:
+                counts -= 1
+                time.sleep(5)
+                continue
+        else:
+            print("\b \r\nTemplate not uploaded after 60 seconds                        ", colour=Fore.RED)
+            exit(1)
+
     finally:
         spinner.stop()
             
@@ -257,10 +284,7 @@ def confirm(question='', count=0):
 
 
 def main():
-
-    if args.version == '0' * 40 and args.environment != 'dev':
-        print('Working copy can only be deployed to dev', colour=Fore.RED)
-        exit(1)
+    boto3.setup_default_session(profile_name=args.profile_name)
 
     if args.environment == 'production':
         print('Are you sure you want to deploy to production?! (y/n)', colour=Fore.YELLOW)
@@ -281,9 +305,7 @@ def main():
 
     else:
         # Check that the CF templates have actually been uploaded
-        print('Checking that s3://{}/{} exists'.format(s3_bucket.name, templates[0][1]),)
-        s3_bucket.Object(templates[0][1]).wait_until_exists()
-        print('Template exists', colour=Fore.GREEN)
+        await_s3_upload(templates[0][1])
 
     if not args.noupdate:
         stack = boto3.resource('cloudformation', region_name=args.region).Stack(get_stack_name())
@@ -393,7 +415,7 @@ if __name__ == '__main__':
     parser.add_argument('environment',
                         choices=['infra', 'dev', 'qa', 'production'],
                         help='Environment')
-    parser.add_argument('subservice',
+    parser.add_argument('--subservice',
                         nargs='?',
                         default='environment',
                         help='Sub-service')
@@ -407,6 +429,10 @@ if __name__ == '__main__':
                         dest='param_map',
                         default='',
                         help='Parameters to rename ("oldparamname->newparamname,...") or drop ("oldparamname->,...")')
+    parser.add_argument('--profile-name',
+                        dest='profile_name',
+                        default='default',
+                        help='boto3 profile to use')
 
     args = parser.parse_args()
     # Need to post-process the version because validation depends on the args.service value
