@@ -1,0 +1,125 @@
+# A template that creates global security infrastructure
+#
+# Copyright 2018 Melon Software Ltd (UK), all rights reserved
+#
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Creates global security infrastructure"
+
+Resources:
+
+    ##########################################################################################################
+    ##  SERVICE ROLES
+    ##########################################################################################################
+
+    ServiceRoleBatch:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "batch.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
+            RoleName: { "Fn::Sub": "infrastructure-service-batch-${AWS::Region}" }
+
+    ServiceRoleCloudFormation:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ { "Fn::Sub": "cloudformation.amazonaws.com" } ] }
+                    Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+                # CloudFormation needs to be able to do precisely the sort of things (eg create IAM Roles or Users, or
+                # edit Trust Policies) which could form a privilege escalation vulnerability, and it's not practical to
+                # try and mitigate them here, doing so effectively would cripple our ability to use CF effectively.
+                # Instead we acknowledge that "stacks are dangerous" and we restrict who can set them up (and hence pass
+                # this role to them) and who can update them (and what templates they update them from). This pushes the
+                # security envelope back towards validation (in Git) of the templates in the first place.
+              - "arn:aws:iam::aws:policy/AdministratorAccess"
+            RoleName: { "Fn::Sub": "infrastructure-service-cloudformation-${AWS::Region}" }
+
+    ServiceRoleEcs:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                  - Effect: "Allow"
+                    Principal:
+                        Service: [ "ecs.amazonaws.com" ]
+                    Action:
+                      - "sts:AssumeRole"
+            Path: "/"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+            RoleName: { "Fn::Sub": "nfrastructure-service-ecs-${AWS::Region}" }
+
+    ServiceRoleEcsContainer:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "ecs-tasks.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            Path: "/"
+            ManagedPolicyArns:
+              - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+            RoleName: { "Fn::Sub": "nfrastructure-service-ecscontainer-${AWS::Region}" }
+
+    ServiceRoleStepFunctions:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ { "Fn::Sub": "states.${AWS::Region}.amazonaws.com" } ] }
+                    Action: "sts:AssumeRole"
+            Policies:
+              - PolicyName: "lambda"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Effect: "Allow"
+                        Action:
+                          - "lambda:InvokeFunction"
+                        Resource: "*"
+            RoleName: { "Fn::Sub": "infrastructure-service-stepfunctions-${AWS::Region}" }
+
+Outputs:
+
+    ServiceRoleBatch:
+        Description: "Service role for Batch"
+        Value: { Ref: "ServiceRoleBatch" }
+        Export:
+            Name: "ServiceRoleBatch"
+
+    ServiceRoleCloudFormation:
+        Description: "Service role for CloudFormation"
+        Value: { Ref: "ServiceRoleCloudFormation" }
+        Export:
+            Name: "ServiceRoleCloudFormation"
+
+    ServiceRoleEcs:
+        Description: "Service role for ECS"
+        Value: { Ref: "ServiceRoleEcs" }
+        Export:
+            Name: "ServiceRoleEcs"
+
+    ServiceRoleEcsContainer:
+        Description: "Service role for ECS Containers"
+        Value: { Ref: "ServiceRoleEcsContainer" }
+        Export:
+            Name: "ServiceRoleEcsContainer"
+
+    ServiceRoleStepFunctions:
+        Description: "Service role for Step Functions"
+        Value: { "Fn::GetAtt": [ "ServiceRoleStepFunctions", "Arn" ] }
+        Export:
+            Name: "ServiceRoleStepFunctions"
