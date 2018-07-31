@@ -30,6 +30,9 @@ subservice_stack_mapping = {
     'infrastructure': {
         'security': 'infrastructure-security',
     },
+    'plans': {
+        'monitoring': 'plans-{environment}-MonitoringStack',
+    },
     'preprocessing': {
         'compute': 'preprocessing-{environment}-ComputeCluster',
         'ingest': 'preprocessing-{environment}-IngestStack',
@@ -362,7 +365,7 @@ def map_templates(service, environment, subservice, version):
             'alerts': ['pipeline'],
             'infrastructure': ['lambci', 'security'],
             'hardware': [],
-            'plans': [],
+            'plans': ['monitoring'],
             'preprocessing': ['compute', 'ingest', 'monitoring', 'pipeline'],
             'statsapi': [],
             'time': ['fargateecs'],
