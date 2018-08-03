@@ -47,17 +47,27 @@ Parameters:
         Default: ""
         Description: "The IDs of the subnets to launch the querypostgres lambda functions in"
 
-    AlertsServiceVersion:
-        Type: "String"
-        Description: "The git commit hash of the Alerts service to deploy"
-        AllowedPattern: "^[a-f0-9]{40}$|^$"
-        ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
-
     HardwareServiceVersion:
         Type: "String"
         Description: "The git commit hash of the Hardware service to deploy"
         AllowedPattern: "^[a-f0-9]{40}$|^$"
         ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+
+    PlansServiceVersion:
+        Type: "String"
+        Description: "The git commit hash of the Plans service to deploy"
+        AllowedPattern: "^[a-f0-9]{40}$|^$"
+        ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+    PlansPeeringId:
+        Type: "String"
+        Default: ""
+        Description: "The ID of the VPC to peer to for MongoDB connections"
+    PlansPeeringCidr:
+        Type: "String"
+        Description: "The CIDR range in the peered VPC to route"
+        Default: ""
+        AllowedPattern: "^((\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2}))|$"
+        ConstraintDescription: "Must be a valid IP CIDR range of the form x.x.x.x/x."
 
     PreprocessingServiceVersion:
         Type: "String"
@@ -124,6 +134,34 @@ Parameters:
         Description: "The git commit hash of the Users service to deploy"
         AllowedPattern: "^[a-f0-9]{40}$|^$"
         ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+    UsersPeeringId:
+        Type: "String"
+        Default: ""
+        Description: "The ID of the VPC to peer to for MongoDB connections"
+    UsersPeeringCidr:
+        Type: "String"
+        Description: "The CIDR range in the peered VPC to route"
+        Default: ""
+        AllowedPattern: "^((\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2}))|$"
+        ConstraintDescription: "Must be a valid IP CIDR range of the form x.x.x.x/x."
+    UsersDynamodbReadCapacity:
+        Default: 1
+        Description: "The read capacity of the DynamoDb table"
+        MinValue: 1
+        Type: "Number"
+    UsersDynamodbWriteCapacity:
+        Default: 1
+        Description: "The write capacity of the DynamoDb table"
+        MinValue: 1
+        Type: "Number"
+    UsersSnsApplicationArnIos:
+        Default: ""
+        Description: "The ARN of the SNS application for mobile pushes via APN"
+        Type: "String"
+    UsersSnsApplicationArnAndroid:
+        Default: ""
+        Description: "The ARN of the SNS application for mobile pushes via GCM"
+        Type: "String"
 
 Mappings:
     TemplateVersion:
@@ -148,13 +186,15 @@ Metadata:
               - "QuerypostgresVpcId"
               - "QuerypostgresSubnetIds"
 
-          - Label: { default: "Alerts" }
-            Parameters:
-              - "AlertsServiceVersion"
-
           - Label: { default: "Hardware" }
             Parameters:
               - "HardwareServiceVersion"
+
+          - Label: { default: "Plans" }
+            Parameters:
+              - "PlansServiceVersion"
+              - "PlansPeeringId"
+              - "PlansPeeringCidr"
 
           - Label: { default: "Preprocessing" }
             Parameters:
@@ -178,6 +218,12 @@ Metadata:
           - Label: { default: "Users" }
             Parameters:
               - "UsersServiceVersion"
+              - "UsersPeeringId"
+              - "UsersPeeringCidr"
+              - "UsersDynamodbReadCapacity"
+              - "UsersDynamodbWriteCapacity"
+              - "UsersSnsApplicationArnAndroid"
+              - "UsersSnsApplicationArnIos"
 
         ParameterLabels:
             Environment: { default: "Environment" }
@@ -188,9 +234,11 @@ Metadata:
             QuerypostgresVpcId: { default: "VPC ID" }
             QuerypostgresSubnetIds: { default: "Subnet IDs" }
 
-            AlertsServiceVersion: { default: "Alerts service version" }
-
             HardwareServiceVersion: { default: "Hardware service version" }
+
+            PlansServiceVersion: { default: "Plans service version" }
+            PlansPeeringId: { default: "Peering VPC/PCN ID" }
+            PlansPeeringCidr: { default: "Peering CIDR Range" }
 
             PreprocessingServiceVersion: { default: "Preprocessing service version" }
             PreprocessingAutoscalingSchedule: { default: "Autoscaling schedule" }
@@ -208,13 +256,19 @@ Metadata:
             StatsapiMongodbCollectionSuffix: { default: "MongoDB collection suffix" }
 
             UsersServiceVersion: { default: "Users service version" }
+            UsersPeeringId: { default: "Peering VPC/PCN ID" }
+            UsersPeeringCidr: { default: "Peering CIDR Range" }
+            UsersDynamodbReadCapacity: { default: "DynamoDB read capacity" }
+            UsersDynamodbWriteCapacity: { default: "DynamoDB write capacity" }
+            UsersSnsApplicationArnAndroid: { default: "SNS Application ARN (Android)" }
+            UsersSnsApplicationArnIos: { default: "SNS Application ARN (iOS)" }
 
 Conditions:
     CreateFathomaiSslCertificateVirginiaValidation: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "FathomaiSslCertificateVirginiaValidation" }, "" ] } ] }
     CreateApiGateway: { "Fn::Equals": [ { Ref: "SslCertificateValidated" }, "true" ] }
     QuerypostgresCreateVpc: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "QuerypostgresVpcId" }, "" ] } ] }
-    CreateAlertsService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "AlertsServiceVersion" }, "" ] } ] }
     CreateHardwareService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "HardwareServiceVersion" }, "" ] } ] }
+    CreatePlansService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PlansServiceVersion" }, "" ] } ] }
     CreatePreprocessingService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "PreprocessingServiceVersion" }, "" ] } ] }
     CreateStatsapiService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "StatsapiServiceVersion" }, "" ] } ] }
     CreateUsersService: { "Fn::Not": [ { "Fn::Equals": [ { Ref: "UsersServiceVersion" }, "" ] } ] }
@@ -394,22 +448,25 @@ Resources:
     ##  ALERTS
     ##########################################################################################################
 
-    AlertsService:
+    PlansService:
         Type: "AWS::CloudFormation::Stack"
         Properties:
             Parameters:
                 Environment: { Ref: "Environment" }
+                VpnCidr: { Ref: 'AWS::NoValue' }
+                MongoDbPeeringId: { Ref: "PlansPeeringId" }
+                MongoDbPeeringCidr: { Ref: "PlansPeeringCidr" }
             Tags:
-              - { Key: "Name", Value: { "Fn::Sub": "alerts-${Environment}" } }
+              - { Key: "Name", Value: { "Fn::Sub": "plans-${Environment}" } }
               - { Key: "Management", Value: "managed" }
-              - { Key: "Project", Value: "alerts" }
+              - { Key: "Project", Value: "plans" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
-            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/alerts/${TemplateVersion}/alerts-environment.yaml", {
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/plans/${TemplateVersion}/plans-environment.yaml", {
                 InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
-                TemplateVersion: { Ref: "AlertsServiceVersion" }
+                TemplateVersion: { Ref: "PlansServiceVersion" }
             } ] }
             TimeoutInMinutes: 30
-        Condition: "CreateAlertsService"
+        Condition: "CreatePlansService"
         DependsOn:
           - "UsersService"
 
@@ -511,6 +568,13 @@ Resources:
         Properties:
             Parameters:
                 Environment: { Ref: "Environment" }
+                VpnCidr: { Ref: 'AWS::NoValue' }
+                PeeringId: { Ref: "UsersPeeringId" }
+                PeeringCidr: { Ref: "UsersPeeringCidr" }
+                DynamodbReadCapacity: { Ref: "UsersDynamodbReadCapacity" }
+                DynamodbWriteCapacity: { Ref: "UsersDynamodbWriteCapacity" }
+                SnsApplicationArnIos: { Ref: "UsersSnsApplicationArnIos" }
+                SnsApplicationArnAndroid: { Ref: "UsersSnsApplicationArnAndroid" }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "users-${Environment}" } }
               - { Key: "Management", Value: "managed" }
