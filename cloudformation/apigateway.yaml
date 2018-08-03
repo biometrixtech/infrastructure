@@ -4,7 +4,7 @@
 # Copyright 2017 Melon Software Ltd (UK), all rights reserved
 #
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Creates a Stats API environment"
+Description: "Creates an API Gateway interface which delivers requests to a given Lambda function"
 Parameters:
 
     Project:
