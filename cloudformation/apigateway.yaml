@@ -23,10 +23,6 @@ Parameters:
         Type: "String"
         Description: "The ARN of the Lambda function to be invoked"
 
-    CustomAuthLambdaArn:
-        Type: "String"
-        Description: "The ARN of the Lambda function to be invoked for custom authentication"
-
     CreateCustomDomain:
         Type: "String"
         Description: "Whether to mount the API Gateway at <service>.<env>.fathomai.com"
@@ -62,14 +58,6 @@ Resources:
         Properties:
             Action: "lambda:invokeFunction"
             FunctionName: { Ref: "LambdaArn" }
-            Principal: "apigateway.amazonaws.com"
-            SourceArn: { "Fn::Sub": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*" }
-
-    CustomAuthLambdaPermission:
-        Type: "AWS::Lambda::Permission"
-        Properties:
-            Action: "lambda:invokeFunction"
-            FunctionName: { Ref: "CustomAuthLambdaArn" }
             Principal: "apigateway.amazonaws.com"
             SourceArn: { "Fn::Sub": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*" }
 
