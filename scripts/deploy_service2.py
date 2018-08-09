@@ -226,11 +226,11 @@ class Repository(object):
         """
         builds = lambci_builds_table.query(
             KeyConditionExpression=Key('project').eq(self.lambci_project_name),
-            FilterExpression=Attr('baseCommit').eq(version)
+            FilterExpression=Attr('commit').eq(version)
         )['Items']
         if len(builds) == 0:
             raise Exception(f'No build has been started for version {version}.  Have you pushed your changes?')
-        elif len(builds) > 0:
+        elif len(builds) > 1:
             cprint(f'Multiple builds found for version {version}, using most recent', colour=Fore.YELLOW)
             return max([b['buildNum'] for b in builds])
         else:
