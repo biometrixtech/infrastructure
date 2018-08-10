@@ -3,3 +3,4 @@
 /vagrant/ansible/authorized_keys/*.azk
 /vagrant/ansible/files/aws/credentials
 /vagrant/ansible/main.retry
+/vagrant/config.env

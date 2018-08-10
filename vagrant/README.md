@@ -18,7 +18,7 @@
        geerlingguy/docker-ubuntu1804-ansible:latest \
        ansible-playbook ansible/main.yml -c local \
    && docker commit \
-       -c 'CMD ["ssh-agen", "bash"]' \
+       -c 'CMD ["ssh-agent", "bash"]' \
        biometrixtech-build \
        biometrixtech:latest \
    && docker rm biometrixtech-build

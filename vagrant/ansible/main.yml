@@ -15,9 +15,27 @@
     ## ADMIN USERS
     ##########################################################################################################
 
+      - name: 'Create a group for the admin users'
+        group:
+            name: 'biometrix'
+            state: present
+
+      - name: 'Create a user'
+        user:
+            name: 'biometrix'
+            shell: '/bin/bash'
+            groups: 'biometrix'
+            uid: '{{user_uid}}'
+
+      - name: 'Add user to sudoers file'
+        lineinfile:
+            dest: '/etc/sudoers'
+            state: present
+            line: 'biometrix ALL=(ALL:ALL) NOPASSWD:ALL'
+
       - name: 'Add scripts directories to path'
         lineinfile:
-            dest: '/root/.bashrc'
+            dest: '/home/biometrix/.bashrc'
             state: present
             line: 'PATH=$PATH:{{item}}'
         with_items:
@@ -117,3 +135,12 @@
             path: '/etc/sudoers'
             line: 'Defaults env_keep+=SSH_AUTH_SOCK'
             insertafter: '^Defaults'
+
+      - name: 'Set git config'
+        git_config:
+            name: '{{item.name}}'
+            scope: system
+            value: '{{item.value}}'
+        with_items:
+          - { name: 'user.name', value: 'Stephen Poole' }
+          - { name: 'user.email', value: 'stephen@melon.software' }
