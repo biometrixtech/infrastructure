@@ -142,5 +142,5 @@
             scope: system
             value: '{{item.value}}'
         with_items:
-          - { name: 'user.name', value: 'Stephen Poole' }
-          - { name: 'user.email', value: 'stephen@melon.software' }
+          - { name: 'user.name', value: '{{user_name}}' }
+          - { name: 'user.email', value: '{{user_email}}' }
