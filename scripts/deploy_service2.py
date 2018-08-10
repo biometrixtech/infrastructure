@@ -73,12 +73,16 @@ class Environment(object):
     def repository(self):
         return self._repository
 
-    def update(self, version, config):
+    def update(self, version, config, service, service_version):
         """
         Update a whole environment to a new template
         :param str version:
         :param dict config:
+        :param str service:
+        :param str service_version:
         """
+        config = self._apply_service_update_config(config, service, service_version)
+
         def format_param(key, value):
             if value is not None:
                 return {'ParameterKey': key, 'ParameterValue': value}
@@ -157,16 +161,45 @@ class Environment(object):
         """
         return {p['ParameterKey']: p['ParameterValue'] for p in self.stack.parameters or []}
 
-    def get_service(self, service):
+    def _get_service(self, service):
         if service not in ['hardware', 'plans', 'preprocessing', 'statsapi', 'time', 'users']:
             raise ValueError('Unrecognised service')
         return Service(self, service)
 
+    def get_service_repository(self, service):
+        return self._get_service(service).repository
+
+    def update_lambda_functions(self, service, service_version):
+        self._get_service(service).update_lambda_functions(service_version)
+
     def _get_stack_name(self):
         return f'infrastructure-{self.name}'
 
+    def _apply_service_update_config(self, config, service, service_version):
+        config[ucfirst(service) + 'ServiceVersion'] = service_version
+        return config
+
     def __str__(self):
         return self.name
+
+
+class LegacyEnvironment(Environment):
+    def __init__(self, region, environment, service):
+        self._service = super()._get_service(service)
+        super().__init__(region, environment)
+        self._repository = self._service.repository
+
+    def _get_service(self, service):
+        if service != self._service.name:
+            raise ValueError('Legacy environments only support updating services homogeneously')
+        return self._service
+
+    def _get_stack_name(self):
+        return f'{self._service.name}-{self.name}'
+
+    def _apply_service_update_config(self, config, service, service_version):
+        # Noop
+        return config
 
 
 class Service(object):
@@ -331,7 +364,7 @@ class Repository(object):
         try:
             self._execute_git_command(f"git update-ref refs/heads/{branch_name} {version}")
             self._execute_git_command(f"git push origin {branch_name} --force")
-        except CalledProcessError as e:
+        except CalledProcessError:
             cprint('Could not update git branch references.  Are your SSH keys set up properly?')
 
     def get_config(self):
@@ -437,35 +470,39 @@ def main():
         if not confirm():
             exit(0)
 
-    if args.environment not in ['test']:
-        # TODO
-        raise NotImplementedError()
-    else:
-        environment = Environment(args.region, args.environment)
-        service = environment.get_service(args.service)
+    if args.environment in ['dev', 'production']:
+        environment = LegacyEnvironment(args.region, args.environment, args.service)
+        service_repository = environment.get_service_repository(args.service)
 
-    if args.environment_version != '':
-        environment_version = environment.repository.parse_ref(args.environment_version)[0]
-    else:
+        if args.environment_version != '':
+            raise ApplicationException('--environment_version parameter is not compatible with legacy environments')
         environment_version = None
 
-    service_version, ref_type = service.repository.parse_ref(args.version)
+    else:
+        environment = Environment(args.region, args.environment)
+        service_repository = environment.get_service_repository(args.service)
+        if args.environment_version != '':
+            environment_version = environment.repository.parse_ref(args.environment_version)[0]
+        else:
+            environment_version = None
+
+    service_version, ref_type = service_repository.parse_ref(args.version)
 
     # Do the pre-upload of templates to the 00000000 version
     if ref_type == 'head':
         if args.environment != 'dev':
             raise ApplicationException('Working copy can only be deployed to dev')
-        service.repository.upload_working_copy()
+        service_repository.upload_working_copy()
 
     elif ref_type == 'branch':
-        comparison = service.repository.compare_remote_status(args.version)
+        comparison = service_repository.compare_remote_status(args.version)
         if comparison == -1:
             confirm(f'Branch {args.version} is behind origin/{args.version}.  Are you sure you want to deploy an earlier version?')
         elif comparison == 1:
             raise ApplicationException(f'Branch {args.version} is ahead of origin/{args.version}.  You need to push your changes')
 
     # Check that the build we're about to deploy has actually been completed
-    service.repository.await_build_completion(service_version)
+    service_repository.await_build_completion(service_version)
 
     if args.subservice:
         if ref_type != 'head':
@@ -477,11 +514,9 @@ def main():
     else:
         new_config = map_config(environment.get_current_config())
 
-        # Actually update the service
-        new_config[ucfirst(args.service) + 'ServiceVersion'] = service_version
-
         try:
-            environment.update(environment_version, new_config)
+            # Actually update the service
+            environment.update(environment_version, new_config, service=args.service, service_version=service_version)
         except ClientError as e:
             if 'No updates are to be performed' in str(e):
                 cprint('No updates are to be performed', colour=Fore.YELLOW)
@@ -497,10 +532,10 @@ def main():
         if args.service != 'time':
             # Update git reference
             cprint('Updating git reference')
-            service.repository.update_git_branch(f'{args.environment}-{args.region}', service_version)
+            service_repository.update_git_branch(f'{args.environment}-{args.region}', service_version)
 
             # Explicitly deploy lambda functions to make sure they update
-            service.update_lambda_functions(service_version)
+            environment.update_lambda_functions(args.service, service_version)
 
 
 if __name__ == '__main__':
@@ -511,7 +546,7 @@ if __name__ == '__main__':
                         default='us-west-2',
                         help='AWS Region')
     parser.add_argument('environment',
-                        choices=['test'],
+                        choices=['dev', 'test', 'production'],
                         help='Environment')
     parser.add_argument('service',
                         choices=[
