@@ -62,6 +62,7 @@ def map_bundle(service, subservice):
         ('preprocessing', 'apigateway'): ('/vagrant/preprocessing/apigateway', 'preprocessing-{environment}-apigateway-execute'),
         ('statsapi', 'apigateway'): ('/vagrant/statsapi/apigateway', 'statsapi-{environment}-apigateway-execute'),
         ('users', 'apigateway'): ('/vagrant/users/apigateway', 'users-{environment}-apigateway-execute'),
+        ('users', 'validateauth'): ('/vagrant/users/lambdas/custom_auth', 'users-{environment}-apigateway-validateauth'),
     }
     if (service, subservice) in bundles:
         return bundles[(service, subservice)]
@@ -116,8 +117,7 @@ if __name__ == '__main__':
                         help='Environment')
     parser.add_argument('subservice',
                         type=str,
-                        choices=['apigateway'],
-                        help='Subservice')
+                        help='Function to deploy')
     parser.add_argument('--no-update',
                         action='store_true',
                         dest='noupdate',
