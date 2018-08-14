@@ -81,7 +81,8 @@ class Environment(object):
         return self._config
 
     def update_environment_version(self, version):
-        self._stack_template_url = f'https://s3.amazonaws.com/{s3_bucket_name}/cloudformation/infrastructure/{version}/infrastructure-environment.yaml'
+        if version is not None:
+            self._stack_template_url = f'https://s3.amazonaws.com/{s3_bucket_name}/cloudformation/infrastructure/{version}/infrastructure-environment.yaml'
 
     def update_service_version(self, service, version):
         self.update_config({ucfirst(service) + 'ServiceVersion': version})
