@@ -65,7 +65,10 @@ class Environment(object):
     def __init__(self, region, environment):
         self.region = region
         self.name = environment
+
         self.stack = boto3.resource('cloudformation', region_name=self.region).Stack(self._get_stack_name())
+        self._config = {p['ParameterKey']: p['ParameterValue'] for p in self.stack.parameters or []}
+        self._stack_template_url = None
 
         self._repository = Repository('infrastructure')
 
@@ -73,35 +76,39 @@ class Environment(object):
     def repository(self):
         return self._repository
 
-    def update(self, version, config, service, service_version):
-        """
-        Update a whole environment to a new template
-        :param str version:
-        :param dict config:
-        :param str service:
-        :param str service_version:
-        """
-        config = self._apply_service_update_config(config, service, service_version)
+    @property
+    def config(self):
+        return self._config
 
+    def update_environment_version(self, version):
+        self._stack_template_url = f'https://s3.amazonaws.com/{s3_bucket_name}/cloudformation/infrastructure/{version}/infrastructure-environment.yaml'
+
+    def update_service_version(self, service, version):
+        self.update_config({ucfirst(service) + 'ServiceVersion': version})
+
+    def update(self):
+        """
+        Commit an update to the Environment
+        """
         def format_param(key, value):
             if value is not None:
                 return {'ParameterKey': key, 'ParameterValue': value}
             else:
                 return {'ParameterKey': key, 'UsePreviousValue': True}
 
-        if version is None:
+        if self._stack_template_url is None:
             cprint(f'Updating stack {self.stack.stack_name}')
             self.stack.update(
                 UsePreviousTemplate=True,
-                Parameters=[format_param(k, v) for k, v in config.items()],
+                Parameters=[format_param(k, v) for k, v in self._config.items()],
                 Capabilities=['CAPABILITY_NAMED_IAM']
             )
         else:
-            template_url = f'https://s3.amazonaws.com/{s3_bucket_name}/cloudformation/infrastructure/{version}/infrastructure-environment.yaml'
+            template_url = self._stack_template_url
             cprint(f'Updating stack {self.stack.stack_name} using template {template_url}')
             self.stack.update(
                 TemplateURL=template_url,
-                Parameters=[format_param(k, v) for k, v in config.items()],
+                Parameters=[format_param(k, v) for k, v in self._config.items()],
                 Capabilities=['CAPABILITY_NAMED_IAM']
             )
 
@@ -154,12 +161,19 @@ class Environment(object):
         finally:
             spinner.stop()
 
-    def get_current_config(self):
+    def update_config(self, new_config):
         """
-        Get the current configuration of the environment
-        :return: dict
+        Apply new config
+        :param dict new_config:
+        :return:
         """
-        return {p['ParameterKey']: p['ParameterValue'] for p in self.stack.parameters or []}
+        for key, value in new_config.items():
+            if value is None:
+                continue
+            elif value is NotImplemented:
+                del self._config[key]
+            else:
+                self._config[key] = value
 
     def _get_service(self, service):
         if service not in ['hardware', 'plans', 'preprocessing', 'statsapi', 'time', 'users']:
@@ -174,10 +188,6 @@ class Environment(object):
 
     def _get_stack_name(self):
         return f'infrastructure-{self.name}'
-
-    def _apply_service_update_config(self, config, service, service_version):
-        config[ucfirst(service) + 'ServiceVersion'] = service_version
-        return config
 
     def __str__(self):
         return self.name
@@ -197,9 +207,12 @@ class LegacyEnvironment(Environment):
     def _get_stack_name(self):
         return f'{self._service.name}-{self.name}'
 
-    def _apply_service_update_config(self, config, service, service_version):
+    def update_service_version(self, service, version):
+        self._stack_template_url = f'https://s3.amazonaws.com/{s3_bucket_name}/cloudformation/{self._service.name}/{version}/{self._service.name}-environment.yaml'
+
+    def update_environment_version(self, version):
         # Noop
-        return config
+        pass
 
 
 class Service(object):
@@ -399,11 +412,11 @@ def map_config(old_config):
     param_renames = dict([a.split('->') for a in filter(None, args.param_renames.split(','))])
     param_updates = dict([a.split('->') for a in filter(None, args.param_updates.split(','))])
 
-    new_config = {old_key: None for old_key in old_config.keys()}
+    new_config = {}
 
     # Rename parameters
     for old_key, new_key in param_renames.items():
-        if old_key not in new_config:
+        if old_key not in old_config:
             raise ApplicationException(f'{old_key} not found in existing config, cannot rename')
 
         if new_key == '':
@@ -412,7 +425,7 @@ def map_config(old_config):
             cprint(f'Renaming parameter {old_key} to {new_key}')
             new_config[new_key] = old_config[old_key]
 
-        del new_config[old_key]
+        new_config[old_key] = NotImplemented
 
     # Set new parameter values
     for key, value in param_updates.items():
@@ -512,11 +525,12 @@ def main():
             raise NotImplementedError()
 
     else:
-        new_config = map_config(environment.get_current_config())
-
         try:
             # Actually update the service
-            environment.update(environment_version, new_config, service=args.service, service_version=service_version)
+            environment.update_config(map_config(environment.config))
+            environment.update_environment_version(environment_version)
+            environment.update_service_version(args.service, service_version)
+            environment.update()
         except ClientError as e:
             if 'No updates are to be performed' in str(e):
                 cprint('No updates are to be performed', colour=Fore.YELLOW)
