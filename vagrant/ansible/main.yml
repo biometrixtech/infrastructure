@@ -33,13 +33,16 @@
             state: present
             line: 'biometrix ALL=(ALL:ALL) NOPASSWD:ALL'
 
-      - name: 'Add scripts directories to path'
+      - name: 'Add useful things to .bashrc'
         lineinfile:
             dest: '/home/biometrix/.bashrc'
             state: present
-            line: 'PATH=$PATH:{{item}}'
+            line: '{{item}}'
         with_items:
-          - '/vagrant/infrastructure/scripts:/vagrant/preprocessing/scripts:/vagrant/users/scripts:/vagrant/hardware/scripts'
+          - 'PATH=$PATH:/vagrant/infrastructure/scripts:/vagrant/preprocessing/scripts:/vagrant/users/scripts:/vagrant/hardware/scripts'
+          - 'alias gitlog="git log --graph --full-history --all --color --pretty=format:\"%x1b[31m%h%x09%x1b[32m%d%x1b[0m%x20%s\""'
+          - 'alias git-log=gitlog'
+
 
     ##########################################################################################################
     ## AWS & PYTHON
@@ -93,18 +96,18 @@
 
       - name: 'Create AWS config directory'
         file:
-            path: '/root/.aws'
+            path: '/home/biometrix/.aws'
             state: directory
-            owner: root
-            group: root
+            owner: 'biometrix'
+            group: 'biometrix'
             mode: 0700
 
       - name: 'Install AWS config files'
         copy:
             src: '{{infrastructure_directory}}/vagrant/ansible/files/aws/{{item}}'
-            dest: '/root/.aws/{{item}}'
-            owner: 'root'
-            group: 'root'
+            dest: '/home/biometrix/.aws/{{item}}'
+            owner: 'biometrix'
+            group: 'biometrix'
             mode: '0600'
             force: No
         with_items:
