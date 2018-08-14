@@ -518,8 +518,8 @@ Resources:
                 Environment: { Ref: "Environment" }
                 CreateVpc: "true"
                 CreateCompute: "true"
-                CreatePipeline: "true"
-                CreateIngest: "true"
+                CreatePipeline: "false"
+                CreateIngest: "false"
                 MultiAz: "true"
                 VpnCidr: 0
                 MongoDbPeeringId: { Ref: "PreprocessingPeeringId" }
