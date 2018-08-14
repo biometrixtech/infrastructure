@@ -83,6 +83,16 @@ Parameters:
         Description: "The write capacity of the DynamoDb table"
         MinValue: 1
         Type: "Number"
+    PreprocessingPeeringId:
+        Type: "String"
+        Default: ""
+        Description: "The ID of the VPC to peer to for MongoDB connections"
+    PreprocessingPeeringCidr:
+        Type: "String"
+        Description: "The CIDR range in the peered VPC to route"
+        Default: ""
+        AllowedPattern: "^((\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2}))|$"
+        ConstraintDescription: "Must be a valid IP CIDR range of the form x.x.x.x/x."
 
     StatsapiServiceVersion:
         Type: "String"
@@ -201,6 +211,8 @@ Metadata:
               - "PreprocessingServiceVersion"
               - "PreprocessingAutoscalingSchedule"
               - "PreprocessingDynamodbWriteCapacity"
+              - "PreprocessingPeeringId"
+              - "PreprocessingPeeringCidr"
 
           - Label: { default: "Stats Api" }
             Parameters:
@@ -243,6 +255,8 @@ Metadata:
             PreprocessingServiceVersion: { default: "Preprocessing service version" }
             PreprocessingAutoscalingSchedule: { default: "Autoscaling schedule" }
             PreprocessingDynamodbWriteCapacity: { default: "DynamoDB WCUs" }
+            PreprocessingPeeringId: { default: "Peering VPC/PCN ID" }
+            PreprocessingPeeringCidr: { default: "Peering CIDR Range" }
 
             StatsapiServiceVersion: { default: "Stats API service version" }
             StatsapiMongoDbPeeringVpc: { default: "MongoDB peering VPC ID" }
@@ -506,11 +520,10 @@ Resources:
                 CreateCompute: "true"
                 CreatePipeline: "true"
                 CreateIngest: "true"
-                PollerVersion: "15901c4"
                 MultiAz: "true"
                 VpnCidr: 0
-                MongoDbPeeringVpc: { Ref: "StatsapiMongoDbPeeringVpc" }
-                MongoDbPeeringCidr: { Ref: "StatsapiMongoDbPeeringCidr" }
+                MongoDbPeeringId: { Ref: "PreprocessingPeeringId" }
+                MongoDbPeeringCidr: { Ref: "PreprocessingPeeringCidr" }
                 AutoscalingSchedule: { Ref: "PreprocessingAutoscalingSchedule" }
                 DynamodbWriteCapacity: { Ref: "PreprocessingDynamodbWriteCapacity" }
             Tags:
