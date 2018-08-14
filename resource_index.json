@@ -18,6 +18,10 @@
             "src": "cloudformation/infrastructure-cfsnippets.yaml"
         },
         {
+            "s3_filename": "infrastructure-environment.yaml",
+            "src": "cloudformation/infrastructure-environment.yaml"
+        },
+        {
             "s3_filename": "infrastructure-security.yaml",
             "src": "cloudformation/infrastructure-security.yaml"
         },
