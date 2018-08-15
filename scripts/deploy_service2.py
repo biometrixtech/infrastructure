@@ -254,6 +254,8 @@ def main():
         service_repository = environment.get_service_repository(args.service)
         if args.environment_version != '':
             environment_version = environment.repository.parse_ref(args.environment_version)[0]
+            # Check that the build we're about to deploy has actually been completed
+            environment.repository.await_build_completion(environment_version)
         else:
             environment_version = None
 
