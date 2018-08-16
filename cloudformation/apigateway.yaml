@@ -214,9 +214,8 @@ Resources:
     ApiDomainBasePathMapping:
         Type: "AWS::ApiGateway::BasePathMapping"
         Properties:
-            BasePath: { "Fn::Sub": "${Project}/latest" }
+            BasePath: { Ref: "Project" }
             DomainName: { "Fn::Sub": "apis.${Environment}.fathomai.com" }
             RestApiId: { Ref: "RestApi" }
-#            Stage: 'latest'
         DependsOn:
           - "ApiStage"
