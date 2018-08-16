@@ -31,6 +31,10 @@
             "regions": [ "us-east-1" ]
         },
         {
+            "s3_filename": "meta-environment.yaml",
+            "src": "cloudformation/meta-environment.yaml"
+        },
+        {
             "s3_filename": "time-environment.yaml",
             "src": "cloudformation/time-environment.yaml"
         },

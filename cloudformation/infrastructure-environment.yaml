@@ -53,6 +53,12 @@ Parameters:
         AllowedPattern: "^[a-f0-9]{40}$|^$"
         ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
 
+    MetaServiceVersion:
+        Type: "String"
+        Description: "The git commit hash of the Meta service to deploy"
+        AllowedPattern: "^[a-f0-9]{40}$|^$"
+        ConstraintDescription: "Must be a 40-hex-digit Git commit hash"
+
     PlansServiceVersion:
         Type: "String"
         Description: "The git commit hash of the Plans service to deploy"
@@ -200,6 +206,10 @@ Metadata:
             Parameters:
               - "HardwareServiceVersion"
 
+          - Label: { default: "Meta" }
+            Parameters:
+              - "MetaServiceVersion"
+
           - Label: { default: "Plans" }
             Parameters:
               - "PlansServiceVersion"
@@ -247,6 +257,8 @@ Metadata:
             QuerypostgresSubnetIds: { default: "Subnet IDs" }
 
             HardwareServiceVersion: { default: "Hardware service version" }
+
+            MetaServiceVersion: { default: "Meta service version" }
 
             PlansServiceVersion: { default: "Plans service version" }
             PlansPeeringId: { default: "Peering VPC/PCN ID" }
@@ -506,6 +518,27 @@ Resources:
         Condition: "CreateHardwareService"
         DependsOn:
           - "UsersService"
+
+    ##########################################################################################################
+    ##  HARDWARE
+    ##########################################################################################################
+
+    MetaService:
+        Type: "AWS::CloudFormation::Stack"
+        Properties:
+            Parameters:
+                Environment: { Ref: "Environment" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "meta-${Environment}" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: "meta" }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/meta/${TemplateVersion}/meta-environment.yaml", {
+                InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
+                TemplateVersion: { Ref: "MetaServiceVersion" }
+            } ] }
+            TimeoutInMinutes: 30
+        Condition: "CreateMetaervice"
 
     ##########################################################################################################
     ##  PREPROCESSING
