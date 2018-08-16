@@ -177,11 +177,7 @@ Resources:
             RestApiId: { Ref: "RestApi" }
             StageName: "latest"
             DeploymentId: { Ref: "ApiDeployment2" }
-            Description:
-                DataTraceEnabled: true
-                Description: { "Fn::Sub": 'Deployment of ${Project}' }
-                LoggingLevel: 'INFO'
-                MetricsEnabled: true
+            Description: { "Fn::Sub": 'Deployment of ${Project}' }
             Variables:
                 LambdaAlias: '$LATEST'
 
