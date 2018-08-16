@@ -217,6 +217,6 @@ Resources:
             BasePath: { "Fn::Sub": "${Project}/latest" }
             DomainName: { "Fn::Sub": "apis.${Environment}.fathomai.com" }
             RestApiId: { Ref: "RestApi" }
-            Stage: 'latest'
+#            Stage: 'latest'
         DependsOn:
           - "ApiStage"
