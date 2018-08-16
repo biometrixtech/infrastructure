@@ -159,7 +159,7 @@ Resources:
                                 responses:
                                     default:
                                         statusCode: '200'
-                                uri: { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations" }
+                                uri: { "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}:${!stageVariables.LambdaAlias}/invocations" }
                                 httpMethod: "POST"
                                 passthroughBehavior: "when_no_match"
                                 type: "aws_proxy"
@@ -170,49 +170,57 @@ Resources:
         Type: "AWS::ApiGateway::Deployment"
         Properties:
             RestApiId: { Ref: "RestApi" }
-            StageName: "v1"
-            StageDescription:
+
+    ApiStage:
+        Type: "AWS::ApiGateway::Stage"
+        Properties:
+            RestApiId: { Ref: "RestApi" }
+            StageName: "latest"
+            DeploymentId: { Ref: "ApiDeployment" }
+            Description:
                 DataTraceEnabled: true
                 Description: { "Fn::Sub": 'Deployment of ${Project}' }
                 LoggingLevel: 'INFO'
                 MetricsEnabled: true
+            Variables:
+                LambdaAlias: '$LATEST'
 
-    CustomDomainName:
-        Type: 'AWS::ApiGateway::DomainName'
-        Properties:
-            DomainName: { "Fn::Sub": "${Project}.${Environment}.fathomai.com" }
-            CertificateArn: { "Fn::ImportValue": { "Fn::Sub": "FathomaiSslCertificateArnVirginia-${Environment}" } }
-        Condition: "CreateCustomDomain"
-
-    CustomDomainBasePathMapping:
-        Type: "AWS::ApiGateway::BasePathMapping"
-        Properties:
-            BasePath: 'v1'
-            DomainName: { "Fn::Sub": "${Project}.${Environment}.fathomai.com" }
-            RestApiId: { Ref: "RestApi" }
-            Stage: 'v1'
-        Condition: "CreateCustomDomain"
-        DependsOn:
-          - "ApiDeployment"
-          - "CustomDomainName"
-
-    CustomDomainCnameRecords:
-        Type: "AWS::Route53::RecordSet"
-        Properties:
-            HostedZoneId: { "Fn::ImportValue": { "Fn::Sub": "FathomaiHostedZoneId-${Environment}" } }
-            Comment: "Stats API"
-            Name: { "Fn::Sub": "${Project}.${Environment}.fathomai.com." }
-            Type: "CNAME"
-            TTL: "600"
-            ResourceRecords: [ { "Fn::GetAtt": [ "CustomDomainName", "DistributionDomainName" ] } ]
-        Condition: "CreateCustomDomain"
+#    CustomDomainName:
+#        Type: 'AWS::ApiGateway::DomainName'
+#        Properties:
+#            DomainName: { "Fn::Sub": "${Project}.${Environment}.fathomai.com" }
+#            CertificateArn: { "Fn::ImportValue": { "Fn::Sub": "FathomaiSslCertificateArnVirginia-${Environment}" } }
+#        Condition: "CreateCustomDomain"
+#
+#    CustomDomainBasePathMapping:
+#        Type: "AWS::ApiGateway::BasePathMapping"
+#        Properties:
+#            BasePath: 'v1'
+#            DomainName: { "Fn::Sub": "${Project}.${Environment}.fathomai.com" }
+#            RestApiId: { Ref: "RestApi" }
+#            Stage: 'v1'
+#        Condition: "CreateCustomDomain"
+#        DependsOn:
+#          - "ApiDeployment"
+#          - "CustomDomainName"
+#
+#    CustomDomainCnameRecords:
+#        Type: "AWS::Route53::RecordSet"
+#        Properties:
+#            HostedZoneId: { "Fn::ImportValue": { "Fn::Sub": "FathomaiHostedZoneId-${Environment}" } }
+#            Comment: "Stats API"
+#            Name: { "Fn::Sub": "${Project}.${Environment}.fathomai.com." }
+#            Type: "CNAME"
+#            TTL: "600"
+#            ResourceRecords: [ { "Fn::GetAtt": [ "CustomDomainName", "DistributionDomainName" ] } ]
+#        Condition: "CreateCustomDomain"
 
     ApiDomainBasePathMapping:
         Type: "AWS::ApiGateway::BasePathMapping"
         Properties:
-            BasePath: { Ref: "Project" }
+            BasePath: { "Fn::Sub": "${Project}/latest" }
             DomainName: { "Fn::Sub": "apis.${Environment}.fathomai.com" }
             RestApiId: { Ref: "RestApi" }
-            Stage: 'v1'
+            Stage: 'latest'
         DependsOn:
-          - "ApiDeployment"
+          - "ApiStage"
