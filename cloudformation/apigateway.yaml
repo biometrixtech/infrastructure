@@ -166,7 +166,7 @@ Resources:
                 x-amazon-apigateway-binary-media-types:
                   - "application/octet-stream"
 
-    ApiDeployment:
+    ApiDeployment2:
         Type: "AWS::ApiGateway::Deployment"
         Properties:
             RestApiId: { Ref: "RestApi" }
@@ -176,7 +176,7 @@ Resources:
         Properties:
             RestApiId: { Ref: "RestApi" }
             StageName: "latest"
-            DeploymentId: { Ref: "ApiDeployment" }
+            DeploymentId: { Ref: "ApiDeployment2" }
             Description:
                 DataTraceEnabled: true
                 Description: { "Fn::Sub": 'Deployment of ${Project}' }
