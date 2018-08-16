@@ -61,6 +61,13 @@ Resources:
             Principal: "apigateway.amazonaws.com"
             SourceArn: { "Fn::Sub": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*" }
 
+    LambdaLatestAlias:
+        Type: "AWS::Lambda::Alias"
+        Properties:
+            FunctionName: { Ref: "LambdaArn" }
+            FunctionVersion: '$LATEST'
+            Name: 'latest'
+
     ##########################################################################################################
     ##  API GATEWAY
     ##########################################################################################################
