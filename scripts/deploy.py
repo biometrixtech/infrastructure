@@ -4,6 +4,7 @@ from __future__ import print_function
 from botocore.exceptions import ClientError
 from colorama import Fore
 from datetime import datetime
+from semver import VersionInfo
 import argparse
 import boto3
 import sys
@@ -224,6 +225,18 @@ def map_config(old_config):
     return new_config
 
 
+def validate_semver_tag(new_tag, old_tags):
+    for old_tag in old_tags:
+        if old_tag == new_tag:
+            raise ApplicationException(f'Release {new_tag} already exists for this service. To roll back to a previous version, run [deploy.py {args.environment} {args.service} --ref {new_tag}]')
+        elif old_tag > new_tag:
+            raise ApplicationException(f'Cannot release version {new_tag} in this service because a later version {old_tag} already exists.')
+    # TODO prevent skipping versions
+
+    if args.environment == 'production' and new_tag.build is not None:
+        raise ApplicationException('Pre-release versions (ie with build suffixes) cannot be deployed to production')
+
+
 def ucfirst(s: str) -> str:
     """
     Uppercase the first letter of a string
@@ -235,11 +248,6 @@ def ucfirst(s: str) -> str:
 
 def main():
     boto3.setup_default_session(profile_name=args.profile_name)
-
-    if args.environment == 'production':
-        cprint('Are you sure you want to deploy to production?! (y/n)', colour=Fore.YELLOW)
-        if not confirm():
-            exit(0)
 
     if args.environment in ['dev', 'production']:
         environment = LegacyEnvironment(args.region, args.environment, args.service)
@@ -259,57 +267,97 @@ def main():
         else:
             environment_version = None
 
-    service_version, ref_type = service_repository.parse_ref(args.version)
+    if args.ref is None:
+        if args.environment == 'production':
+            args.ref = 'master'
+        else:
+            args.ref = f'{args.environment}-master'
+
+    service_version, ref_type = service_repository.parse_ref(args.ref)
+
+    if args.tag is None:
+        if args.environment == 'dev':
+            # It's ok to not tag versions in dev
+            version = None
+        elif ref_type == 'tag':
+            # Deploying from a tag, could be a rollback
+            version = None
+        else:
+            raise ApplicationException('Deployments to environments above dev must be tagged')
+    else:
+        version = VersionInfo.parse(args.tag or args.ref)
+        validate_semver_tag(version, service_repository.get_semver_tags())
+
+    #             | head                  | commit    | branch                  | tag
+    #  -----------+-----------------------+-----------+-------------------------+-----
+    #  dev        | upload_working_copy() | Ok        | compare_remote_status() | Ok
+    #  test       | X                     | confirm() | compare_remote_status() | confirm()
+    #  <other>    | X                     | confirm() | compare_remote_status() | confirm()
+    #  production | X                     | confirm() | X                       | confirm()
 
     # Do the pre-upload of templates to the 00000000 version
     if ref_type == 'head':
-        if args.environment != 'dev':
+        if args.environment == 'dev':
+            service_repository.upload_working_copy()
+        else:
             raise ApplicationException('Working copy can only be deployed to dev')
-        service_repository.upload_working_copy()
 
-    elif ref_type == 'branch':
-        comparison = service_repository.compare_remote_status(args.version)
-        if comparison == -1:
-            confirm(f'Branch {args.version} is behind origin/{args.version}.  Are you sure you want to deploy an earlier version?')
-        elif comparison == 1:
-            raise ApplicationException(f'Branch {args.version} is ahead of origin/{args.version}.  You need to push your changes')
+    if ref_type == 'branch':
+        if args.environment == 'production':
+            raise ApplicationException(f'Only tagged versions can be deployed to production. Run with [deploy.py {args.environment} {args.service} --ref {args.tag}')
+        else:
+            comparison = service_repository.compare_remote_status(args.ref)
+            if comparison == -1:
+                if not confirm(f'Branch {args.version} is behind origin/{args.ref}.  Are you sure you want to deploy an earlier version?'):
+                    exit(0)
+            elif comparison == 1:
+                raise ApplicationException(f'Branch {args.ref} is ahead of origin/{args.ref}.  You need to push your changes')
+
+    if version is not None:
+        cprint(f"Going to tag commit {service_version[0:16]} (from {ref_type} {args.ref}) as {version} and deploy to {args.environment}", colour=Fore.YELLOW)
+    else:
+        cprint(f"Going to deploy commit {service_version[0:16]} (from {ref_type} {args.ref}) to {args.environment}", colour=Fore.YELLOW)
+
+    if args.environment != 'dev' or version is not None:
+        if not confirm('Is this what you wanted? '):
+            exit(0)
+
+    if args.environment == 'production':
+        cprint('Are you sure you want to deploy to production?! (y/n)', colour=Fore.YELLOW)
+        if not confirm():
+            exit(0)
+
+    if version is not None:
+        service_repository.create_semver_tag(version, service_version)
 
     # Check that the build we're about to deploy has actually been completed
     service_repository.await_build_completion(service_version)
 
-    if args.subservice:
-        if ref_type != 'head':
-            raise ApplicationException('Can only update subservice with working copy')
+    try:
+        # Actually update the service
+        environment.update_config(map_config(environment.config))
+        environment.update_environment_version(environment_version)
+        environment.update_service_version(args.service, service_version)
+        environment.update()
+    except ClientError as e:
+        if 'No updates are to be performed' in str(e):
+            cprint('No updates are to be performed', colour=Fore.YELLOW)
+        elif 'is in UPDATE_IN_PROGRESS state' in str(e):
+            cprint('Stack is already updating', colour=Fore.YELLOW)
+            environment.await_deployment_complete()
         else:
-            # TODO
-            raise NotImplementedError()
+            cprint(e, colour=Fore.RED)
+        exit(1)
 
-    else:
-        try:
-            # Actually update the service
-            environment.update_config(map_config(environment.config))
-            environment.update_environment_version(environment_version)
-            environment.update_service_version(args.service, service_version)
-            environment.update()
-        except ClientError as e:
-            if 'No updates are to be performed' in str(e):
-                cprint('No updates are to be performed', colour=Fore.YELLOW)
-            elif 'is in UPDATE_IN_PROGRESS state' in str(e):
-                cprint('Stack is already updating', colour=Fore.YELLOW)
-                environment.await_deployment_complete()
-            else:
-                cprint(e, colour=Fore.RED)
-            exit(1)
+    environment.await_deployment_complete()
 
-        environment.await_deployment_complete()
+    if service_repository.git_repo_name != 'infrastructure':
+        # Update git reference
+        cprint('Updating git reference')
+        service_repository.update_git_branch(f'{args.environment}-{args.region}', service_version)
 
-        if args.service != 'time':
-            # Update git reference
-            cprint('Updating git reference')
-            service_repository.update_git_branch(f'{args.environment}-{args.region}', service_version)
-
-            # Explicitly deploy lambda functions to make sure they update
-            environment.update_lambda_functions(args.service, service_version)
+        # Explicitly deploy lambda functions to make sure they update
+        environment.update_lambda_functions(args.service, service_version)
 
 
 if __name__ == '__main__':
@@ -325,6 +373,7 @@ if __name__ == '__main__':
     parser.add_argument('service',
                         choices=[
                             'hardware',
+                            'meta',
                             'plans',
                             'preprocessing',
                             'statsapi',
@@ -332,16 +381,19 @@ if __name__ == '__main__':
                             'users',
                         ],
                         help='The service being deployed')
-    parser.add_argument('version',
-                        help='the version of the service to deploy')
+
+    parser.add_argument('--ref',
+                        help='the branch or commit to deploy from',
+                        default=None)
+
+    parser.add_argument('--tag',
+                        help='the tag to assign to the deployed version of the service',
+                        default=None)
+
     parser.add_argument('--environment-version',
                         dest='environment_version',
                         default='',
                         help='The version of the whole-environment template to deploy')
-
-    parser.add_argument('--subservice',
-                        default='',
-                        help='The subservice to update')
 
     parser.add_argument('--param-renames',
                         dest='param_renames',

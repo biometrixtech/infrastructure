@@ -1,5 +1,6 @@
 from boto3.dynamodb.conditions import Key, Attr
 from colorama import Fore
+from semver import VersionInfo
 from subprocess import CalledProcessError
 import boto3
 import json
@@ -13,11 +14,20 @@ from components.ui import cprint, Spinner
 
 lambci_builds_table = boto3.resource('dynamodb', region_name='us-east-1').Table('infrastructure-lambci-builds')
 
+# https://github.com/semver/semver/issues/232#issuecomment-405596809
+semver_regex = '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'
+
 
 class Repository(object):
     def __init__(self, service):
         self.service = service
         self._git_dir = self._get_git_dir()
+
+    @property
+    def git_repo_name(self):
+        if self.service in ['time', 'meta']:
+            return 'infrastructure'
+        return self.service
 
     def upload_working_copy(self):
         """
@@ -113,11 +123,17 @@ class Repository(object):
         else:
             try:
                 # Parse the value as a branch name and get the associated git commit hash
-                x2 = self._execute_git_command(f'git rev-parse {version}')
-                cprint(f"Branch '{version}' has commit hash {x2}", colour=Fore.GREEN)
-                return x2, 'branch'
+                x2 = self._execute_git_command(f'git show-ref --verify refs/tags/{version}').split(' ')[0]
+                cprint(f"Tag '{version}' has commit hash {x2}", colour=Fore.GREEN)
+                return x2, 'tag'
             except CalledProcessError:
-                raise ApplicationException('Version must be a 40-hex-digit git hash or valid branch name')
+                try:
+                    # Parse the value as a branch name and get the associated git commit hash
+                    x2 = self._execute_git_command(f'git show-ref --verify refs/heads/{version}').split(' ')[0]
+                    cprint(f"Branch '{version}' has commit hash {x2}", colour=Fore.GREEN)
+                    return x2, 'branch'
+                except CalledProcessError:
+                    raise ApplicationException('Version must be a 40-hex-digit git hash or valid branch or tag name')
 
     def compare_remote_status(self, branch_name):
         """
@@ -128,12 +144,22 @@ class Repository(object):
         # Update remotes first
         self._execute_git_command('git remote update')
 
-        local_ref = self._execute_git_command(f'git rev-parse {branch_name}')
+        return self.compare_refs(branch_name, f'origin/{branch_name}')
 
-        remote_ref = self._execute_git_command(f'git rev-parse origin/{branch_name}')
+    def compare_refs(self, ref1, ref2):
+        """
+        Check whether one git ref is behind, equal to or ahead of another
+        :param str ref1:
+        :param str ref2:
+        :return: int
+        """
+
+        local_ref = self._execute_git_command(f'git rev-parse {ref1}')
+
+        remote_ref = self._execute_git_command(f'git rev-parse {ref2}')
 
         # The first common ancestor of the local and remote branches
-        parent_ref = self._execute_git_command(f'git merge-base {branch_name} origin/{branch_name}')
+        parent_ref = self._execute_git_command(f'git merge-base {ref1} {ref2}')
 
         if local_ref == remote_ref:
             return 0  # Branches are equal
@@ -142,7 +168,7 @@ class Repository(object):
         elif remote_ref == parent_ref:
             return 1  # The local ref is ahead of remote
         else:
-            raise ApplicationException(f'Branch {branch_name} has diverged from origin/{branch_name}')
+            raise ApplicationException(f'Branch {ref1} has diverged from {ref2}')
 
     def update_git_branch(self, branch_name, version):
         """
@@ -155,18 +181,31 @@ class Repository(object):
             self._execute_git_command(f"git update-ref refs/heads/{branch_name} {version}")
             self._execute_git_command(f"git push origin {branch_name} --force")
         except CalledProcessError:
-            cprint('Could not update git branch references.  Are your SSH keys set up properly?')
+            cprint('Could not update git branch references.  Are your SSH keys set up properly?', colour=Fore.RED)
 
     def get_config(self):
         with open(os.path.join(self._git_dir, 'resource_index.json'), 'r') as f:
             config = json.load(f)
             return config
 
+    def get_semver_tags(self):
+        def make_semver(tag):
+            try:
+                return VersionInfo.parse(tag)
+            except ValueError:
+                return None
+
+        all_tags = self._execute_git_command(f'git tag')
+        return list(filter(None, [make_semver(tag) for tag in all_tags.split('\n')]))
+
+    def create_semver_tag(self, tag, ref):
+        self._execute_git_command(f"git tag {tag} {ref}")
+        self._execute_git_command(f'git push origin {tag}')
+
     def _get_git_dir(self):
         try:
-            git_repo_name = 'infrastructure' if self.service == 'time' else self.service
             return os.path.realpath(
-                os.path.join(os.path.dirname(os.path.abspath(__file__)), f'../../../{git_repo_name}'))
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), f'../../../{self.git_repo_name}'))
         except KeyError:
             raise ApplicationException(f'No Git repository configured for service {self.service}')
 
