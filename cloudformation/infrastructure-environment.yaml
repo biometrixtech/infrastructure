@@ -521,7 +521,7 @@ Resources:
           - "UsersService"
 
     ##########################################################################################################
-    ##  HARDWARE
+    ##  META
     ##########################################################################################################
 
     MetaService:
@@ -534,7 +534,7 @@ Resources:
               - { Key: "Management", Value: "managed" }
               - { Key: "Project", Value: "meta" }
               - { Key: "Environment", Value: { Ref: "Environment" } }
-            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/meta/${TemplateVersion}/meta-environment.yaml", {
+            TemplateURL: { "Fn::Sub": [ "https://s3.amazonaws.com/${InfrastructureBucketName}/cloudformation/infrastructure/${TemplateVersion}/meta-environment.yaml", {
                 InfrastructureBucketName: { "Fn::ImportValue": "InfrastructureBucketName" },
                 TemplateVersion: { Ref: "MetaServiceVersion" }
             } ] }
