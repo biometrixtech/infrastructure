@@ -75,14 +75,14 @@ Resources:
     RestApi:
         Type: "AWS::ApiGateway::RestApi"
         Properties:
-            Name: { "Fn::Sub": "${Project} - ${Environment}" }
+            Name: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
             Description: { "Fn::Sub": "${Project} service (${Environment} environment)" }
             FailOnWarnings: true
             Body:
                 swagger: "2.0"
                 info:
                     version: "2016-08-18T18:08:34Z"
-                    title: { "Fn::Sub": "${Project} - ${Environment}" }
+                    title: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
                 basePath: "/LATEST"
                 schemes:
                   - "https"
