@@ -11,6 +11,21 @@ Resources:
     ##  SERVICE ROLES
     ##########################################################################################################
 
+    ServiceRoleApiGateway:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Statement:
+                  - Effect: "Allow"
+                    Principal:
+                        Service: [ "apigateway.amazonaws.com" ]
+                    Action:
+                      - "sts:AssumeRole"
+            Path: "/"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+            RoleName: { "Fn::Sub": "infrastructure-service-apigateway-${AWS::Region}" }
+
     ServiceRoleBatch:
         Type: "AWS::IAM::Role"
         Properties:
