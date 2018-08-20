@@ -57,7 +57,7 @@ Resources:
         Type: "AWS::Lambda::Permission"
         Properties:
             Action: "lambda:invokeFunction"
-            FunctionName: { Ref: "LambdaArn" }
+            FunctionName: { "Fn::Sub": "${LambdaArn}:*" }
             Principal: "apigateway.amazonaws.com"
             SourceArn: { "Fn::Sub": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*" }
 
