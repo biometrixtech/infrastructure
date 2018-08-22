@@ -83,6 +83,7 @@
           - 'awscli'
           - 'boto3'
           - 'colorama'
+          - 'semver'
 
       - name: 'Install pip tools (python 3)'
         pip:
@@ -93,6 +94,7 @@
           - 'boto3'
           - 'pandas' # Needed for get_cost_breakdown.py
           - 'colorama'
+          - 'semver'
 
       - name: 'Create AWS config directory'
         file:
