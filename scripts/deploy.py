@@ -155,6 +155,22 @@ class Environment(object):
         if tag is not None:
             service.create_lambda_aliases(tag)
 
+    def update_sliding_lambda_aliases(self, service, semantic_version: VersionInfo):
+        service = self._get_service(service)
+        if semantic_version.patch != 0:
+            # New patch version --> slide both major and minor
+            service.update_lambda_aliases(f'{semantic_version.major}.{semantic_version.minor}', semantic_version)
+            service.update_lambda_aliases(f'{semantic_version.major}_', semantic_version)
+        elif semantic_version.patch == 0 and semantic_version.minor != 0:
+            # New minor version --> slide major, new minor
+            service.create_lambda_aliases(f'{semantic_version.major}.{semantic_version.minor}', semantic_version)
+            service.update_lambda_aliases(f'{semantic_version.major}_', semantic_version)
+        else:
+            # New major version
+            service.create_lambda_aliases(f'{semantic_version.major}.{semantic_version.minor}', semantic_version)
+            service.create_lambda_aliases(f'{semantic_version.major}_', semantic_version)
+
+
     def create_apigateway_stages(self, service, tag):
         self._get_service(service).create_apigateway_stages(tag=tag)
 
@@ -207,9 +223,19 @@ class Service(object):
         for lambda_function in self._lambda_functions:
             lambda_function.update_code(ref, publish_tags)
 
-    def create_lambda_aliases(self, tag):
+    def create_lambda_aliases(self, tag, from_tag=None):
+        """
+        Create a new lambda alias
+        :param VersionInfo|str tag:
+        :param VersionInfo|str from_tag:
+        :return:
+        """
         for lambda_function in self._lambda_functions:
-            lambda_function.create_alias(tag)
+            lambda_function.create_alias(tag, from_tag)
+
+    def update_lambda_aliases(self, tag, target_tag):
+        for lambda_function in self._lambda_functions:
+            lambda_function.update_alias(tag, target_tag)
 
     def create_apigateway_stages(self, tag):
         for apigateway in self._api_gateways:
@@ -236,11 +262,19 @@ class LambdaFunction:
     def get_latest_version(self):
         return self._get_all_versions()[-1][1]
 
-    def create_alias(self, semantic_version: VersionInfo, lambda_version=None):
+    def create_alias(self, semantic_version, lambda_version=None):
+        """
+        Create a new lambda alias
+        :param VersionInfo|str semantic_version:
+        :param VersionInfo|str lambda_version:
+        :return:
+        """
         alias_name = self.semantic_version_to_alias_name(semantic_version)
 
         if lambda_version is None:
             lambda_version = self.get_latest_version()
+        else:
+            lambda_version = self._get_version_of_alias(self.semantic_version_to_alias_name(lambda_version))
 
         cprint(f'Tagging version {self.name}:{lambda_version} as alias {alias_name}', colour=Fore.CYAN)
         lambda_client.create_alias(
@@ -249,7 +283,7 @@ class LambdaFunction:
             FunctionVersion=lambda_version
         )
 
-    def add_apigateway_permission(self, semantic_version: VersionInfo, apigateway):
+    def add_apigateway_permission(self, semantic_version, apigateway):
         alias_name = self.semantic_version_to_alias_name(semantic_version)
         lambda_client.add_permission(
             FunctionName=self._name,
@@ -260,7 +294,7 @@ class LambdaFunction:
             Qualifier=alias_name
         )
 
-    def update_alias(self, semantic_version: VersionInfo, target_alias):
+    def update_alias(self, semantic_version, target_alias):
         """
         Update an existing lambda alias to point to another alias
         :param target_alias:
@@ -299,8 +333,8 @@ class LambdaFunction:
         return sorted(ret)
 
     @staticmethod
-    def semantic_version_to_alias_name(semantic_version: VersionInfo):
-        return str(semantic_version).replace('.', '_')
+    def semantic_version_to_alias_name(semantic_version):
+        return str(semantic_version).replace('.', '_').rstrip('_')
 
 
 class ApiGateway:
@@ -337,7 +371,7 @@ class ApiGateway:
         deployment_id = sorted(all_deployments, key=lambda x: x['createdDate'])[-1]['id']
         return deployment_id
 
-    def create_stage(self, semantic_version: VersionInfo):
+    def create_stage(self, semantic_version):
         deployment_id = self.get_latest_deployment_id()
         stage_name = self.semantic_version_to_stage_name(semantic_version)
         cprint(f'Creating API Gateway stage {self.id}/{deployment_id}/{stage_name} for {self.name}', colour=Fore.CYAN)
@@ -350,8 +384,8 @@ class ApiGateway:
         self._lambda_function.add_apigateway_permission(semantic_version, self)
 
     @staticmethod
-    def semantic_version_to_stage_name(semantic_version: VersionInfo):
-        return str(semantic_version).replace('.', '_')
+    def semantic_version_to_stage_name(semantic_version):
+        return str(semantic_version).replace('.', '_').rstrip('_')
 
 
 def map_config(old_config):
@@ -520,8 +554,7 @@ def main():
 
         if version.prerelease is None:
             # Deploying a 'proper' build, so 'slide' the partially-pinned aliases up to the new version
-            # TODO
-            pass
+            environment.update_sliding_lambda_aliases(args.service, version)
 
     else:
         # Explicitly deploy lambda functions anyway to make sure the $LATEST version is up to date
