@@ -214,7 +214,7 @@ class Service(object):
         self._api_gateways = [ApiGateway(self, ag['name'], self._get_lambda_function(ag['lambda_function_name'])) for ag in config.get('apigateways', [])]
 
     @property
-    def repository(self):
+    def repository(self) -> Repository:
         return self._repository
 
     def update_lambda_functions(self, ref, publish_tags=False):
@@ -226,7 +226,6 @@ class Service(object):
         Create a new lambda alias
         :param VersionInfo|str tag:
         :param VersionInfo|str from_tag:
-        :return:
         """
         for lambda_function in self._lambda_functions:
             lambda_function.create_alias(tag, from_tag)
@@ -251,7 +250,7 @@ def map_config(old_config):
     """
     Create the new config
     :param dict old_config:
-    :return: list
+    :return: dict
     """
     param_renames = dict([a.split('->') for a in filter(None, args.param_renames.split(','))])
     param_updates = dict([a.split('->') for a in filter(None, args.param_updates.split(','))])
@@ -280,15 +279,61 @@ def map_config(old_config):
 
 
 def validate_semver_tag(new_tag, old_tags):
+    """
+    Check for various version consistency gotchas
+    :param VersionInfo new_tag:
+    :param list[VersionInfo] old_tags:
+    :return:
+    """
     for old_tag in old_tags:
         if old_tag == new_tag:
-            raise ApplicationException(f'Release {new_tag} already exists for this service. To roll back to a previous version, run [deploy.py {args.environment} {args.service} --ref {new_tag}]')
+            raise ApplicationException(f'Release {args.service}:{new_tag} already exists. To roll back to a previous version, run [deploy.py {args.environment} {args.service} --ref {new_tag}]')
         elif old_tag > new_tag:
-            raise ApplicationException(f'Cannot release version {new_tag} in this service because a later version {old_tag} already exists.')
-    # TODO prevent skipping versions
+            if old_tag.major != new_tag.major:
+                # It's ok to prepare a legacy release
+                pass
+            elif old_tag.minor != new_tag.minor:
+                # It's ok to patch an old minor release when a new minor release exists
+                pass
+            else:
+                raise ApplicationException(f'Cannot release {args.service}:{new_tag} because a later version {old_tag} already exists.')
 
-    if args.environment == 'production' and new_tag.build is not None:
+    # Prevent skipping versions
+    previous_tag = get_previous_semver(new_tag)
+    for old_tag in old_tags:
+        if old_tag > previous_tag:
+            break
+    else:
+        raise ApplicationException(f'Cannot release {args.service}:{new_tag} because it skips (at least) version {previous_tag}.')
+
+    if args.environment == 'production' and new_tag.prerelease is not None:
         raise ApplicationException('Pre-release versions (ie with build suffixes) cannot be deployed to production')
+
+
+def get_previous_semver(v: VersionInfo) -> VersionInfo:
+    """
+    Return a semantic version which is definitely less than the target version
+    :param VersionInfo v:
+    :return: VersionInfo
+    """
+    if v.build is not None:
+        raise Exception(f'Cannot calculate previous version because {v} has a build number')
+
+    if v.prerelease is not None:
+        prerelease_parts = v.prerelease.split('.')
+        if prerelease_parts[-1].isdigit() and int(prerelease_parts[-1]) > 1:
+            return VersionInfo(v.major, v.minor, v.patch, prerelease_parts[0] + '.' + str(int(prerelease_parts[-1]) - 1))
+
+    if v.patch > 0:
+        return VersionInfo(v.major, v.minor, v.patch - 1)
+
+    if v.minor > 0:
+        return VersionInfo(v.major, v.minor - 1, 0)
+
+    if v.major > 0:
+        return VersionInfo(v.major - 1, 0, 0)
+
+    raise Exception(f'Could not calculate a previous version for {v}')
 
 
 def ucfirst(s: str) -> str:
