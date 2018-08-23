@@ -10,12 +10,11 @@ import boto3
 import sys
 import time
 
+from components.api_gateway import ApiGateway
 from components.exceptions import ApplicationException
+from components.lambda_function import LambdaFunction
 from components.repository import Repository
 from components.ui import confirm, cprint, Spinner
-
-
-apigateway_client = None
 
 
 class Environment(object):
@@ -47,7 +46,7 @@ class Environment(object):
 
     def update_environment_version(self, version):
         if version is not None:
-            self._stack_template_url = f'https://s3.amazonaws.com/{s3_bucket_name}/cloudformation/infrastructure/{version}/infrastructure-environment.yaml'
+            self._stack_template_url = f'https://s3.amazonaws.com/biometrix-infrastructure-{self.region}/cloudformation/infrastructure/{version}/infrastructure-environment.yaml'
 
     def update_service_version(self, service, version):
         self.update_config({ucfirst(service) + 'ServiceVersion': version})
@@ -170,7 +169,6 @@ class Environment(object):
             service.create_lambda_aliases(f'{semantic_version.major}.{semantic_version.minor}', semantic_version)
             service.create_lambda_aliases(f'{semantic_version.major}_', semantic_version)
 
-
     def create_apigateway_stages(self, service, tag):
         self._get_service(service).create_apigateway_stages(tag=tag)
 
@@ -196,7 +194,7 @@ class LegacyEnvironment(Environment):
         return f'{self._service.name}-{self.name}'
 
     def update_service_version(self, service, version):
-        self._stack_template_url = f'https://s3.amazonaws.com/{s3_bucket_name}/cloudformation/{self._service.name}/{version}/{self._service.name}-environment.yaml'
+        self._stack_template_url = f'https://s3.amazonaws.com/biometrix-infrastructure-{self.region}/cloudformation/{self._service.name}/{version}/{self._service.name}-environment.yaml'
 
     def update_environment_version(self, version):
         # Noop
@@ -247,145 +245,6 @@ class Service(object):
             if lambda_function.name == name:
                 return lambda_function
         raise Exception(f'Could not find lambda function {name}')
-
-
-class LambdaFunction:
-    def __init__(self, service, name, s3_filepath):
-        self._service = service
-        self._name = name.format(ENVIRONMENT=service.environment.name)
-        self._s3_filepath = s3_filepath
-
-    @property
-    def name(self):
-        return self._name
-
-    def get_latest_version(self):
-        return self._get_all_versions()[-1][1]
-
-    def create_alias(self, semantic_version, lambda_version=None):
-        """
-        Create a new lambda alias
-        :param VersionInfo|str semantic_version:
-        :param VersionInfo|str lambda_version:
-        :return:
-        """
-        alias_name = self.semantic_version_to_alias_name(semantic_version)
-
-        if lambda_version is None:
-            lambda_version = self.get_latest_version()
-        else:
-            lambda_version = self._get_version_of_alias(self.semantic_version_to_alias_name(lambda_version))
-
-        cprint(f'Tagging version {self.name}:{lambda_version} as alias {alias_name}', colour=Fore.CYAN)
-        lambda_client.create_alias(
-            FunctionName=self._name,
-            Name=alias_name,
-            FunctionVersion=lambda_version
-        )
-
-    def add_apigateway_permission(self, semantic_version, apigateway):
-        alias_name = self.semantic_version_to_alias_name(semantic_version)
-        lambda_client.add_permission(
-            FunctionName=self._name,
-            StatementId=alias_name,
-            Action='lambda:InvokeFunction',
-            Principal='apigateway.amazonaws.com',
-            SourceArn=f'arn:aws:execute-api:{args.region}:887689817172:{apigateway.id}/*',
-            Qualifier=alias_name
-        )
-
-    def update_alias(self, semantic_version, target_alias):
-        """
-        Update an existing lambda alias to point to another alias
-        :param target_alias:
-        :param semantic_version:
-        :return:
-        """
-        target_version = self._get_version_of_alias(self.semantic_version_to_alias_name(target_alias))
-
-        lambda_client.update_alias(
-            FunctionName=self._name,
-            Name=self.semantic_version_to_alias_name(semantic_version),
-            FunctionVersion=target_version
-        )
-
-    def update_code(self, ref, publish_version=False):
-        s3_filepath = 'lambdas/{}/{}/{}'.format(self._service.name, ref, self._s3_filepath)
-        cprint(f'Updating Lambda {self._name} with bundle s3://{s3_filepath}', colour=Fore.CYAN)
-        lambda_client.update_function_code(
-            FunctionName=self._name,
-            S3Bucket=s3_bucket_name,
-            S3Key=s3_filepath,
-            Publish=publish_version
-        )
-
-    def _get_version_of_alias(self, alias_name):
-        return lambda_client.get_function(FunctionName=self._name, Qualifier=alias_name)['Version']
-
-    def _get_all_versions(self, next_marker=None):
-        if next_marker is not None:
-            res = lambda_client.list_versions_by_function(FunctionName=self._name, Marker=next_marker)
-        else:
-            res = lambda_client.list_versions_by_function(FunctionName=self._name)
-        ret = [(v['LastModified'], v['Version']) for v in res['Versions'] if v['Version'] != '$LATEST']
-        if 'NextMarker' in res:
-            ret += self._get_all_versions(res['NextMarker'])
-        return sorted(ret)
-
-    @staticmethod
-    def semantic_version_to_alias_name(semantic_version):
-        return str(semantic_version).replace('.', '_').rstrip('_')
-
-
-class ApiGateway:
-    _id = None
-
-    def __init__(self, service, name, lambda_function: LambdaFunction):
-        self._service = service
-        self._name = name.format(ENVIRONMENT=service.environment.name)
-        self._lambda_function = lambda_function
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def id(self):
-        if self._id is None:
-            for api in self._get_all_rest_apis():
-                if api['name'] == self._name:
-                    self._id = api['id']
-                    break
-            else:
-                raise Exception(f'API Gateway {self.name} was not found')
-        return self._id
-
-    @staticmethod
-    def _get_all_rest_apis():
-        all_apis = apigateway_client.get_rest_apis()
-        # TODO paging
-        return all_apis['items']
-
-    def get_latest_deployment_id(self):
-        all_deployments = apigateway_client.get_deployments(restApiId=self.id)['items']
-        deployment_id = sorted(all_deployments, key=lambda x: x['createdDate'])[-1]['id']
-        return deployment_id
-
-    def create_stage(self, semantic_version):
-        deployment_id = self.get_latest_deployment_id()
-        stage_name = self.semantic_version_to_stage_name(semantic_version)
-        cprint(f'Creating API Gateway stage {self.id}/{deployment_id}/{stage_name} for {self.name}', colour=Fore.CYAN)
-        apigateway_client.create_stage(
-            restApiId=self.id,
-            deploymentId=deployment_id,
-            stageName=stage_name,
-            variables={'LambdaAlias': LambdaFunction.semantic_version_to_alias_name(semantic_version)}
-        )
-        self._lambda_function.add_apigateway_permission(semantic_version, self)
-
-    @staticmethod
-    def semantic_version_to_stage_name(semantic_version):
-        return str(semantic_version).replace('.', '_').rstrip('_')
 
 
 def map_config(old_config):
@@ -616,10 +475,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    s3_bucket_name = 'biometrix-infrastructure-{}'.format(args.region)
     boto3.setup_default_session(profile_name=args.profile_name, region_name=args.region)
-    apigateway_client = boto3.client('apigateway')
-    lambda_client = boto3.client('lambda')
 
     try:
         main()
