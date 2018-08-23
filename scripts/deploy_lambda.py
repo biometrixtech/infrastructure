@@ -1,31 +1,20 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Zip and upload a Lambda bundle
-from __future__ import print_function
-from colorama import Fore, Back, Style
+from colorama import Fore
 import argparse
 import boto3
 import os
 import shutil
 import zipfile
 
-try:
-    import builtins as __builtin__
-except ImportError:
-    import __builtin__
-
-
-def get_boto3_resource(resource):
-    return boto3.resource(
-        resource,
-        region_name=args.region,
-    )
+from components.ui import cprint
 
 
 def update_function(bundle, lambda_function_name):
     s3_bucket, s3_path = get_s3_paths(bundle)
     s3_path += '.zip'
     lambda_function_name = lambda_function_name.format(environment=args.environment)
-    print('Updating function {} with s3://{}/{}'.format(lambda_function_name, s3_bucket, s3_path))
+    cprint('Updating function {} with s3://{}/{}'.format(lambda_function_name, s3_bucket, s3_path), colour=Fore.CYAN)
     boto3.client('lambda', region_name=args.region).update_function_code(
         FunctionName=lambda_function_name,
         S3Bucket=s3_bucket,
@@ -36,14 +25,14 @@ def update_function(bundle, lambda_function_name):
 
 def upload_bundle(bundle):
     s3_bucket, s3_path = get_s3_paths(bundle)
-    print('Uploading {} to s3://{}/{}'.format(bundle, s3_bucket, s3_path))
-    s3_resource = get_boto3_resource('s3')
+    cprint('Uploading {} to s3://{}/{}'.format(bundle, s3_bucket, s3_path), colour=Fore.CYAN)
+    s3_resource = boto3.resource('s3', region_name=args.region)
     data = open(bundle, 'rb')
     s3_resource.Bucket(s3_bucket).put_object(Key=s3_path, Body=data)
 
 
 def zip_bundle(filename):
-    print('Zipping bundle')
+    cprint('Zipping bundle', colour=Fore.CYAN)
     if filename[-3:] == '.py':
         # Zipping one file
         output_filename = filename.replace('.py', '')
@@ -67,7 +56,7 @@ def map_bundle(service, subservice):
     if (service, subservice) in bundles:
         return bundles[(service, subservice)]
     else:
-        print('Unrecognised service/subservice combination', colour=Fore.RED)
+        cprint('Unrecognised service/subservice combination', colour=Fore.RED)
         exit(1)
 
 
@@ -75,21 +64,6 @@ def get_s3_paths(bundle):
     s3_bucket = 'biometrix-infrastructure-{}'.format(args.region)
     s3_path = 'lambdas/{}/{}/{}'.format(args.service, '0' * 40, os.path.basename(bundle))
     return s3_bucket, s3_path
-
-
-def print(*pargs, **kwargs):
-    if 'colour' in kwargs:
-        __builtin__.print(kwargs['colour'], end="")
-        del kwargs['colour']
-
-        end = kwargs.get('end', '\n')
-        kwargs['end'] = ''
-        __builtin__.print(*pargs, **kwargs)
-
-        __builtin__.print(Style.RESET_ALL, end=end)
-
-    else:
-        __builtin__.print(*pargs, **kwargs)
 
 
 if __name__ == '__main__':
