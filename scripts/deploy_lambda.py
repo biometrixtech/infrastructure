@@ -30,7 +30,7 @@ def update_function(bundle, lambda_function_name):
         FunctionName=lambda_function_name,
         S3Bucket=s3_bucket,
         S3Key=s3_path,
-        Publish=True,
+        Publish=False,
     )
 
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
                         help='The service being deployed')
     parser.add_argument('environment',
                         type=str,
-                        choices=['infra', 'dev', 'qa', 'production'],
+                        choices=['infra', 'dev', 'test', 'production'],
                         help='Environment')
     parser.add_argument('subservice',
                         type=str,
