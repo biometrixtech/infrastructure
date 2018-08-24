@@ -58,11 +58,12 @@ class LambdaFunction:
         :param semantic_version:
         :return:
         """
+        alias_name = self.semantic_version_to_alias_name(semantic_version)
         target_version = self._get_version_of_alias(self.semantic_version_to_alias_name(target_alias))
-
+        cprint(f'Updating {self.name}:{alias_name} to {target_version}', colour=Fore.CYAN)
         self._lambda_client.update_alias(
             FunctionName=self._name,
-            Name=self.semantic_version_to_alias_name(semantic_version),
+            Name=alias_name,
             FunctionVersion=target_version
         )
 
@@ -77,7 +78,7 @@ class LambdaFunction:
         )
 
     def _get_version_of_alias(self, alias_name):
-        return self._lambda_client.get_function(FunctionName=self._name, Qualifier=alias_name)['Version']
+        return self._lambda_client.get_function(FunctionName=self._name, Qualifier=alias_name)['Configuration']['Version']
 
     def _get_all_versions(self, next_marker=None):
         if next_marker is not None:
@@ -91,4 +92,4 @@ class LambdaFunction:
 
     @staticmethod
     def semantic_version_to_alias_name(semantic_version):
-        return str(semantic_version).replace('.', '_').rstrip('_')
+        return str(semantic_version).replace('.', '_')
