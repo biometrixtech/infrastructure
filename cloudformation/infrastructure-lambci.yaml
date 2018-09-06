@@ -46,7 +46,7 @@ Resources:
             Handler: 'index.handler'
             MemorySize: '1536'
             Timeout: '300'
-            Role: { 'Fn::GetAtt': [ 'LambdaExecution', 'Arn' ] }
+            Role: { 'Fn::GetAtt': [ 'LambdaExecutionRole', 'Arn' ] }
             Code:
                 S3Bucket: { 'Fn::Sub': 'lambci-${AWS::Region}' }
                 S3Key: { 'Fn::Sub': 'fn/lambci-build-${Version}.zip' }
@@ -54,6 +54,7 @@ Resources:
 
     BuildResults:
         Type: 'AWS::S3::Bucket'
+        DeletionPolicy: "Retain"
 
     ConfigTable:
         Type: 'AWS::DynamoDB::Table'
@@ -106,9 +107,14 @@ Resources:
     InvokeTopic:
         Type: 'AWS::SNS::Topic'
         Properties:
-            Subscription:
-              - Endpoint: { 'Fn::GetAtt': [ 'BuildLambda', 'Arn' ] }
-                Protocol: 'lambda'
+            TopicName: { 'Fn::Sub': 'infrastructure-lambci-snsinvoke-${AWS::Region}' }
+
+    BuildLambdaSnsSubscription:
+        Type: 'AWS::SNS::Subscription'
+        Properties:
+            Protocol: 'lambda'
+            Endpoint: { 'Fn::GetAtt': [ 'BuildLambda', 'Arn' ] }
+            TopicArn: { Ref: 'InvokeTopic' }
 
     LambdaInvoke:
         Type: 'AWS::Lambda::Permission'
@@ -118,7 +124,7 @@ Resources:
             Principal: 'sns.amazonaws.com'
             SourceArn: { Ref: 'InvokeTopic' }
 
-    LambdaExecution:
+    LambdaExecutionRole:
         Type: 'AWS::IAM::Role'
         Properties:
             AssumeRolePolicyDocument:
@@ -177,8 +183,13 @@ Resources:
                 PolicyDocument:
                     Statement:
                         Effect: 'Allow'
-                        Action: 'sns:SetTopicAttributes'
-                        Resource: { 'Fn::Sub': 'arn:aws:sns:*:*:${AWS::StackName}-*' }
+                        Action:
+                          - 'sns:SetTopicAttributes'
+                          - 'iam:PassRole'
+                        Resource:
+                          - { Ref: "InvokeTopic" }
+                          - { 'Fn::GetAtt': [ 'SnsFailuresRole', 'Arn' ] }
+            RoleName: { 'Fn::Sub': 'infrastructure-lambci-execute-${AWS::Region}' }
 
     SnsSender:
         Type: 'AWS::IAM::User'
@@ -190,13 +201,16 @@ Resources:
                         Effect: 'Allow'
                         Action: 'sns:Publish'
                         Resource: { Ref: 'InvokeTopic' }
+            UserName: { 'Fn::Sub': 'infrastructure-lambci-snsinvoker-${AWS::Region}' }
 
     SnsAccessKey:
         Type: 'AWS::IAM::AccessKey'
         Properties:
-            UserName: { Ref: 'SnsSender' }
+            UserName: { 'Fn::Sub': 'infrastructure-lambci-snsinvoker-${AWS::Region}' }
+        DependsOn:
+          - 'SnsSender'
 
-    SnsFailures:
+    SnsFailuresRole:
         Type: 'AWS::IAM::Role'
         Properties:
             AssumeRolePolicyDocument:
@@ -204,18 +218,9 @@ Resources:
                     Effect: 'Allow'
                     Principal: { Service: 'sns.amazonaws.com' }
                     Action: 'sts:AssumeRole'
-            Policies:
-              - PolicyName: 'WriteLogs'
-                PolicyDocument:
-                    Statement:
-                        Effect: 'Allow'
-                        Action:
-                          - 'logs:CreateLogGroup'
-                          - 'logs:CreateLogStream'
-                          - 'logs:PutLogEvents'
-                          - 'logs:PutMetricFilter'
-                          - 'logs:PutRetentionPolicy'
-                        Resource: { 'Fn::Sub': 'arn:aws:logs:*:*:log-group:sns/*/*/${InvokeTopic.TopicName}/*' }
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+            RoleName: { 'Fn::Sub': 'infrastructure-lambci-snsfailures-${AWS::Region}' }
 
     ConfigUpdater:
         Type: 'Custom::ConfigUpdater'
@@ -229,7 +234,7 @@ Resources:
             SnsTopic: { Ref: 'InvokeTopic' }
             SnsAccessKey: { Ref: 'SnsAccessKey' }
             SnsSecret: { 'Fn::GetAtt': [ 'SnsAccessKey', 'SecretAccessKey' ] }
-            SnsFailuresRole: { 'Fn::GetAtt': [ 'SnsFailures', 'Arn' ] }
+            SnsFailuresRole: { 'Fn::GetAtt': [ 'SnsFailuresRole', 'Arn' ] }
 
 Outputs:
     S3Bucket:
