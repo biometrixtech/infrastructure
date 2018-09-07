@@ -186,7 +186,7 @@ Resources:
             DeploymentId: { Ref: "ApiDeployment2" }
             Description: { "Fn::Sub": 'Deployment of ${Project}' }
             Variables:
-                LambdaAlias: 'LATEST'
+                LambdaAlias: 'latest'
 
 #    CustomDomainName:
 #        Type: 'AWS::ApiGateway::DomainName'
