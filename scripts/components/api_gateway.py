@@ -1,5 +1,6 @@
 from colorama import Fore
 import boto3
+from botocore.exceptions import ClientError
 
 from components.lambda_function import LambdaFunction
 from components.ui import cprint
@@ -8,9 +9,8 @@ from components.ui import cprint
 class ApiGateway:
     _id = None
 
-    def __init__(self, service, name, lambda_function: LambdaFunction):
-        self._service = service
-        self._name = name.format(ENVIRONMENT=service.environment.name)
+    def __init__(self, name, lambda_function: LambdaFunction):
+        self._name = name
         self._lambda_function = lambda_function
 
         self._apigateway_client = boto3.client('apigateway')
@@ -44,12 +44,19 @@ class ApiGateway:
         deployment_id = self.get_latest_deployment_id()
         stage_name = self.semantic_version_to_stage_name(semantic_version)
         cprint(f'Creating API Gateway stage {self.id}/{deployment_id}/{stage_name} for {self.name}', colour=Fore.CYAN)
-        self._apigateway_client.create_stage(
-            restApiId=self.id,
-            deploymentId=deployment_id,
-            stageName=stage_name,
-            variables={'LambdaAlias': LambdaFunction.semantic_version_to_alias_name(semantic_version)}
-        )
+        try:
+            self._apigateway_client.create_stage(
+                restApiId=self.id,
+                deploymentId=deployment_id,
+                stageName=stage_name,
+                variables={'LambdaAlias': LambdaFunction.semantic_version_to_alias_name(semantic_version)}
+            )
+        except ClientError as e:
+            if 'ConflictException' in str(e):
+                cprint(f'API Gateway stage {self.id}/{stage_name} already exists', colour=Fore.YELLOW)
+            else:
+                raise
+
         self._lambda_function.add_apigateway_permission(semantic_version, self)
 
     @staticmethod
