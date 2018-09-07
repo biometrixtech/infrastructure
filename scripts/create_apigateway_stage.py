@@ -24,16 +24,17 @@ def main():
         function_name=f'{args.service}-{args.environment}-apigateway-execute',
         s3_filepath='apigateway.zip'
     )
+    api_gateway = ApiGateway(f'{args.service}-{args.environment}-apigateway', lambda_function)
 
     if args.lambda_version is None:
         args.lambda_version = lambda_function.publish_version()
         cprint(f'Published lambda version {args.lambda_version}', colour=Fore.CYAN)
 
-    # Create lambda alias
-    lambda_function.create_alias(args.version, args.lambda_version)
+    for version in args.version:
+        # Create lambda alias
+        lambda_function.create_alias(version, args.lambda_version)
 
-    api_gateway = ApiGateway(f'{args.service}-{args.environment}-apigateway', lambda_function)
-    api_gateway.create_stage(args.version)
+        api_gateway.create_stage(version)
 
 
 if __name__ == '__main__':
@@ -60,7 +61,7 @@ if __name__ == '__main__':
 
     parser.add_argument('version',
                         help='The semantic version to deploy',
-                        default=None)
+                        nargs='+')
     parser.add_argument('--lambda-version',
                         help='The lambda version number to refer to',
                         default=None)

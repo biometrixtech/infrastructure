@@ -46,7 +46,12 @@ class LambdaFunction:
             )
         except ClientError as e:
             if 'ResourceConflictException' in str(e):
-                cprint(f'Lambda version {self.name}:{alias_name} already exists', colour=Fore.YELLOW)
+                cprint(f'Lambda version {self.name}:{alias_name} already exists, updating', colour=Fore.YELLOW)
+                self._lambda_client.update_alias(
+                    FunctionName=self._name,
+                    Name=alias_name,
+                    FunctionVersion=lambda_version
+                )
             else:
                 raise
 
@@ -87,12 +92,14 @@ class LambdaFunction:
     def update_code(self, ref, publish_version=False):
         s3_filepath = 'lambdas/{}/{}/{}'.format(self.service_name, ref, self._s3_filepath)
         cprint(f'Updating Lambda {self._name} with bundle s3://{s3_filepath}', colour=Fore.CYAN)
-        self._lambda_client.update_function_code(
+        res = self._lambda_client.update_function_code(
             FunctionName=self._name,
             S3Bucket='biometrix-infrastructure-{}'.format(self.region_name),
             S3Key=s3_filepath,
             Publish=publish_version
         )
+        if publish_version:
+            cprint(f"Published lambda version {res['Version']}")
 
     def publish_version(self):
         res = self._lambda_client.publish_version(
