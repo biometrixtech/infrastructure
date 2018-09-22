@@ -69,6 +69,100 @@ Resources:
             Name: 'latest'
 
     ##########################################################################################################
+    ##  ASYNC SQS
+    ##########################################################################################################
+
+    AsyncSqsQueue:
+        Type: "AWS::SQS::Queue"
+        Properties:
+            DelaySeconds: 0
+            QueueName: { "Fn::Sub": "${Project}-${Environment}-${Service}-async" }
+            VisibilityTimeout: 300
+
+    AsyncLambdaExecutionRole:
+        Type: "AWS::IAM::Role"
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                  - Effect: "Allow"
+                    Principal: { Service: [ "lambda.amazonaws.com" ] }
+                    Action: "sts:AssumeRole"
+            ManagedPolicyArns:
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+              - "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+            Policies:
+              - PolicyName: "default"
+                PolicyDocument:
+                    Version: "2012-10-17"
+                    Statement:
+                      - Action:
+                          - "sqs:SendMessage"
+                        Effect: "Allow"
+                        Resource: { "Fn::GetAtt": [ "AsyncSqsQueue", "Arn" ] }
+                      - Action:
+                          - "lambda:InvokeFunction"
+                        Effect: "Allow"
+                        Resource: { Ref: 'LambdaArn' }
+            RoleName: { "Fn::Sub": "${Project}-${Environment}-${Service}-async-${AWS::Region}" }
+
+    AsyncConsumerLambda:
+        Type: "AWS::Lambda::Function"
+        Properties:
+            Code:
+                ZipFile: |
+                    import boto3, datetime, json, os
+                    def handler(event, _):
+                        print(json.dumps(event))
+                        now = datetime.datetime.now()
+                        event = json.loads(event['Records'][0]['body'])
+
+                        if 'X-Execute-At' in event['headers']:
+                            execute_at = datetime.datetime.strptime(event['headers']['X-Execute-At'], "%Y-%m-%dT%H:%M:%SZ")
+                            if execute_at > now:
+                                print('Not executing yet')
+                                boto3.client('sqs').send_message(
+                                    QueueUrl=os.environ['SQS_QUEUE_URL'],
+                                    MessageBody=json.dumps(event),
+                                    DelaySeconds=max(0, min(int((execute_at - datetime.datetime.now()).total_seconds()), 15*60)),
+                                )
+                                return
+
+                        boto3.client('lambda').invoke(FunctionName=os.environ['LAMBDA_ARN'], Payload=json.dumps(event))
+            Environment:
+                Variables:
+                    SQS_QUEUE_URL: { Ref: 'AsyncSqsQueue' }
+                    LAMBDA_ARN: { Ref: 'LambdaArn' }
+            Handler: "index.handler"
+            MemorySize: "256"
+            Runtime: "python3.6"
+            Timeout: "60"
+            Role: { "Fn::GetAtt" : [ "IotEnvironmentFilterLambdaExecutionRole", "Arn" ] }
+            FunctionName: { "Fn::Sub": "users-${Environment}-device-iotenvironmentfilter" }
+            Tags:
+              - { Key: "Name", Value: { "Fn::Sub": "${Project}-${Environment}-${Service}-asyncconsumer" } }
+              - { Key: "Management", Value: "managed" }
+              - { Key: "Project", Value: { Ref: 'Project' } }
+              - { Key: "Environment", Value: { Ref: "Environment" } }
+              - { Key: "Service", Value: { Ref: 'Service' } }
+
+    AsyncLambdaInvokePermission:
+        Type: 'AWS::Lambda::Permission'
+        Properties:
+            FunctionName: { Ref: 'LambdaArn' }
+            Action: 'lambda:InvokeFunction'
+            Principal: 'sqs.amazonaws.com'
+            SourceArn: { "Fn::GetAtt": [ 'AsyncSqsQueue', "Arn" ] }
+
+    AsyncLambdaTriggerMapping:
+        Type: "AWS::Lambda::EventSourceMapping"
+        Properties:
+            BatchSize: 1
+            Enabled: true
+            EventSourceArn: { "Fn::GetAtt": [ 'AsyncSqsQueue', "Arn" ] }
+            FunctionName: { Ref: "AsyncConsumerLambda" }
+
+    ##########################################################################################################
     ##  API GATEWAY
     ##########################################################################################################
 
