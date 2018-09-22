@@ -282,36 +282,6 @@ Resources:
             Variables:
                 LambdaAlias: 'latest'
 
-#    CustomDomainName:
-#        Type: 'AWS::ApiGateway::DomainName'
-#        Properties:
-#            DomainName: { "Fn::Sub": "${Project}.${Environment}.fathomai.com" }
-#            CertificateArn: { "Fn::ImportValue": { "Fn::Sub": "FathomaiSslCertificateArnVirginia-${Environment}" } }
-#        Condition: "CreateCustomDomain"
-#
-#    CustomDomainBasePathMapping:
-#        Type: "AWS::ApiGateway::BasePathMapping"
-#        Properties:
-#            BasePath: 'v1'
-#            DomainName: { "Fn::Sub": "${Project}.${Environment}.fathomai.com" }
-#            RestApiId: { Ref: "RestApi" }
-#            Stage: 'v1'
-#        Condition: "CreateCustomDomain"
-#        DependsOn:
-#          - "ApiDeployment"
-#          - "CustomDomainName"
-#
-#    CustomDomainCnameRecords:
-#        Type: "AWS::Route53::RecordSet"
-#        Properties:
-#            HostedZoneId: { "Fn::ImportValue": { "Fn::Sub": "FathomaiHostedZoneId-${Environment}" } }
-#            Comment: "Stats API"
-#            Name: { "Fn::Sub": "${Project}.${Environment}.fathomai.com." }
-#            Type: "CNAME"
-#            TTL: "600"
-#            ResourceRecords: [ { "Fn::GetAtt": [ "CustomDomainName", "DistributionDomainName" ] } ]
-#        Condition: "CreateCustomDomain"
-
     ApiDomainBasePathMapping:
         Type: "AWS::ApiGateway::BasePathMapping"
         Properties:
@@ -320,3 +290,8 @@ Resources:
             RestApiId: { Ref: "RestApi" }
         DependsOn:
           - "ApiStage"
+
+Outputs:
+    AsyncSqsQueueArn:
+        Description: 'Arn of the async SQS queue'
+        Value: { "Fn::GetAtt": [ "AsyncSqsQueue", "Arn" ] }
