@@ -113,22 +113,25 @@ Resources:
                 ZipFile: |
                     import boto3, datetime, json, os
                     def handler(event, _):
-                        print(json.dumps(event))
                         now = datetime.datetime.now()
-                        event = json.loads(event['Records'][0]['body'])
+                        body = json.loads(event['Records'][0]['body'])
+                        print(json.dumps(body))
 
-                        if 'X-Execute-At' in event['headers']:
-                            execute_at = datetime.datetime.strptime(event['headers']['X-Execute-At'], "%Y-%m-%dT%H:%M:%SZ")
+                        if 'X-Execute-At' in body['headers']:
+                            execute_at = datetime.datetime.strptime(body['headers']['X-Execute-At'], "%Y-%m-%dT%H:%M:%SZ")
                             if execute_at > now:
                                 print('Not executing yet')
                                 boto3.client('sqs').send_message(
                                     QueueUrl=os.environ['SQS_QUEUE_URL'],
-                                    MessageBody=json.dumps(event),
+                                    MessageBody=json.dumps(body),
                                     DelaySeconds=max(0, min(int((execute_at - datetime.datetime.now()).total_seconds()), 15*60)),
                                 )
                                 return
 
-                        boto3.client('lambda').invoke(FunctionName=os.environ['LAMBDA_ARN'], Payload=json.dumps(event))
+                        body['requestContext']['eventSourceARN'] = event['Records'][0]['eventSourceARN']
+                        print(json.dumps(body))
+                        boto3.client('lambda').invoke(FunctionName=os.environ['LAMBDA_ARN'], Payload=json.dumps(body))
+
             Environment:
                 Variables:
                     SQS_QUEUE_URL: { Ref: 'AsyncSqsQueue' }
