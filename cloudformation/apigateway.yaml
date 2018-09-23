@@ -23,9 +23,9 @@ Parameters:
         Type: "String"
         Description: "The ARN of the Lambda function to be invoked"
 
-    CreateCustomDomain:
+    CreateAsync:
         Type: "String"
-        Description: "Whether to mount the API Gateway at <service>.<env>.fathomai.com"
+        Description: "Whether to create an SQS queue for asynchronous invocation of the API"
         AllowedValues: [ "true", "false" ]
         Default: "false"
 
@@ -48,7 +48,7 @@ Metadata:
             LambdaArn: { default: "Lambda ARN" }
 
 Conditions:
-    CreateCustomDomain: { "Fn::Equals": [ { Ref: "CreateCustomDomain" }, "true" ] }
+    CreateAsync: { "Fn::Equals": [ { Ref: "CreateAsync" }, "true" ] }
 
 
 Resources:
@@ -78,6 +78,7 @@ Resources:
             DelaySeconds: 0
             QueueName: { "Fn::Sub": "${Project}-${Environment}-${Service}-async" }
             VisibilityTimeout: 300
+        Condition: 'CreateAsync'
 
     AsyncLambdaExecutionRole:
         Type: "AWS::IAM::Role"
@@ -105,6 +106,7 @@ Resources:
                         Effect: "Allow"
                         Resource: { Ref: 'LambdaArn' }
             RoleName: { "Fn::Sub": "${Project}-${Environment}-${Service}-async-${AWS::Region}" }
+        Condition: 'CreateAsync'
 
     AsyncConsumerLambda:
         Type: "AWS::Lambda::Function"
@@ -148,6 +150,7 @@ Resources:
               - { Key: "Project", Value: { Ref: 'Project' } }
               - { Key: "Environment", Value: { Ref: "Environment" } }
               - { Key: "Service", Value: { Ref: 'Service' } }
+        Condition: 'CreateAsync'
 
     AsyncLambdaInvokePermission:
         Type: 'AWS::Lambda::Permission'
@@ -156,6 +159,7 @@ Resources:
             Action: 'lambda:InvokeFunction'
             Principal: 'sqs.amazonaws.com'
             SourceArn: { "Fn::GetAtt": [ 'AsyncSqsQueue', "Arn" ] }
+        Condition: 'CreateAsync'
 
     AsyncLambdaTriggerMapping:
         Type: "AWS::Lambda::EventSourceMapping"
@@ -164,6 +168,7 @@ Resources:
             Enabled: true
             EventSourceArn: { "Fn::GetAtt": [ 'AsyncSqsQueue', "Arn" ] }
             FunctionName: { Ref: "AsyncConsumerLambda" }
+        Condition: 'CreateAsync'
 
     ##########################################################################################################
     ##  API GATEWAY
@@ -297,4 +302,4 @@ Resources:
 Outputs:
     AsyncSqsQueueArn:
         Description: 'Arn of the async SQS queue'
-        Value: { "Fn::GetAtt": [ "AsyncSqsQueue", "Arn" ] }
+        Value: { 'Fn::If': [ 'CreateAsync', { "Fn::GetAtt": [ "AsyncSqsQueue", "Arn" ] }, { Ref: 'AWS::NoValue' } ] }
