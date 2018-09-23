@@ -302,4 +302,4 @@ Resources:
 Outputs:
     AsyncSqsQueueArn:
         Description: 'Arn of the async SQS queue'
-        Value: { 'Fn::If': [ 'CreateAsync', { "Fn::GetAtt": [ "AsyncSqsQueue", "Arn" ] }, { Ref: 'AWS::NoValue' } ] }
+        Value: { 'Fn::If': [ 'CreateAsync', { "Fn::GetAtt": [ "AsyncSqsQueue", "Arn" ] }, '' ] }
