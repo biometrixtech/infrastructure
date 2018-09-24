@@ -91,9 +91,11 @@
             state: latest
             executable: 'pip3'
         with_items:
+          - 'aws_xray_sdk'
           - 'boto3'
-          - 'pandas' # Needed for get_cost_breakdown.py
+          - 'boto3'
           - 'colorama'
+          - 'pandas' # Needed for get_cost_breakdown.py
           - 'semver'
 
       - name: 'Create AWS config directory'
@@ -149,3 +151,4 @@
         with_items:
           - { name: 'user.name', value: '{{user_name}}' }
           - { name: 'user.email', value: '{{user_email}}' }
+          - { name: 'core.excludesfile', value: '/vagrant/.gitignore' }

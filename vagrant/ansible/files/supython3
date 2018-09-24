@@ -1,4 +1,4 @@
 #!/bin/sh
 # Python Interpreter for running python as root
 # user needs sudo NOPASSWD enabled
-sudo -H PYTHONPATH=$PYTHONPATH python "$@"
+sudo -H PYTHONPATH=$PYTHONPATH python3 "$@"
