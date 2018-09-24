@@ -55,6 +55,24 @@ class LambdaFunction:
             else:
                 raise
 
+    def delete_alias(self, semantic_version):
+        """
+        Create a new lambda alias
+        :param VersionInfo|str semantic_version:
+        :return:
+        """
+        alias_name = self.semantic_version_to_alias_name(semantic_version)
+
+        cprint(f'Deleting alias {self.name}:{alias_name}', colour=Fore.CYAN)
+
+        try:
+            self._lambda_client.delete_alias(FunctionName=self._name, Name=alias_name)
+        except ClientError as e:
+            if 'ResourceNotFound' in str(e):
+                cprint(f'Lambda alias {self.name}:{alias_name} does not exist', colour=Fore.YELLOW)
+            else:
+                raise
+
     def add_apigateway_permission(self, semantic_version, apigateway):
         alias_name = self.semantic_version_to_alias_name(semantic_version)
 
@@ -65,11 +83,26 @@ class LambdaFunction:
                 Action='lambda:InvokeFunction',
                 Principal='apigateway.amazonaws.com',
                 SourceArn=f'arn:aws:execute-api:{self.region_name}:887689817172:{apigateway.id}/*',
-                Qualifier=alias_name
+                Qualifier=alias_namemiaow
             )
         except ClientError as e:
             if 'ResourceConflictException' in str(e):
                 cprint(f'Permission already exists for {apigateway.id}/* on {self.name}:{alias_name}', colour=Fore.YELLOW)
+            else:
+                raise
+
+    def remove_apigateway_permission(self, semantic_version, apigateway):
+        alias_name = self.semantic_version_to_alias_name(semantic_version)
+
+        try:
+            self._lambda_client.remove_permission(
+                FunctionName=self._name,
+                StatementId=f'{apigateway.id}_{alias_name}',
+                Qualifier=alias_name
+            )
+        except ClientError as e:
+            if 'ResourceNotFound' in str(e):
+                cprint(f'No existing permission for {apigateway.id}/* on {self.name}:{alias_name}', colour=Fore.YELLOW)
             else:
                 raise
 

@@ -54,10 +54,28 @@ class ApiGateway:
         except ClientError as e:
             if 'ConflictException' in str(e):
                 cprint(f'API Gateway stage {self.id}/{stage_name} already exists', colour=Fore.YELLOW)
+            elif 'LimitExceededException' in str(e):
+                cprint(f'Maximum number of API Gateway stages reached for API {self.id}.  Delete some old stages using delete_apigateway_stage.py', colour=Fore.RED)
             else:
                 raise
 
         self._lambda_function.add_apigateway_permission(semantic_version, self)
+
+    def delete_stage(self, semantic_version):
+        stage_name = self.semantic_version_to_stage_name(semantic_version)
+        cprint(f'Deleting API Gateway stage {self.id}/{stage_name} for {self.name}', colour=Fore.CYAN)
+        try:
+            self._apigateway_client.delete_stage(
+                restApiId=self.id,
+                stageName=stage_name,
+            )
+        except ClientError as e:
+            if 'NotFoundException' in str(e):
+                cprint(f'API Gateway stage {self.id}/{stage_name} does not exist', colour=Fore.YELLOW)
+            else:
+                raise
+
+        self._lambda_function.remove_apigateway_permission(semantic_version, self)
 
     @staticmethod
     def semantic_version_to_stage_name(semantic_version):
