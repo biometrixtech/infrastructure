@@ -164,7 +164,7 @@ def main():
     if ref_type == 'branch':
         comparison = service_repository.compare_remote_status(args.ref)
         if comparison == -1:
-            if not confirm(f'Branch {args.version} is behind origin/{args.ref}.  Are you sure you want to deploy an earlier version?'):
+            if not confirm(f'Branch {args.ref} is behind origin/{args.ref}.  Are you sure you want to deploy an earlier version?'):
                 exit(0)
         elif comparison == 1:
             raise ApplicationException(f'Branch {args.ref} is ahead of origin/{args.ref}.  You need to push your changes')
