@@ -123,13 +123,13 @@ class Repository(object):
         else:
             try:
                 # Parse the value as a branch name and get the associated git commit hash
-                x2 = self._execute_git_command(f'git show-ref --verify refs/tags/{version}').split(' ')[0]
+                x2 = self._execute_git_command(f'git show-ref --verify refs/tags/{version}', True).split(' ')[0]
                 cprint(f"Tag '{version}' has commit hash {x2}", colour=Fore.GREEN)
                 return x2, 'tag'
             except CalledProcessError:
                 try:
                     # Parse the value as a branch name and get the associated git commit hash
-                    x2 = self._execute_git_command(f'git show-ref --verify refs/heads/{version}').split(' ')[0]
+                    x2 = self._execute_git_command(f'git show-ref --verify refs/heads/{version}', True).split(' ')[0]
                     cprint(f"Branch '{version}' has commit hash {x2}", colour=Fore.GREEN)
                     return x2, 'branch'
                 except CalledProcessError:
@@ -209,8 +209,9 @@ class Repository(object):
         except KeyError:
             raise ApplicationException(f'No Git repository configured for service {self.service}')
 
-    def _execute_git_command(self, command):
-        return subprocess.check_output(command, cwd=self._git_dir, shell=True).decode('utf-8').strip()
+    def _execute_git_command(self, command, suppress_errors=False):
+        stderr = subprocess.DEVNULL if suppress_errors else subprocess.STDOUT
+        return subprocess.check_output(command, cwd=self._git_dir, shell=True, stderr=stderr).decode('utf-8').strip()
 
     @property
     def lambci_project_name(self):

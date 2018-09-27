@@ -83,7 +83,7 @@ class LambdaFunction:
                 Action='lambda:InvokeFunction',
                 Principal='apigateway.amazonaws.com',
                 SourceArn=f'arn:aws:execute-api:{self.region_name}:887689817172:{apigateway.id}/*',
-                Qualifier=alias_namemiaow
+                Qualifier=alias_name
             )
         except ClientError as e:
             if 'ResourceConflictException' in str(e):
