@@ -130,9 +130,14 @@ Resources:
                                 )
                                 return
 
-                        body['requestContext']['eventSourceARN'] = event['Records'][0]['eventSourceARN']
+                        body.setdefault('requestContext', {})['eventSourceARN'] = event['Records'][0]['eventSourceARN']
+                        version = body.get('stageVariables', {}).get('LambdaAlias', 'latest')
                         print(json.dumps(body))
-                        boto3.client('lambda').invoke(FunctionName=os.environ['LAMBDA_ARN'], Payload=json.dumps(body))
+                        boto3.client('lambda').invoke(
+                            FunctionName=os.environ['LAMBDA_ARN'],
+                            FunctionVersion=version,
+                            Payload=json.dumps(body)
+                        )
 
             Environment:
                 Variables:
