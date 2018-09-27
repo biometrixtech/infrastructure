@@ -469,7 +469,9 @@ Resources:
                   - Action:
                       - "lambda:InvokeFunction"
                     Effect: "Allow"
-                    Resource: { "Fn::GetAtt": [ "QuerypostgresLambda", "Arn" ] }
+                    Resource:
+                      - { "Fn::GetAtt": [ "QuerypostgresLambda", "Arn" ] }
+                      - { "Fn::Sub": "${QuerypostgresLambda.Arn:$LATEST" }
 
     ##########################################################################################################
     ##  ALERTS
