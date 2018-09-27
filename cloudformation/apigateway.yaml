@@ -135,7 +135,7 @@ Resources:
                         print(json.dumps(body))
                         boto3.client('lambda').invoke(
                             FunctionName=os.environ['LAMBDA_ARN'],
-                            FunctionVersion=version,
+                            Qualifier=version,
                             Payload=json.dumps(body)
                         )
 
