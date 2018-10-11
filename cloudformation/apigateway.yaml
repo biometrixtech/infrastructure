@@ -146,7 +146,7 @@ Resources:
             Handler: "index.handler"
             MemorySize: "256"
             Runtime: "python3.6"
-            Timeout: "5"
+            Timeout: "300"
             Role: { "Fn::GetAtt" : [ "AsyncLambdaExecutionRole", "Arn" ] }
             FunctionName: { "Fn::Sub": "${Project}-${Environment}-${Service}-asyncconsumer" }
             Tags:
