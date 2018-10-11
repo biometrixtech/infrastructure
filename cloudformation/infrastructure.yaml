@@ -329,6 +329,29 @@ Resources:
                   - "40	ASPMX2.GOOGLEMAIL.COM"
                   - "50	ASPMX3.GOOGLEMAIL.COM"
 
+    PublicHostedZoneFathomaiSesValidationRecords:
+        Type: "AWS::Route53::RecordSetGroup"
+        Properties:
+            HostedZoneId: { Ref: "PublicHostedZoneFathomai" }
+            RecordSets:
+              - Name: "_amazonses.fathomai.com."
+                Type: "TXT"
+                TTL: "900"
+                ResourceRecords:
+                  - '"kNL+FDPbf9rgAubvZP5VTQRKU8kU5VpgPi35BUX8Bag="'
+
+              - Name: "ciowhmo6jdmy3ykvvqbb5wutrnsypev3._domainkey.fathomai.com."
+                Type: "CNAME"
+                TTL: "600"
+                ResourceRecords:
+                  - "ciowhmo6jdmy3ykvvqbb5wutrnsypev3.dkim.amazonses.com"
+
+              - Name: "rshluuewhtdryv7hjcilv2j2bg46gs6u._domainkey.fathomai.com."
+                Type: "CNAME"
+                TTL: "600"
+                ResourceRecords:
+                  - "rshluuewhtdryv7hjcilv2j2bg46gs6u.dkim.amazonses.com"
+
     PublicHostedZoneFathomaiLegacyRecords:
         Type: "AWS::Route53::RecordSetGroup"
         Properties:
@@ -383,7 +406,7 @@ Resources:
               - Name: "time.fathomai.com."
                 Type: "CNAME"
                 TTL: "900"
-                ResourceRecords: [ 'ec2-52-11-26-32.us-west-2.compute.amazonaws.com' ]
+                ResourceRecords: [ '35.163.220.1' ]
 
               - Name: "www.fathomai.com."
                 Type: "CNAME"
