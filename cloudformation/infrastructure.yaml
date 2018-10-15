@@ -352,6 +352,12 @@ Resources:
                 ResourceRecords:
                   - "rshluuewhtdryv7hjcilv2j2bg46gs6u.dkim.amazonses.com"
 
+              - Name: "olwredy5xne7d4gwqa27oqstemw7lqdt._domainkey.fathomai.com."
+                Type: "CNAME"
+                TTL: "600"
+                ResourceRecords:
+                  - "olwredy5xne7d4gwqa27oqstemw7lqdt.dkim.amazonses.com"
+
     PublicHostedZoneFathomaiLegacyRecords:
         Type: "AWS::Route53::RecordSetGroup"
         Properties:
