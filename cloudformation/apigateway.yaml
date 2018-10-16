@@ -131,7 +131,11 @@ Resources:
                                 return
 
                         body.setdefault('requestContext', {})['eventSourceARN'] = event['Records'][0]['eventSourceARN']
-                        version = body.get('stageVariables', {}).get('LambdaAlias', 'latest')
+                        stage_variables = body.get('stageVariables')
+                        if stage_variables is not None:
+                            version = body.get('stageVariables', {}).get('LambdaAlias', 'latest')
+                        else:
+                            version = body.get('path').split('/')[2]
                         print(json.dumps(body))
                         boto3.client('lambda').invoke(
                             FunctionName=os.environ['LAMBDA_ARN'],
