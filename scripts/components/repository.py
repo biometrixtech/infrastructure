@@ -113,6 +113,7 @@ class Repository(object):
             # All zeroes = working copy
             cprint('Deploying working copy', colour=Fore.YELLOW)
             return '0' * 40, 'head'
+
         elif re.match('^[0-9a-f]{40}$', version):
             # Already a full commit hash
             try:
@@ -120,6 +121,14 @@ class Repository(object):
                 return version, 'commit'
             except CalledProcessError:
                 raise ApplicationException(f'Commit {version} does not exist')
+
+        elif version == 'HEAD':
+            try:
+                version = self._execute_git_command(f'git rev-parse HEAD')
+                return version, 'head'
+            except CalledProcessError:
+                raise ApplicationException(f'Commit {version} does not exist')
+
         else:
             try:
                 # Parse the value as a branch name and get the associated git commit hash
