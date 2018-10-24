@@ -52,6 +52,7 @@ def map_bundle(service, subservice):
         ('statsapi', 'apigateway'): ('/vagrant/statsapi/apigateway', 'statsapi-{environment}-apigateway-execute'),
         ('users', 'apigateway'): ('/vagrant/users/apigateway', 'users-{environment}-apigateway-execute'),
         ('users', 'validateauth'): ('/vagrant/users/lambdas/custom_auth', 'users-{environment}-apigateway-validateauth'),
+        ('users', 'serviceauth'): ('/vagrant/users/lambdas/custom_auth', 'users-{environment}-apigateway-serviceauth'),
     }
     if (service, subservice) in bundles:
         return bundles[(service, subservice)]
