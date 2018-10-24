@@ -23,6 +23,22 @@ Resources:
         # Don't delete this if we accidentally delete the stack (which would fail anyway unless the bucket is empty)
         DeletionPolicy : "Retain"
 
+    InfrastructureUploadPolicy:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: { "Fn::Sub": "infrastructure-lambci-deploypolicy-${AWS::Region}" }
+            PolicyDocument:
+                Version: "2012-10-17"
+                Statement:
+                    Effect: 'Allow'
+                    Action:
+                      - 's3:GetObject'
+                      - 's3:PutObject'
+                      - 's3:PutObjectAcl'
+                    Resource:
+                      - { 'Fn::Sub': 'arn:aws:s3:::biometrix-infrastructure-${AWS::Region}/cloudformation/*'}
+                      - { 'Fn::Sub': 'arn:aws:s3:::biometrix-infrastructure-${AWS::Region}/lambdas/*'}
+
     ##########################################################################################################
     ##  LAMBDAS
     ##########################################################################################################
