@@ -49,7 +49,8 @@ class ApiGateway:
                 restApiId=self.id,
                 deploymentId=deployment_id,
                 stageName=stage_name,
-                variables={'LambdaAlias': LambdaFunction.semantic_version_to_alias_name(semantic_version)}
+                variables={'LambdaAlias': LambdaFunction.semantic_version_to_alias_name(semantic_version)},
+                tracingEnabled=True,
             )
         except ClientError as e:
             if 'ConflictException' in str(e):
