@@ -49,6 +49,7 @@ def map_bundle(service, subservice):
         ('hardware', 'apigateway'): ('/vagrant/hardware/apigateway', 'hardware-{environment}-apigateway-execute'),
         ('plans', 'apigateway'): ('/vagrant/plans/apigateway', 'plans-{environment}-apigateway-execute'),
         ('preprocessing', 'apigateway'): ('/vagrant/preprocessing/apigateway', 'preprocessing-{environment}-apigateway-execute'),
+        ('preprocessing', 'sessions_stream'): ('/vagrant/preprocessing/lambdas/sessions_stream', 'preprocessing-{environment}-ingest-sessions-stream'),
         ('statsapi', 'apigateway'): ('/vagrant/statsapi/apigateway', 'statsapi-{environment}-apigateway-execute'),
         ('users', 'apigateway'): ('/vagrant/users/apigateway', 'users-{environment}-apigateway-execute'),
         ('users', 'validateauth'): ('/vagrant/users/lambdas/custom_auth', 'users-{environment}-apigateway-validateauth'),
