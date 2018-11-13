@@ -114,34 +114,77 @@ Resources:
             Code:
                 ZipFile: |
                     import boto3, datetime, json, os
+                    _sqs_client = boto3.client('sqs')
+                    _lambda_client = boto3.client('lambda')
                     def handler(event, _):
                         now = datetime.datetime.now()
                         body = json.loads(event['Records'][0]['body'])
-                        print(json.dumps(body))
-
-                        if 'X-Execute-At' in body['headers']:
-                            execute_at = datetime.datetime.strptime(body['headers']['X-Execute-At'], "%Y-%m-%dT%H:%M:%SZ")
-                            if execute_at > now:
-                                print('Not executing yet')
-                                boto3.client('sqs').send_message(
-                                    QueueUrl=os.environ['SQS_QUEUE_URL'],
-                                    MessageBody=json.dumps(body),
-                                    DelaySeconds=max(0, min(int((execute_at - datetime.datetime.now()).total_seconds()), 15*60)),
-                                )
-                                return
-
                         body.setdefault('requestContext', {})['eventSourceARN'] = event['Records'][0]['eventSourceARN']
+
                         stage_variables = body.get('stageVariables')
                         if stage_variables is not None:
                             version = body.get('stageVariables', {}).get('LambdaAlias', 'latest')
                         else:
                             version = body.get('path').split('/')[2]
+
                         print(json.dumps(body))
-                        boto3.client('lambda').invoke(
-                            FunctionName=os.environ['LAMBDA_ARN'],
-                            Qualifier=version,
-                            Payload=json.dumps(body)
-                        )
+
+                        if 'X-Execute-At' in body['headers']:
+                            execute_at = datetime.datetime.strptime(body['headers']['X-Execute-At'], "%Y-%m-%dT%H:%M:%SZ")
+                            delay_seconds = max(0, int((execute_at - datetime.datetime.now()).total_seconds()))
+                        else:
+                            delay_seconds = 0
+
+                        if delay_seconds > 5:
+                            print('Not executing yet')
+
+                            if 'X-Prewarm' in body['headers']:
+                                if delay_seconds > 20 * 60:
+                                    # Do nothing, we'll re-process this at least 5 mins before, and deal with it then
+                                    pass
+                                elif 10 * 60 < delay_seconds < 20 * 60:
+                                    # Retrigger 5 mins before so we can prewarm
+                                    delay_seconds -= 5 * 60
+                                elif delay_seconds < 10 * 60:
+                                    # Prewarm
+                                    prewarm(version, int(body['headers']['X-Prewarm']))
+                                    del body['headers']['X-Prewarm']
+
+                            _sqs_client.send_message(
+                                QueueUrl=os.environ['SQS_QUEUE_URL'],
+                                MessageBody=json.dumps(body),
+                                DelaySeconds=min(delay_seconds, 15*60),
+                            )
+
+                        else:
+                            _lambda_client.invoke(
+                                FunctionName=os.environ['LAMBDA_ARN'],
+                                Qualifier=version,
+                                Payload=json.dumps(body)
+                            )
+
+                    def prewarm(version, count):
+                        for i in range(count):
+                            print(f'Triggering prewarm #{i}')
+                            _lambda_client.invoke(
+                                FunctionName=os.environ['LAMBDA_ARN'],
+                                Qualifier=version,
+                                Payload=json.dumps({
+                                    "path": '/misc/prewarm',
+                                    "httpMethod": 'POST',
+                                    "headers": {
+                                        "Accept": "*/*",
+                                        "Content-Type": "application/json",
+                                        "User-Agent": "Biometrix/Prewarmer",
+                                    },
+                                    "pathParameters": {"endpoint": 'misc/prewarm'},
+                                    "stageVariables": {"LambdaAlias": '2_0'},
+                                    "body": None,
+                                    "isBase64Encoded": False,
+                                    "requestContext": {"eventSourceARN": "sqs:prewarm"}
+                                }),
+                                InvocationType='Event',
+                            )
 
             Environment:
                 Variables:
