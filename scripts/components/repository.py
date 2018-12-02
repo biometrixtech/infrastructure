@@ -44,7 +44,8 @@ class Repository(object):
         """
         builds = lambci_builds_table.query(
             KeyConditionExpression=Key('project').eq(self.lambci_project_name),
-            FilterExpression=Attr('commit').eq(version)
+            FilterExpression=Attr('commit').eq(version),
+            ScanIndexForward=False,
         )['Items']
         if len(builds) == 0:
             raise ApplicationException(f'No build has been started for {version}.  Have you pushed your changes?')
