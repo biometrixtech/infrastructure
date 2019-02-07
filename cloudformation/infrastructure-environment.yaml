@@ -472,7 +472,7 @@ Resources:
                     Effect: "Allow"
                     Resource:
                       - { "Fn::GetAtt": [ "QuerypostgresLambda", "Arn" ] }
-                      - { "Fn::Sub": "${QuerypostgresLambda.Arn:$LATEST" }
+                      - { "Fn::Sub": "${QuerypostgresLambda.Arn}:$LATEST" }
 
     ##########################################################################################################
     ##  ALERTS
