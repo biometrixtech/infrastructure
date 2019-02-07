@@ -103,7 +103,7 @@ Parameters:
         Type: "String"
         Description: "The type of Batch compute instances to use"
         Default: "r4.xlarge"
-        AllowedValues: [ 
+        AllowedValues: [
           "c3", "c3.large", "c3.xlarge", "c3.2xlarge", "c3.4xlarge", "c3.8xlarge",
           "c4", "c4.large", "c4.xlarge", "c4.2xlarge", "c4.4xlarge", "c4.8xlarge",
           "d2", "d2.xlarge", "d2.2xlarge", "d2.4xlarge", "d2.8xlarge",
@@ -403,25 +403,6 @@ Resources:
             ManagedPolicyArns:
               - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
               - "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
-            Policies:
-              - PolicyName: "default"
-                PolicyDocument:
-                    Version: "2012-10-17"
-                    Statement:
-                      - Action: "ssm:DescribeParameters"
-                        Effect: "Allow"
-                        Resource: "*"
-
-                      - Action:
-                          - "ssm:GetParameters"
-                        Effect: "Allow"
-                        Resource: { "Fn::Sub": "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/preprocessing.${Environment}.*" }
-
-                      - Action:
-                          - "kms:Decrypt"
-                        Effect: "Allow"
-                        Resource:
-                          - "*" # TODO this should be segregated by environment somehow
             RoleName: { "Fn::Sub": "infrastructure-${Environment}-querypostgres-${AWS::Region}" }
 
     QuerypostgresVpcSecurityGroup:
