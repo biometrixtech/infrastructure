@@ -97,12 +97,20 @@ Resources:
                     Principal: { Service: [ { "Fn::Sub": "states.${AWS::Region}.amazonaws.com" } ] }
                     Action: "sts:AssumeRole"
             Policies:
-              - PolicyName: "lambda"
+              - PolicyName: "execute"
                 PolicyDocument:
                     Version: "2012-10-17"
                     Statement:
                       - Effect: "Allow"
                         Action:
+                          - "batch:SubmitJob"
+                          - "dynamodb:GetItem"
+                          - "dynamodb:PutItem"
+                          - "dynamodb:UpdateItem"
+                          - "events:DeleteRule"
+                          - "events:PutRule"
+                          - "events:PutTargets"
+                          - "events:RemoveTargets"
                           - "lambda:InvokeFunction"
                         Resource: "*"
             RoleName: { "Fn::Sub": "infrastructure-service-stepfunctions-${AWS::Region}" }
