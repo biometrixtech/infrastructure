@@ -116,11 +116,22 @@ class LambdaFunction:
         alias_name = self.semantic_version_to_alias_name(semantic_version)
         target_version = self._get_version_of_alias(self.semantic_version_to_alias_name(target_alias))
         cprint(f'Updating {self.name}:{alias_name} to {target_version}', colour=Fore.CYAN)
-        self._lambda_client.update_alias(
-            FunctionName=self._name,
-            Name=alias_name,
-            FunctionVersion=target_version
-        )
+        try:
+            self._lambda_client.update_alias(
+                FunctionName=self._name,
+                Name=alias_name,
+                FunctionVersion=target_version
+            )
+        except ClientError as e:
+            if 'ResourceNotFound' in str(e):
+                cprint(f'Lambda alias {self.name}:{alias_name} does not exist', colour=Fore.YELLOW)
+                self._lambda_client.create_alias(
+                    FunctionName=self._name,
+                    Name=alias_name,
+                    FunctionVersion=target_version
+                )
+            else:
+                raise
 
     def update_code(self, ref, publish_version=False):
         s3_filepath = 'lambdas/{}/{}/{}'.format(self.service_name, ref, self._s3_filepath)

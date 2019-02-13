@@ -212,6 +212,10 @@ class Repository(object):
         self._execute_git_command(f"git tag {tag} {ref}")
         self._execute_git_command(f'git push origin {tag}')
 
+    def delete_tag(self, tag):
+        self._execute_git_command(f"git tag --delete {tag}")
+        self._execute_git_command(f'git push --delete origin {tag}')
+
     def _get_git_dir(self):
         try:
             return os.path.realpath(

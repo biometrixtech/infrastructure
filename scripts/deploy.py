@@ -8,7 +8,7 @@ import boto3
 
 from components.environment import Environment, LegacyEnvironment
 from components.exceptions import ApplicationException
-from components.ui import confirm, cprint, Spinner
+from components.ui import confirm, cprint
 
 
 def map_config(old_config):
@@ -196,6 +196,10 @@ def main():
         environment.update_service_version(args.service, service_version)
         environment.update()
     except ClientError as e:
+        if ref_type == 'tag':
+            # Delete the tag
+            service_repository.delete_tag(version)
+
         if 'No updates are to be performed' in str(e):
             cprint('No updates are to be performed', colour=Fore.YELLOW)
         elif 'is in UPDATE_IN_PROGRESS state' in str(e):
