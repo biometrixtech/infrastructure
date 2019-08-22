@@ -141,6 +141,9 @@ def main():
         elif ref_type == 'tag':
             # Deploying from a tag, could be a rollback
             version = None
+        elif args.force:
+            cprint(f"Deployments to environments above dev should be tagged", colour=Fore.RED)
+            version = None
         else:
             raise ApplicationException('Deployments to environments above dev must be tagged')
     else:
@@ -237,7 +240,7 @@ if __name__ == '__main__':
                         default='us-west-2',
                         help='AWS Region')
     parser.add_argument('environment',
-                        choices=['dev', 'test', 'production'],
+                        choices=['dev', 'test', 'production', 'public'],
                         help='Environment')
     parser.add_argument('service',
                         choices=[

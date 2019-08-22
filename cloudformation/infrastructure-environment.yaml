@@ -486,6 +486,7 @@ Resources:
                 VpnCidr: { Ref: 'AWS::NoValue' }
                 MongoDbPeeringId: { Ref: "PlansPeeringId" }
                 MongoDbPeeringCidr: { Ref: "PlansPeeringCidr" }
+                ServiceAuthPolicyArn: { "Fn::If": [ "CreateUsersService", { "Fn::GetAtt": [ "UsersService", "Outputs.ServiceAuthPolicyArn" ] }, "" ] }
             Tags:
               - { Key: "Name", Value: { "Fn::Sub": "plans-${Environment}" } }
               - { Key: "Management", Value: "managed" }
@@ -497,8 +498,6 @@ Resources:
             } ] }
             TimeoutInMinutes: 30
         Condition: "CreatePlansService"
-        DependsOn:
-          - "UsersService"
 
     ##########################################################################################################
     ##  HARDWARE
