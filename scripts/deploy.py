@@ -5,6 +5,7 @@ from colorama import Fore
 from semver import VersionInfo
 import argparse
 import boto3
+import subprocess
 
 from components.environment import Environment, LegacyEnvironment
 from components.exceptions import ApplicationException
@@ -165,12 +166,15 @@ def main():
             raise ApplicationException('Working copy can only be deployed to dev')
 
     if ref_type == 'branch':
-        comparison = service_repository.compare_remote_status(args.ref)
-        if comparison == -1:
-            if not confirm(f'Branch {args.ref} is behind origin/{args.ref}.  Are you sure you want to deploy an earlier version?'):
-                exit(0)
-        elif comparison == 1:
-            raise ApplicationException(f'Branch {args.ref} is ahead of origin/{args.ref}.  You need to push your changes')
+        try:
+            comparison = service_repository.compare_remote_status(args.ref)
+            if comparison == -1:
+                if not confirm(f'Branch {args.ref} is behind origin/{args.ref}.  Are you sure you want to deploy an earlier version?'):
+                    exit(0)
+            elif comparison == 1:
+                raise ApplicationException(f'Branch {args.ref} is ahead of origin/{args.ref}.  You need to push your changes')
+        except subprocess.CalledProcessError as e:
+            raise ApplicationException(str(e))
 
     if version is not None:
         cprint(f"Going to tag commit {service_version[0:16]} (from {ref_type} {args.ref}) as {version} and deploy to {args.environment}", colour=Fore.YELLOW)
