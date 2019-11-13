@@ -4,7 +4,7 @@
 # Copyright 2017 Melon Software Ltd (UK), all rights reserved
 #
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Creates global infrastructure for the pre-processing pipeline"
+Description: "Creates global infrastructure"
 
 Resources:
 
@@ -435,6 +435,17 @@ Resources:
                 TTL: "900"
                 ResourceRecords: [ 'wordpress-prod-1136385471.us-west-2.elb.amazonaws.com' ]
 
+
+    ##########################################################################################################
+    ##  ALERTS
+    ##########################################################################################################
+
+    InfrastructureAlarmTopic:
+        Type: "AWS::SNS::Topic"
+        Properties:
+            DisplayName: "Infrastructure alarm notifications"
+            TopicName: "infrastructure-infra-infrastructurealarms"
+
     ##########################################################################################################
     ##  OUTPUTS
     ##########################################################################################################
@@ -466,3 +477,9 @@ Outputs:
     FathomaiHostedZoneNameservers:
         Description: "The nameservers that the fathomai.com domain should be delegated to"
         Value: { "Fn::Join": [ ", ", { "Fn::GetAtt": [ "PublicHostedZoneFathomai", "NameServers" ] } ] }
+
+    InfrastructureAlarmTopicArn:
+        Description: "ARN of the infrastructure alarm notification topic"
+        Value: !Ref "InfrastructureAlarmTopic"
+        Export:
+            Name: "InfrastructureAlarmTopicArn"

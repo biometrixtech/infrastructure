@@ -351,6 +351,30 @@ Resources:
         DependsOn:
           - "ApiStage"
 
+    ##########################################################################################################
+    ##  ALARMS
+    ##########################################################################################################
+
+    Alarm500Errors:
+        Type: "AWS::CloudWatch::Alarm"
+        Properties:
+            ActionsEnabled: true
+            AlarmActions:
+              - { "Fn::ImportValue": "InfrastructureAlarmTopicArn" }
+            AlarmDescription: "Alerts when this API gateway returns 500 errors"
+            AlarmName: { "Fn::Sub":  "${Project}-${Environment}-${Service}-apigateway500errors" }
+            ComparisonOperator: "GreaterThanThreshold"
+            Dimensions:
+              - Name: "ApiName"
+                Value: { "Fn::Sub": "${Project}-${Environment}-${Service}" }
+            EvaluationPeriods: 1
+            MetricName: "5XXError"
+            Namespace: "y"
+            Period: 60
+            Statistic: "Average"
+            Threshold: 5
+            TreatMissingData: "notBreaching"
+
 Outputs:
     AsyncSqsQueueArn:
         Description: 'Arn of the async SQS queue'
