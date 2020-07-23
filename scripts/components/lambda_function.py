@@ -106,6 +106,24 @@ class LambdaFunction:
             else:
                 raise
 
+    def add_s3_permission(self, semantic_version, s3):
+        alias_name = self.semantic_version_to_alias_name(semantic_version)
+
+        try:
+            self._lambda_client.add_permission(
+                FunctionName=self._name,
+                StatementId=f's3_{alias_name}',
+                Action='lambda:InvokeFunction',
+                Principal='s3.amazonaws.com',
+                SourceArn=f'arn:aws:s3:::{s3._name}',
+                Qualifier=alias_name
+            )
+        except ClientError as e:
+            if 'ResourceConflictException' in str(e):
+                cprint(f'Permission already exists for {s3.name}/* on {self.name}:{alias_name}', colour=Fore.YELLOW)
+            else:
+                raise
+
     def update_alias(self, semantic_version, target_alias):
         """
         Update an existing lambda alias to point to another alias

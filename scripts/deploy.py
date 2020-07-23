@@ -244,7 +244,7 @@ if __name__ == '__main__':
                         default='us-west-2',
                         help='AWS Region')
     parser.add_argument('environment',
-                        choices=['dev', 'test', 'production', 'public'],
+                        choices=['dev', 'test', 'production', 'public', 'soflete-test', 'demo'],
                         help='Environment')
     parser.add_argument('service',
                         choices=[

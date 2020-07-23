@@ -89,7 +89,9 @@ class Repository(object):
                 if build_status == 'success':
                     cprint("\b \r\nBuild complete                        ", colour=Fore.GREEN)
                     break
-
+                elif build_status == 'failure':
+                    cprint("\b \r\nBuild was not successful                        ", colour=Fore.RED)
+                    exit(1)
                 else:
                     counts -= 1
                     time.sleep(5)
